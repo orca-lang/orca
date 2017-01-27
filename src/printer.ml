@@ -4,18 +4,18 @@ let rec print_exp = function
   | Star -> "*"
   | Set n -> "set" ^ string_of_int n
   | Pi (n, t, e) -> "(pi " ^ n ^ " " ^ print_exp t ^ " " ^ print_exp e ^ ")"
-  | Box (ctx, e) -> "(|- " ^ print_ctx ctx ^ " " ^ print_exp e ^ ")"
+  | Box (ctx, e) -> "(|- " ^ print_exp ctx ^ " " ^ print_exp e ^ ")"
   | Fn (f, e) -> "(fn " ^ f ^ " " ^ print_exp e ^ ")"
   | Lam (f, e) -> "(\ " ^ f ^ " " ^ print_exp e ^ ")"
   | App (e1, e2) -> "(app " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
-  | AppL (e1, e2) -> "(appl " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
+  | AppL (e1, e2) -> "(' " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
   | Ident n -> n
-  | Clos (e1, e2) -> "(clos " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
+  | Clos (e1, e2) -> "([] " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
   | EmptyS -> "^"
   | Shift n -> "^" ^ string_of_int n
-  | Comma (e1, e2) -> "(dot " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
-
-and print_ctx ctx = "(ctx " ^ String.concat " " (List.map (fun (n, e) -> "(: " ^ n ^ " " ^ print_exp e ^ ")") ctx)
+  | Comma (e1, e2) -> "(, " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
+  | Nil -> "0"    
+  | Annot (e1, e2) -> "(: " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
 
 let print_decls decls = String.concat "\n" (List.map (fun (n, e) -> "(" ^ n ^ " " ^ print_exp e ^ ")") decls )
 let print_pats pats = String.concat " " pats

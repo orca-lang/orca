@@ -7,3 +7,8 @@ test: default
 
 menhir:
 	menhir --explain src/parser.mly 
+
+clean:
+	ocamlbuild -clean
+
+all: default test

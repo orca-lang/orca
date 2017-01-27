@@ -8,8 +8,6 @@ let regexp wsp = [' ''\t']
 let regexp digit = ['0' - '9']+
 let regexp numeral = digit+
 
-let regexp linecomment = "--"[^ '\n']* nl
-
 let regexp lower = ['a'-'z']
 let regexp upper = ['A'-'Z']
 
@@ -35,7 +33,7 @@ let remove_set s = String.sub s 3 (String.length s - 3)
 let rec main_scanner pos = lexer
   | wsp | tab -> main_scanner (add_word pos 1) lexbuf (* ignore whitespace *)
   | nl -> main_scanner (add_line pos) lexbuf   (* ignores new lines *)
-  | linecomment  -> main_scanner (add_line pos) lexbuf
+  | "(*)" -> linecomment (add_word pos (Ulexing.lexeme_length lexbuf)) lexbuf
   | "(*" -> comment pos 0 lexbuf
   | eof -> add_word pos (Ulexing.lexeme_length lexbuf), EOF
 
@@ -50,6 +48,7 @@ let rec main_scanner pos = lexer
   | "^" numeral -> add_word pos (Ulexing.lexeme_length lexbuf), SHIFT (int_of_string (Ulexing.utf8_lexeme lexbuf))
   | "^" -> add_word pos (Ulexing.lexeme_length lexbuf), EMPTYS
   | ".." -> add_word pos (Ulexing.lexeme_length lexbuf), SHIFT 0
+  | "0" ->  add_word pos (Ulexing.lexeme_length lexbuf), NIL
   | "[" -> add_word pos (Ulexing.lexeme_length lexbuf), LSQUARE
   | "]" -> add_word pos (Ulexing.lexeme_length lexbuf), RSQUARE
   | "fn" -> add_word pos (Ulexing.lexeme_length lexbuf), FN
@@ -74,3 +73,8 @@ and comment pos level = lexer
   | "(*" -> comment (add_word pos 2) (level+1) lexbuf
   | "\n" -> comment (add_line pos) level lexbuf
   | _ -> comment (add_word pos (Ulexing.lexeme_length lexbuf)) level lexbuf
+
+and linecomment pos = lexer
+    | nl -> main_scanner (add_line pos) lexbuf
+    | _  -> linecomment (add_word pos (Ulexing.lexeme_length lexbuf)) lexbuf
+    | eof -> add_word pos (Ulexing.lexeme_length lexbuf), EOF

@@ -6,8 +6,7 @@ type exp =
 | Star
 | Set of int
 | Pi of name * exp * exp
-| Box of ctx * exp
-| CtxBox of ctx * ctx
+| Box of exp * exp
 | Fn of name * exp
 | Lam of name * exp
 | App of exp * exp
@@ -17,9 +16,9 @@ type exp =
 | EmptyS
 | Shift of int
 | Comma of exp * exp
-
-and ctx = (name * exp) list
-
+| Nil
+| Annot of exp * exp
+    
 type decls = (name * exp) list
 type def_decls = (pats * exp) list
 type icit = Explicit | Implicit
