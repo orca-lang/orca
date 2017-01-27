@@ -5,7 +5,7 @@ exception Syntax_error of Lexing.position
 exception Scanning_error of Lexing.position * string
 
 let file_name = "nanuq"
-    
+
 let parse menhir_parser lexbuf =
   let position = ref (Lexer.initial_pos file_name) in
   let lexer () =
@@ -23,18 +23,17 @@ let parse menhir_parser lexbuf =
 let usage_msg = "Bears ahead"
 let file = ref ""
 let args = []
-    
+
 let () =
   try
     Arg.parse args (fun s -> file := s) usage_msg;
     let ch = if !file = "" then stdin else open_in !file in
     let lexbuf = Ulexing.from_utf8_channel ch in
-    let _c = parse Parser.program lexbuf in
-    print_string ("Happy!\n")
+    let c = String.concat "\n" (List.map Printer.print_program (parse Parser.program lexbuf)) in
+    print_string ("The tree is:\n" ^ c)
   with
   | Syntax_error pos -> Printf.printf "Syntax error in line %d, col %d\n" pos.Lexing.pos_lnum pos.Lexing.pos_cnum
   | Scanning_error (pos, s) ->
     Printf.printf "Scanning error in line %d, col %d\nMessage:%s\n"
       pos.Lexing.pos_lnum pos.Lexing.pos_cnum s
   | Ulexing.Error -> Printf.printf "Ulexing Error\n"
-
