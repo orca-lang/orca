@@ -7,6 +7,7 @@ type exp =
 | Set of int
 | Pi of name * exp * exp
 | Box of ctx * exp
+| CtxBox of ctx * ctx
 | Fn of name * exp
 | Lam of name * exp
 | App of exp * exp
