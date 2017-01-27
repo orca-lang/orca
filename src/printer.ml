@@ -15,9 +15,7 @@ let rec print_exp = function
   | Shift n -> "^" ^ string_of_int n
   | Comma (e1, e2) -> "(dot " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
 
-and print_ctx = function
-  | Nil -> "."
-  | Cons (c, e) -> "(cons " ^ print_ctx c ^ " " ^ print_exp e ^ ")"
+and print_ctx ctx = "(ctx " ^ String.concat " " (List.map (fun (n, e) -> "(: " ^ n ^ " " ^ print_exp e ^ ")") ctx)
 
 let print_decls decls = String.concat "\n" (List.map (fun (n, e) -> "(" ^ n ^ " " ^ print_exp e ^ ")") decls )
 let print_pats pats = String.concat " " pats

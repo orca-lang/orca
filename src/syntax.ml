@@ -17,9 +17,7 @@ type exp =
 | Shift of int
 | Comma of exp * exp
 
-and ctx =
-| Nil
-| Cons of ctx * exp
+and ctx = (name * exp) list
 
 type decls = (name * exp) list
 type def_decls = (pats * exp) list
