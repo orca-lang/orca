@@ -24,8 +24,8 @@ let print_pats pats = String.concat " " pats
 let print_def_decls decls = String.concat "\n" (List.map (fun (pats, e) -> "(" ^ print_pats pats ^ " " ^ print_exp e ^ ")") decls)
 
 let print_param = function
-  | ParamI (n, e) -> "(:i " ^ n ^ " " ^ print_exp e ^ ")"
-  | ParamE (n, e) -> "(:e " ^ n ^ " " ^ print_exp e ^ ")"
+  | Implicit, n, e -> "(:i " ^ n ^ " " ^ print_exp e ^ ")"
+  | Explicit, n, e -> "(:e " ^ n ^ " " ^ print_exp e ^ ")"
 
 let print_params ps = String.concat " " (List.map print_param ps)
 

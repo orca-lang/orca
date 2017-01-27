@@ -20,12 +20,13 @@ type exp =
 and ctx =
 | Nil
 | Cons of ctx * exp
-    
+
 type decls = (name * exp) list
 type def_decls = (pats * exp) list
-type param = ParamI of name * exp | ParamE of name * exp
+type icit = Explicit | Implicit
+type param = icit * name * exp
 type params = param list
-  
+
 type program =
 | Data of name * params * exp * decls
 | Syn of name * params * exp * decls

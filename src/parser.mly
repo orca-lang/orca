@@ -15,7 +15,7 @@ open Syntax
 %token <int>SHIFT
 
 %right LAM FN
-%nonassoc DOT RARR 
+%nonassoc DOT RARR
 %right ARR
 %left APPL APP
 %left COMMA
@@ -36,8 +36,8 @@ toplevel:
 | DEF f = IDENT COLON t = exp EQ e = exp {Def (f, t, e)}
 
 params:
-| LPAREN s = IDENT+ COLON t = exp RPAREN p = params {List.map (fun x -> ParamE (x, t)) s @ p}
-| LCURLY s = IDENT+ COLON t = exp RCURLY p = params {List.map (fun x -> ParamI (x, t)) s @ p}
+| LPAREN s = IDENT+ COLON t = exp RPAREN p = params {List.map (fun x -> (Explicit, x, t)) s @ p}
+| LCURLY s = IDENT+ COLON t = exp RCURLY p = params {List.map (fun x -> (Implicit, x, t)) s @ p}
 | (* empty *) {[]}
 
 decl:
@@ -45,7 +45,7 @@ decl:
 
 def_decl:
 | p = pattern+ RARR e = exp {p, e}
-    
+
 exp:
 | e1 = exp e2 = exp {App (e1, e2)} %prec APP
 | e1 = exp APPL e2 = exp {AppL (e1, e2)}
@@ -59,7 +59,7 @@ exp:
 | EMPTYS {EmptyS}
 | s = IDENT {Ident s}
 | e1 = exp LSQUARE e2 = exp RSQUARE {Clos (e1, e2)}
-    
+
 (* exp: *)
 (* | e = simple_exp+ { match e with [m] -> m | m :: ms -> App (m, ms) | _ -> assert false }  *)
 (* | FN x = IDENT RARR e = exp { Fn (x, e) } *)
@@ -73,4 +73,4 @@ exp:
 (* | SHIFT (\* do we want index applied? If so just a numeral? *\) *)
 
 pattern:
-| s = IDENT {s}    
+| s = IDENT {s}
