@@ -57,7 +57,7 @@ ctx_exp:
 | e1 = ctx_exp APPL e2 = ctx_exp {AppL (e1, e2)}
 | FN x = IDENT RARR e = ctx_exp {Fn (x, e)}
 | LAM x = IDENT DOT e = ctx_exp {Lam (x, e)}
-| s = ctx_exp ARR t = ctx_exp {Pi ("", s, t)}
+| s = ctx_exp ARR t = ctx_exp {Pi ("_", s, t)}
 | LPAREN t = exp RPAREN {t}
 | STAR {Star}
 | n = SET {Set n}
@@ -75,7 +75,7 @@ exp:
 | e1 = exp APPL e2 = exp {AppL (e1, e2)}
 | FN x = IDENT RARR e = exp {Fn (x, e)}
 | LAM x = IDENT DOT e = exp {Lam (x, e)}
-| s = exp ARR t = exp {Pi ("", s, t)}
+| s = exp ARR t = exp {Pi ("_", s, t)}
 | LPAREN t = texp RPAREN {t}
 | STAR {Star}
 | n = SET {Set n}

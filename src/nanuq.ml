@@ -30,7 +30,7 @@ let () =
     let ch = if !file = "" then stdin else open_in !file in
     let lexbuf = Ulexing.from_utf8_channel ch in
     let c = String.concat "\n" (List.map Printer.print_program (parse Parser.program lexbuf)) in
-    print_string ("The tree is:\n" ^ c)
+    print_string ("The tree is:\n" ^ c ^ "\n")
   with
   | Syntax_error pos -> Printf.printf "Syntax error in line %d, col %d\n" pos.Lexing.pos_lnum pos.Lexing.pos_cnum
   | Scanning_error (pos, s) ->
