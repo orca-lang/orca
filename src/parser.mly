@@ -6,16 +6,21 @@ open Syntax
 
 %token DATA SYN DEF MID RARR COLON WHERE EQ
 %token LPAREN RPAREN LCURLY RCURLY LSQUARE RSQUARE
-%token FN LAM APP 
+%token FN LAM APPL APP
 %token STAR ARR TURNSTILE
 %token <int>SET
 %token <string>IDENT
 %token EOF
-%token COMMA ID SHIFT
+%token COMMA EMPTYS DOT
+%token <int>SHIFT
 
+%right LAM FN
+%nonassoc DOT RARR 
 %right ARR
-%right APP
+%left APPL APP
 %left COMMA
+%nonassoc STAR SHIFT SET EMPTYS IDENT
+%right LPAREN LSQUARE
 
 %start <Syntax.program list>program
 
@@ -40,15 +45,21 @@ decl:
 
 def_decl:
 | p = pattern+ RARR e = exp {p, e}
-
+    
 exp:
+| e1 = exp e2 = exp {App (e1, e2)} %prec APP
+| e1 = exp APPL e2 = exp {AppL (e1, e2)}
+| FN x = IDENT RARR e = exp {Fn (x, e)}
+| LAM x = IDENT DOT e = exp {Lam (x, e)}
+| s = exp ARR t = exp {Pi ("", s, t)}
+| LPAREN t = exp RPAREN {t}
 | STAR {Star}
 | n = SET {Set n}
-(* | s = tp ARR t = tp *)
-(* | s = IDENT es = exp* *)
-(* | g = context TURNSTILE t = tp *)
-(* | LPAREN t = tp RPAREN *)
-
+| n = SHIFT {Shift n}
+| EMPTYS {EmptyS}
+| s = IDENT {Ident s}
+| e1 = exp LSQUARE e2 = exp RSQUARE {Clos (e1, e2)}
+    
 (* exp: *)
 (* | e = simple_exp+ { match e with [m] -> m | m :: ms -> App (m, ms) | _ -> assert false }  *)
 (* | FN x = IDENT RARR e = exp { Fn (x, e) } *)

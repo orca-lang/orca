@@ -30,6 +30,8 @@ let add_line pos = { pos with
 		   }
 let add_word pos length = { pos with Lexing.pos_cnum = pos.Lexing.pos_cnum + length }
 
+let remove_set s = String.sub s 3 (String.length s - 3)
+
 let rec main_scanner pos = lexer
   | wsp | tab -> main_scanner (add_word pos 1) lexbuf (* ignore whitespace *)
   | nl -> main_scanner (add_line pos) lexbuf   (* ignores new lines *)
@@ -45,12 +47,15 @@ let rec main_scanner pos = lexer
   | "->" -> add_word pos (Ulexing.lexeme_length lexbuf), ARR
   | ":" -> add_word pos (Ulexing.lexeme_length lexbuf), COLON
   | "," -> add_word pos (Ulexing.lexeme_length lexbuf), COMMA
-  | ".." -> add_word pos (Ulexing.lexeme_length lexbuf), ID
+  | "^" numeral -> add_word pos (Ulexing.lexeme_length lexbuf), SHIFT (int_of_string (Ulexing.utf8_lexeme lexbuf))
+  | "^" -> add_word pos (Ulexing.lexeme_length lexbuf), EMPTYS
+  | ".." -> add_word pos (Ulexing.lexeme_length lexbuf), SHIFT 0
   | "[" -> add_word pos (Ulexing.lexeme_length lexbuf), LSQUARE
   | "]" -> add_word pos (Ulexing.lexeme_length lexbuf), RSQUARE
   | "fn" -> add_word pos (Ulexing.lexeme_length lexbuf), FN
   | "\\" -> add_word pos (Ulexing.lexeme_length lexbuf), LAM
-  | "." -> add_word pos (Ulexing.lexeme_length lexbuf), APP
+  | "." -> add_word pos (Ulexing.lexeme_length lexbuf), DOT
+  | "'" -> add_word pos (Ulexing.lexeme_length lexbuf), APPL
   | "*" -> add_word pos (Ulexing.lexeme_length lexbuf), STAR
   | "|-" -> add_word pos (Ulexing.lexeme_length lexbuf), TURNSTILE
   | "(" -> add_word pos (Ulexing.lexeme_length lexbuf), LPAREN
@@ -59,7 +64,8 @@ let rec main_scanner pos = lexer
   | "}" -> add_word pos (Ulexing.lexeme_length lexbuf), RCURLY
   | "where" -> add_word pos (Ulexing.lexeme_length lexbuf), WHERE
   | "=" -> add_word pos (Ulexing.lexeme_length lexbuf), EQ
-  | "set" -> set_number (add_word pos (Ulexing.lexeme_length lexbuf)) lexbuf
+  | "set" numeral -> add_word pos (Ulexing.lexeme_length lexbuf), SET (int_of_string (remove_set (Ulexing.utf8_lexeme lexbuf)))
+  | "set" -> add_word pos (Ulexing.lexeme_length lexbuf), SET 0
   | identifier -> add_word pos (Ulexing.lexeme_length lexbuf), IDENT (Ulexing.utf8_lexeme lexbuf)
 
  
@@ -68,7 +74,3 @@ and comment pos level = lexer
   | "(*" -> comment (add_word pos 2) (level+1) lexbuf
   | "\n" -> comment (add_line pos) level lexbuf
   | _ -> comment (add_word pos (Ulexing.lexeme_length lexbuf)) level lexbuf
-
-and set_number pos = lexer
-  | wsp -> set_number (add_word pos (Ulexing.lexeme_length lexbuf)) lexbuf
-  | numeral -> add_word pos (Ulexing.lexeme_length lexbuf), SET (int_of_string (Ulexing.utf8_lexeme lexbuf))

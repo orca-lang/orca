@@ -5,12 +5,17 @@ type pats = name list
 type exp =
 | Star
 | Set of int
-| Arr of exp * exp
+| Pi of name * exp * exp
 | Box of ctx * exp
 | Fn of name * exp
 | Lam of name * exp
-| App of exp * exp list
+| App of exp * exp
 | AppL of exp * exp
+| Ident of name
+| Clos of exp * exp
+| EmptyS
+| Shift of int
+| Comma of exp * exp
 
 and ctx =
 | Nil
