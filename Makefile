@@ -1,14 +1,16 @@
+OCAMLBUILD = ocamlbuild -use-ocamlfind -yaccflags --infer
+
 default:
 	utils/menhir-clean.sh
-	ocamlbuild -use-ocamlfind src/nanuq.byte
+	$(OCAMLBUILD) src/nanuq.byte
 
 test: default
 	utils/tests.sh
 
 menhir:
-	menhir --explain src/parser.mly 
+	menhir --explain --infer src/parser.mly
 
 clean:
-	ocamlbuild -clean
+	$(OCAMLBUILD) -clean
 
 all: default test
