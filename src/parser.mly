@@ -26,16 +26,26 @@ open Syntax
 
 %start <Syntax.program list>program
 
+%{
+
+let unwrap_or def = function
+  | None -> def
+  | Some x -> x
+%}
+
 %%
 
 program:
 | d = toplevel* EOF {d}
 
 toplevel:
-| DATA s = IDENT p = params COLON t = exp WHERE option(MID) d = separated_list (MID, decl) {Data (s, p, t, d)}
-| SYN s = IDENT p = params COLON t = exp WHERE option(MID) d = separated_list (MID, decl) {Syn (s, p, t, d)}
+| DATA s = IDENT p = params t = type_dec? WHERE option(MID) d = separated_list (MID, decl) {Data (s, p, unwrap_or Star t, d)}
+| SYN s = IDENT p = params t = type_dec? WHERE option(MID) d = separated_list (MID, decl) {Syn (s, p, unwrap_or Star t, d)}
 | DEF f = IDENT COLON t = exp WHERE option(MID) d = separated_list (MID, def_decl) {DefPM (f, t, d)}
 | DEF f = IDENT COLON t = exp EQ e = exp {Def (f, t, e)}
+
+type_dec:
+| COLON t = exp { t }
 
 params:
 | LPAREN s = IDENT+ COLON t = exp RPAREN p = params {List.map (fun x -> (Explicit, x, t)) s @ p}
@@ -58,7 +68,7 @@ exp:
 | s = exp ARR t = exp {Pi ("_", s, t)}
 | s = exp COMMA e = exp {Comma (s, e)}
 | e = simple_exp {e}
-    
+
 simple_exp:
 | LPAREN t = exp RPAREN {t}
 | STAR {Star}
