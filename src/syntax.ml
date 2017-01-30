@@ -8,7 +8,7 @@ module Ext = struct
   type exp =
     | Star
     | Set of int
-    | Pi of name * exp * exp
+    | Arr of exp * exp
     | Box of exp * exp
     | Fn of name * exp
     | Lam of name * exp

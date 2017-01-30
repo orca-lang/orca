@@ -3,7 +3,7 @@ open Syntax.Ext
 let rec print_exp = function
   | Star -> "*"
   | Set n -> "set" ^ string_of_int n
-  | Pi (n, t, e) -> "(pi " ^ n ^ " " ^ print_exp t ^ " " ^ print_exp e ^ ")"
+  | Arr (t, e) -> "(-> " ^ print_exp t ^ " " ^ print_exp e ^ ")"
   | Box (ctx, e) -> "(|- " ^ print_exp ctx ^ " " ^ print_exp e ^ ")"
   | Fn (f, e) -> "(fn " ^ f ^ " " ^ print_exp e ^ ")"
   | Lam (f, e) -> "(\ " ^ f ^ " " ^ print_exp e ^ ")"
