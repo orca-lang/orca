@@ -1,4 +1,4 @@
-open Syntax
+open Syntax.Ext
 
 let rec print_exp = function
   | Star -> "*"
@@ -14,7 +14,7 @@ let rec print_exp = function
   | EmptyS -> "^"
   | Shift n -> "^" ^ string_of_int n
   | Comma (e1, e2) -> "(, " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
-  | Nil -> "0"    
+  | Nil -> "0"
   | Annot (e1, e2) -> "(: " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
 
 let print_decls decls = String.concat "\n" (List.map (fun (n, e) -> "(" ^ n ^ " " ^ print_exp e ^ ")") decls )

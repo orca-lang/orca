@@ -1,6 +1,6 @@
 %{
 
-open Syntax
+open Syntax.Ext
 
 %}
 
@@ -24,7 +24,7 @@ open Syntax
 %nonassoc STAR SHIFT SET EMPTYS IDENT NIL
 %right LPAREN
 
-%start <Syntax.program list>program
+%start <Syntax.Ext.program list>program
 
 %{
 
