@@ -67,8 +67,9 @@ let rec main_scanner pos = lexer
   | "set" -> add_word pos (Ulexing.lexeme_length lexbuf), SET 0
   | identifier -> add_word pos (Ulexing.lexeme_length lexbuf), IDENT (Ulexing.utf8_lexeme lexbuf)
 
- 
+
 and comment pos level = lexer
+  | "(*)" -> comment (add_word pos 2) level lexbuf
   | "*)" -> if level = 0 then main_scanner (add_word pos 2) lexbuf else comment (add_word pos 2) (level-1) lexbuf
   | "(*" -> comment (add_word pos 2) (level+1) lexbuf
   | "\n" -> comment (add_line pos) level lexbuf
