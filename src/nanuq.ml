@@ -29,7 +29,13 @@ let () =
     Arg.parse args (fun s -> file := s) usage_msg;
     let ch = if !file = "" then stdin else open_in !file in
     let lexbuf = Ulexing.from_utf8_channel ch in
-    let c = String.concat "\n" (List.map Printer.print_program (parse Parser.program lexbuf)) in
+    (* let c = String.concat "\n" *)
+    (*    (List.map (fun x -> Syntax.Int.print_program (snd (Preproc.pre_process [] [] x))) (parse Parser.program lexbuf)) *)
+    let c = String.concat "\n"
+                          (List.map Syntax.Int.print_program (snd
+                                                       (List.fold_left (fun (s, ds) d -> let s', d' = Preproc.pre_process s d in s', (d' :: ds)) ([], []) (parse Parser.program lexbuf))))
+    in
+
     print_string ("The tree is:\n" ^ c ^ "\n")
   with
   | Syntax_error pos -> Printf.printf "Syntax error in line %d, col %d\n" pos.Lexing.pos_lnum pos.Lexing.pos_cnum

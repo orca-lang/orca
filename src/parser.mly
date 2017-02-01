@@ -1,5 +1,6 @@
 %{
 
+open Syntax
 open Syntax.Ext
 
 %}
