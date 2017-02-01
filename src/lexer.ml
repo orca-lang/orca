@@ -11,7 +11,8 @@ let regexp numeral = digit+
 let regexp lower = ['a'-'z']
 let regexp upper = ['A'-'Z']
 
-let regexp identifier = (lower | upper) (lower | upper | digit)*
+(* Old regexp: (lower | upper) (lower | upper | digit)* *)
+let regexp identifier = [^ '\x09'-'\x0a' '\x20' '\x0d']+
 
 (* Managing source code positions *)
 
