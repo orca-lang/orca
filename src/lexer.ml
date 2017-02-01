@@ -12,7 +12,6 @@ let regexp lower = ['a'-'z']
 let regexp upper = ['A'-'Z']
 
 let regexp identifier = (lower | upper) (lower | upper | digit)*
-let regexp constructor_identifier = upper (lower | upper | digit)*
 
 (* Managing source code positions *)
 
@@ -73,6 +72,7 @@ and comment pos level = lexer
   | "*)" -> if level = 0 then main_scanner (add_word pos 2) lexbuf else comment (add_word pos 2) (level-1) lexbuf
   | "(*" -> comment (add_word pos 2) (level+1) lexbuf
   | "\n" -> comment (add_line pos) level lexbuf
+  | eof -> raise (Error "Found end of file inside of a block comment.\n\nPlease close comment block.")
   | _ -> comment (add_word pos (Ulexing.lexeme_length lexbuf)) level lexbuf
 
 and linecomment pos = lexer
