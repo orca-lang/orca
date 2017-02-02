@@ -10,6 +10,7 @@ module Ext = struct
     | Star
     | Set of int
     | Arr of exp * exp
+    | SArr of exp * exp
     | Box of exp * exp
     | Fn of name * exp
     | Lam of name * exp
@@ -120,7 +121,7 @@ module Int = struct
     | Star -> "*"
     | Set n -> "set" ^ string_of_int n
     | Pi (n, s, t) -> "(pi " ^ print_name n ^ " " ^ print_exp s ^ print_exp s ^ ")"
-    | Arr (t, e) -> "(-> " ^ print_exp t ^ " " ^ print_exp e ^ ")"
+    | Arr (t, e) -> "(->> " ^ print_exp t ^ " " ^ print_exp e ^ ")"
     | Box (ctx, e) -> "(|- " ^ print_exp ctx ^ " " ^ print_exp e ^ ")"
     | Fn (f, e) -> "(fn " ^ print_name f ^ " " ^ print_exp e ^ ")"
     | Lam (f, e) -> "(\ " ^ print_name f ^ " " ^ print_exp e ^ ")"

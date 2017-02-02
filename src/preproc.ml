@@ -47,7 +47,8 @@ let rec pproc_exp (s : sign) (cG : ctx) (cP : bctx) (e : E.exp) : I.exp =
   | E.Arr (E.Annot (E.Ident n, t0), t1) ->
      let cG', n' = add_name cG n in
      I.Pi (n', f t0, pproc_exp s cG cP t1)
-  | E.Arr (s, t) -> I.Arr(f s, f t)
+  | E.Arr (s, t) -> I.Pi(I.gen_name "_", f s, f t)
+  | E.SArr (s, t) -> I.Arr(f s, f t)
   | E.Box (g, e) ->
      let cP' = get_bound_var_ctx g in
      I.Box(pproc_exp s cG cP' g, pproc_exp s cG cP' e)

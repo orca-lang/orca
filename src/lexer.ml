@@ -43,6 +43,7 @@ let rec main_scanner pos = lexer
   | "|" -> add_word pos (Ulexing.lexeme_length lexbuf), MID
   | "=>" -> add_word pos (Ulexing.lexeme_length lexbuf), RARR
   | "->" -> add_word pos (Ulexing.lexeme_length lexbuf), ARR
+  | "->>" -> add_word pos (Ulexing.lexeme_length lexbuf), SARR
   | ":" -> add_word pos (Ulexing.lexeme_length lexbuf), COLON
   | "," -> add_word pos (Ulexing.lexeme_length lexbuf), COMMA
   | "^" numeral -> add_word pos (Ulexing.lexeme_length lexbuf), SHIFT (int_of_string (Ulexing.utf8_lexeme lexbuf))

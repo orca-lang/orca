@@ -8,7 +8,7 @@ open Syntax.Ext
 %token DATA SYN DEF MID RARR COLON WHERE EQ
 %token LPAREN RPAREN LCURLY RCURLY LSQUARE RSQUARE
 %token FN LAM APPL
-%token STAR ARR TURNSTILE
+%token STAR ARR SARR TURNSTILE
 %token <int>SET
 %token <string>IDENT
 %token EOF
@@ -19,7 +19,7 @@ open Syntax.Ext
 %nonassoc DOT RARR
 %left COMMA
 %nonassoc COLON
-%right ARR
+%right ARR SARR
 %left APPL
 
 %nonassoc STAR SHIFT SET EMPTYS IDENT NIL
@@ -67,6 +67,7 @@ exp:
 | FN x = IDENT RARR e = exp {Fn (x, e)}
 | LAM x = IDENT DOT e = exp {Lam (x, e)}
 | s = exp ARR t = exp {Arr (s, t)}
+| s = exp SARR t = exp {SArr (s, t)}
 | s = exp COMMA e = exp {Comma (s, e)}
 | e = simple_exp {e}
 
