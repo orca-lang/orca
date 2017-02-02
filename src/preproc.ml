@@ -53,7 +53,7 @@ let rec pproc_exp (s : sign) (cG : ctx) (cP : bctx) (e : E.exp) : I.exp =
   | E.Set n -> I.Set n
   | E.Arr (E.Annot (E.Ident n, t0), t1) ->
      let cG', n' = add_name cG n in
-     I.Pi (Some n', f t0, pproc_exp s cG cP t1)
+     I.Pi (Some n', f t0, pproc_exp s cG' cP t1)
   | E.Arr (s, t) -> I.Pi(None, f s, f t)
   | E.SArr (s, t) -> I.Arr(f s, f t)
   | E.Box (g, e) ->
