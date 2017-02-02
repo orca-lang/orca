@@ -8,14 +8,14 @@ open Syntax.Ext
 %token DATA SYN DEF MID RARR COLON WHERE EQ
 %token LPAREN RPAREN LCURLY RCURLY LSQUARE RSQUARE
 %token FN LAM APPL
-%token STAR ARR SARR TURNSTILE
+%token STAR ARR SARR TURNSTILE TTS (* term turnstile *)
 %token <int>SET
 %token <string>IDENT
 %token EOF
 %token COMMA EMPTYS DOT NIL
 %token <int>SHIFT
 
-%nonassoc TURNSTILE
+%nonassoc TURNSTILE TTS
 %nonassoc DOT RARR
 %left COMMA
 %nonassoc COLON
@@ -61,6 +61,7 @@ def_decl:
 
 exp:
 | g = exp TURNSTILE e = exp {Box (g, e)}
+| g = exp TTS e = exp {TBox (g, e)}
 | e1 = exp e2 = simple_exp {App (e1, e2)}
 | e1 = exp APPL e2 = exp {AppL (e1, e2)}
 | e1 = exp COLON e2 = exp {Annot (e1, e2)}

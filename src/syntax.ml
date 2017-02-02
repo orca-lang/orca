@@ -12,6 +12,7 @@ module Ext = struct
     | Arr of exp * exp
     | SArr of exp * exp
     | Box of exp * exp
+    | TBox of exp * exp (* term box, only in external syntax *)
     | Fn of name * exp
     | Lam of name * exp
     | App of exp * exp
@@ -39,7 +40,9 @@ module Ext = struct
     | Star -> "*"
     | Set n -> "set" ^ string_of_int n
     | Arr (t, e) -> "(-> " ^ print_exp t ^ " " ^ print_exp e ^ ")"
+    | SArr (t, e) -> "(->> " ^ print_exp t ^ " " ^ print_exp e ^ ")"
     | Box (ctx, e) -> "(|- " ^ print_exp ctx ^ " " ^ print_exp e ^ ")"
+    | TBox (ctx, e) -> "(:> " ^ print_exp ctx ^ " " ^ print_exp e ^ ")"
     | Fn (f, e) -> "(fn " ^ f ^ " " ^ print_exp e ^ ")"
     | Lam (f, e) -> "(\ " ^ f ^ " " ^ print_exp e ^ ")"
     | App (e1, e2) -> "(app " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"

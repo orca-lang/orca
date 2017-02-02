@@ -39,6 +39,13 @@ let rec get_bound_var_ctx (e: E.exp) : bctx =
   | E.EmptyS -> []
   | _ -> []
 
+let rec get_bound_var_ctx_no_annot (e: E.exp) : bctx =
+  match e with
+  | E.Comma (g, E.Annot(E.Ident n, _)) -> n :: (get_bound_var_ctx_no_annot g)
+  | E.Comma (g, E.Ident n) -> n :: (get_bound_var_ctx_no_annot g)
+  | E.EmptyS -> []
+  | _ -> []
+
 let rec pproc_exp (s : sign) (cG : ctx) (cP : bctx) (e : E.exp) : I.exp =
   let f = pproc_exp s cG cP in
   match e with
@@ -52,6 +59,9 @@ let rec pproc_exp (s : sign) (cG : ctx) (cP : bctx) (e : E.exp) : I.exp =
   | E.Box (g, e) ->
      let cP' = get_bound_var_ctx g in
      I.Box(pproc_exp s cG cP' g, pproc_exp s cG cP' e)
+  | E.TBox (g, e) ->
+     let cP' = get_bound_var_ctx_no_annot g in
+     pproc_exp s cG cP' e
   | E.Fn (n, e) ->
      let cG', n' = add_name cG n in
      I.Fn(n', pproc_exp s cG' cP e)
