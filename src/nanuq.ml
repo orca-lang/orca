@@ -20,9 +20,16 @@ let parse menhir_parser lexbuf =
       | Lexer.Error x -> raise (Scanning_error (!position, x))
       | Parser.Error  -> raise (Syntax_error !position)
 
+
+let set_print_external, get_print_external =
+  let print = ref false in
+  (fun () -> print := true),
+  (fun () -> !print)
+
 let usage_msg = "Bears ahead"
 let file = ref ""
-let args = []
+let args = [("-ext", Arg.Unit set_print_external, "Activates printing external syntax before preprocessing")]
+
 
 let () =
   try
@@ -35,11 +42,11 @@ let () =
 
     let program = parse Parser.program lexbuf in
 
-    (* let ext_pp = String.concat "\n" *)
-    (*     (List.map Syntax.Ext.print_program program) *)
-    (* in *)
-
-    (* print_string ("The external tree is:\n" ^ ext_pp ^ "\n") ; *)
+    if get_print_external() then
+      let ext_pp = String.concat "\n"
+        (List.map Syntax.Ext.print_program program)
+      in
+      print_string ("The external tree is:\n" ^ ext_pp ^ "\n") ;
 
     let int_pp = String.concat "\n"
         (List.map Syntax.Int.print_program (snd
