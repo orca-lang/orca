@@ -42,11 +42,12 @@ let () =
 
     let program = parse Parser.program lexbuf in
 
-    if get_print_external() then
+    begin if get_print_external() then
       let ext_pp = String.concat "\n"
         (List.map Syntax.Ext.print_program program)
       in
-      print_string ("The external tree is:\n" ^ ext_pp ^ "\n") ;
+      print_string ("The external tree is:\n" ^ ext_pp ^ "\n")
+    end;
 
     let int_pp = String.concat "\n"
         (List.map Syntax.Int.print_program (snd
