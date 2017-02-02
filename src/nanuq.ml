@@ -36,25 +36,22 @@ let () =
     Arg.parse args (fun s -> file := s) usage_msg;
     let ch = if !file = "" then stdin else open_in !file in
     let lexbuf = Ulexing.from_utf8_channel ch in
-    (* let c = String.concat "\n" *)
-    (*    (List.map (fun x -> Syntax.Int.print_program (snd (Preproc.pre_process [] [] x))) (parse Parser.program lexbuf)) *)
-
 
     let program = parse Parser.program lexbuf in
 
     begin if get_print_external() then
       let ext_pp = String.concat "\n"
-        (List.map Syntax.Ext.print_program program)
+        (List.rev (List.map Syntax.Ext.print_program program))
       in
       print_string ("The external tree is:\n" ^ ext_pp ^ "\n")
     end;
 
     let int_pp = String.concat "\n"
-        (List.map Syntax.Int.print_program (snd
+        (List.rev (List.map Syntax.Int.print_program (snd
             (List.fold_left
                 (fun (s, ds) d -> let s', d' = Preproc.pre_process s d in s', (d' :: ds))
                 ([], [])
-                program)))
+                program))))
     in
 
     print_string ("The internal tree is:\n" ^ int_pp ^ "\n")
