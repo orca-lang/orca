@@ -89,7 +89,7 @@ module Int = struct
   type exp =
     | Star
     | Set of int
-    | Pi of name * exp * exp (* A pi type *)
+    | Pi of name option * exp * exp (* A pi type *)
     | Arr of exp * exp       (* A syntactic type *)
     | Box of exp * exp
     | Fn of name * exp
@@ -123,7 +123,8 @@ module Int = struct
   let rec print_exp = function
     | Star -> "*"
     | Set n -> "set" ^ string_of_int n
-    | Pi (n, s, t) -> "(pi " ^ print_name n ^ " " ^ print_exp s ^ print_exp s ^ ")"
+    | Pi (Some n, s, t) -> "(pi " ^ print_name n ^ " " ^ print_exp s ^ print_exp s ^ ")"
+    | Pi (None, s, t) -> "(-> " ^ print_exp s ^ " " ^ print_exp s ^ ")"
     | Arr (t, e) -> "(->> " ^ print_exp t ^ " " ^ print_exp e ^ ")"
     | Box (ctx, e) -> "(|- " ^ print_exp ctx ^ " " ^ print_exp e ^ ")"
     | Fn (f, e) -> "(fn " ^ print_name f ^ " " ^ print_exp e ^ ")"
