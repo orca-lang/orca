@@ -26,10 +26,17 @@ let set_print_external, get_print_external =
   (fun () -> print := true),
   (fun () -> !print)
 
+let set_run_tc, get_run_tc =
+  let print = ref false in
+  (fun () -> print := true),
+  (fun () -> !print)
+
+
 let usage_msg = "Bears ahead"
 let file = ref ""
-let args = [("-ext", Arg.Unit set_print_external, "Activates printing external syntax before preprocessing")]
-
+let args = [("-ext", Arg.Unit set_print_external, "Activates printing external syntax before preprocessing")
+           ;("-tc", Arg.Unit set_run_tc, "Run the incomplete typechecker")
+           ]
 
 let () =
   try
@@ -46,12 +53,19 @@ let () =
       print_string ("The external tree is:\n" ^ ext_pp ^ "\n")
     end;
 
+    let _, int_rep = (List.fold_left
+                           (fun (s, ds) d -> let s', d' = Preproc.pre_process s d in s', (d' :: ds))
+                           ([], [])
+                           program)
+    in
+
+    begin if get_run_tc () then
+            let _sign' = List.fold_left Typecheck.tc_program [] int_rep in
+            print_string "Typechecked"
+    end;
+
     let int_pp = String.concat "\n"
-        (List.rev (List.map Syntax.Int.print_program (snd
-            (List.fold_left
-                (fun (s, ds) d -> let s', d' = Preproc.pre_process s d in s', (d' :: ds))
-                ([], [])
-                program))))
+        (List.rev (List.map Syntax.Int.print_program int_rep))
     in
 
     print_string ("The internal tree is:\n" ^ int_pp ^ "\n")
