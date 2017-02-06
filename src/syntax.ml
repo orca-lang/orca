@@ -118,6 +118,39 @@ module Int = struct
     | DefPM of name * exp * def_decls
     | Def of name * exp * exp
 
+  (* Generate fresh names for all the variables, to keep names unique *)
+
+  let rec refresh (e : exp) : exp = assert false
+
+  (* Substitution of regular variables *)
+
+  let rec subst ((x, es) : name * exp) (e : exp) : exp =
+    let f e = subst (x, refresh es) e in
+    match e with
+    | Star -> Star
+    | Set n ->  Set n
+    | Pi (Some n, s, t) -> assert false
+    | Pi (None, s, t) -> Pi (None, f s, f t)
+    | Arr (t, e) -> Arr(f t, f e)
+    | Box (ctx, e) -> Box(f ctx, f e)
+    | Fn (f, e) -> assert false
+    | Lam (x, e) -> Lam(x, f e)
+    | App (e1, e2) -> Arr(f e1, f e1)
+    | AppL (e1, e2) -> Arr(f e1, f e1)
+    | Const n -> Const n
+    | Var n -> assert false ; Var n
+    | BVar i -> BVar i
+    | Clos (e1, e2) -> Clos(f e1, f e1)
+    | EmptyS -> EmptyS
+    | Shift n -> Shift n
+    | Comma (e1, e2) -> Comma(f e1, f e1)
+    | Nil -> Nil
+    | Annot (e1, e2) -> Annot(f e1, f e1)
+
+
+
+  (* Pretty printer -- could be prettier *)
+
   let print_name (n, i) = n ^ "_" ^ string_of_int i
 
   let rec print_exp = function

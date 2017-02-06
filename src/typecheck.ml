@@ -1,9 +1,10 @@
 open Syntax.Int
 
 type signature = (name * exp) list
+let lookup n sign = List.assoc n sign
 
 let rec infer (e : exp) : exp = assert false
-and check (e : exp) : unit = assert false
+and check (e : exp) (t : exp) : unit = assert false
 
 (* infers the type of e, and it has to be something of kind set_n *)
 (* no normalization happens here *)
@@ -15,12 +16,22 @@ let rec infer_universe (sign : signature) : exp -> int =
   | Pi (_, s, Star) -> 0
   | Pi (_, s, t) -> max (infer_universe sign s) (infer_universe sign t)
 
-  | Const n
-  | App(Const n, _) -> infer_universe sign (List.assoc n sign)
-  | App(e1, e2) -> infer_universe sign e1
-  (* | Const n -> assert false (\* a constant from the signature,needs its type looked up *\) *)
+  | Const n -> infer_universe sign (lookup n sign)
+  | App(Const n, e) ->
+     let Pi (_, s, t) = lookup n sign in
+     let _ = check e s in
+     (* we infer the type after substituting for e in the pitype *)
+     (* infer_universe sign (subst (x, e) t) *)
+     assert false
+  | App(e1, e2) ->
+     (* e1 has to be of pitype *)
+     (* e2 has to be of the right type for e1 *)
+     (* substitute and continue infering the universe *)
+  (* infer_universe sign e1 *) (* Wrong!! *)
+     assert false
 
-  | _ -> assert false (* not a canonical type? *)
+
+  | _ -> assert false (* not a type? *)
 
   (* | Arr (t, e) -> "(->> " ^ print_exp t ^ " " ^ print_exp e ^ ")" *)
   (* | Fn (f, e) -> "(fn " ^ print_name f ^ " " ^ print_exp e ^ ")" *)
