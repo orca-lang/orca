@@ -1,6 +1,6 @@
 open Syntax.Int
 
-type signature = (name * exp) list
+type signature = (def_name * exp) list
 let lookup n sign = List.assoc n sign
 
 let rec infer (e : exp) : exp = assert false
