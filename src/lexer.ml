@@ -46,6 +46,7 @@ let rec main_scanner pos = lexer
   | "->>" -> add_word pos (Ulexing.lexeme_length lexbuf), SARR
   | ":" -> add_word pos (Ulexing.lexeme_length lexbuf), COLON
   | "," -> add_word pos (Ulexing.lexeme_length lexbuf), COMMA
+  | ";" -> add_word pos (Ulexing.lexeme_length lexbuf), SEMICOLON
   | "^" numeral -> add_word pos (Ulexing.lexeme_length lexbuf), SHIFT (int_of_string (Ulexing.utf8_lexeme lexbuf))
   | "^" -> add_word pos (Ulexing.lexeme_length lexbuf), EMPTYS
   | ".." -> add_word pos (Ulexing.lexeme_length lexbuf), SHIFT 0

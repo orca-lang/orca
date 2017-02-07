@@ -22,6 +22,7 @@ module Ext = struct
     | EmptyS
     | Shift of int
     | Comma of exp * exp
+    | Semicolon of exp * exp
     | Nil
     | Annot of exp * exp
 
@@ -52,6 +53,7 @@ module Ext = struct
     | EmptyS -> "^"
     | Shift n -> "^" ^ string_of_int n
     | Comma (e1, e2) -> "(, " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
+    | Semicolon (e1, e2) -> "(; " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
     | Nil -> "0"
     | Annot (e1, e2) -> "(: " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
 
@@ -106,6 +108,7 @@ module Int = struct
     | EmptyS
     | Shift of int
     | Comma of exp * exp
+    | Subst of exp * exp
     | Nil
     | Annot of exp * exp
 
@@ -153,6 +156,7 @@ module Int = struct
       | EmptyS -> EmptyS
       | Shift n -> Shift n
       | Comma (e1, e2) -> Comma(f e1, f e1)
+      | Subst (e1, e2) -> Subst(f e1, f e1)
       | Nil -> Nil
       | Annot (e1, e2) -> Annot(f e1, f e1)
     in
@@ -181,6 +185,7 @@ module Int = struct
     | EmptyS -> EmptyS
     | Shift n -> Shift n
     | Comma (e1, e2) -> Comma(f e1, f e1)
+    | Subst (e1, e2) -> Subst(f e1, f e1)
     | Nil -> Nil
     | Annot (e1, e2) -> Annot(f e1, f e1)
 
@@ -206,6 +211,7 @@ module Int = struct
     | EmptyS -> "^"
     | Shift n -> "^" ^ string_of_int n
     | Comma (e1, e2) -> "(, " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
+    | Subst (e1, e2) -> "(; " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
     | Nil -> "0"
     | Annot (e1, e2) -> "(: " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
 

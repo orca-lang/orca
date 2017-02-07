@@ -89,6 +89,7 @@ let rec pproc_exp (s : sign) (cG : ctx) (cP : bctx) : E.exp -> I.exp =
   | E.EmptyS -> I.EmptyS
   | E.Shift n -> I.Shift n
   | E.Comma (e1, e2) -> I.Comma(f e1, f e2)
+  | E.Semicolon (e1, e2) -> I.Subst(f e1, f e2)
   | E.Nil -> I.Nil
   | E.Annot (e1, e2) -> I.Annot(f e1, f e2)
 

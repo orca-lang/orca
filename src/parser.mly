@@ -5,7 +5,7 @@ open Syntax.Ext
 
 %}
 
-%token DATA SYN DEF MID RARR COLON WHERE EQ
+%token DATA SYN DEF MID RARR COLON SEMICOLON WHERE EQ
 %token LPAREN RPAREN LCURLY RCURLY LSQUARE RSQUARE
 %token FN LAM APPL
 %token STAR ARR SARR TURNSTILE TTS (* term turnstile *)
@@ -17,7 +17,7 @@ open Syntax.Ext
 
 %nonassoc TURNSTILE TTS
 %nonassoc DOT RARR
-%left COMMA
+%left COMMA SEMICOLON
 %nonassoc COLON
 %right ARR SARR
 %left APPL
@@ -70,6 +70,7 @@ exp:
 | s = exp ARR t = exp {Arr (s, t)}
 | s = exp SARR t = exp {SArr (s, t)}
 | s = exp COMMA e = exp {Comma (s, e)}
+| s = exp SEMICOLON e = exp {Semicolon (s, e)}
 | e = simple_exp {e}
 
 simple_exp:
