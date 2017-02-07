@@ -124,7 +124,32 @@ module Int = struct
     | DefPM of def_name * exp * pat_decls
     | Def of def_name * exp * exp
 
-  (* Generate fresh names for all the variables, to keep names unique *)
+  let rec fv =
+    let (--) l n = List.filter ((!=) n) l in
+    function
+    | Star -> []
+    | Set n ->  []
+    | Pi (Some n, s, t) -> fv s @ (fv t -- n)
+    | Pi (None, s, t) -> fv s @ fv t
+    | Arr (t, e) -> fv t @ fv e
+    | Box (ctx, e) -> fv ctx @ fv e
+    | Fn (x, e) -> (fv e -- x)
+    | Lam (x, e) -> fv e
+    | App (e1, e2) -> fv e1 @ fv e2
+    | AppL (e1, e2) -> fv e1 @ fv e2
+    | Const n -> []
+    | Var n -> [n]
+    | BVar i -> []
+    | Clos (e1, e2) -> fv e1 @ fv e2
+    | EmptyS -> []
+    | Shift n -> []
+    | Comma (e1, e2) -> fv e1 @ fv e2
+    | Subst (e1, e2) -> fv e1 @ fv e2
+    | Nil -> []
+    | Annot (e1, e2) -> fv e1 @ fv e2
+
+  (* Generate fresh names for all the bound variables,
+     to keep names unique *)
 
   let refresh (e : exp) : exp =
     let rec refresh (rep : (name * name) list) : exp -> exp =
@@ -162,18 +187,57 @@ module Int = struct
     in
     refresh [] e
 
-  (* Substitution of regular variables *)
-
-  let rec subst ((x, es) : name * exp) : exp ->  exp =
-    let f e = subst (x, refresh es) e in
-    function
+  (* refresh one free variable *)
+  let rec refresh_free_var (x , y : name * name) (e : exp) : exp =
+    let f e = refresh_free_var (x, y) e in
+    match e with
     | Star -> Star
     | Set n ->  Set n
-    | Pi (Some n, s, t) -> assert false
+    | Pi (Some n, _, _) when n = x -> raise (Error.Violation "Duplicate variable name")
+    | Pi (n, s, t) -> Pi (n, f s, f t)
+    | Arr (t, e) -> Arr(f t, f e)
+    | Box (ctx, e) -> Box(f ctx, f e)
+    | Fn (n, _) when n = x -> raise (Error.Violation "Duplicate variable name")
+    | Fn (x, e) -> Fn (x, f e)
+    | Lam (x, e) -> Lam(x, f e)
+    | App (e1, e2) -> Arr(f e1, f e1)
+    | AppL (e1, e2) -> Arr(f e1, f e1)
+    | Const n -> Const n
+    | Var n when n = x -> Var y
+    | Var n -> Var n
+    | BVar i -> BVar i
+    | Clos (e1, e2) -> Clos(f e1, f e1)
+    | EmptyS -> EmptyS
+    | Shift n -> Shift n
+    | Comma (e1, e2) -> Comma(f e1, f e1)
+    | Subst (e1, e2) -> Subst(f e1, f e1)
+    | Nil -> Nil
+    | Annot (e1, e2) -> Annot(f e1, f e1)
+
+  (* Substitution of regular variables *)
+
+  (* TODO: do the refreshing while substituting, otherwise it
+     might be really slow. *)
+
+  let rec subst ((x, es) : name * exp) (e : exp) :  exp =
+    let f e = subst (x, es) e in
+    if List.mem x (fv e) then raise (Error.Violation "Duplicate variable name in substitution.") ;
+    match e with
+    | Star -> Star
+    | Set n ->  Set n
+    | Pi (Some n, s, t) ->
+       let n' = refresh_name n in
+       (* the following cannot happen because n' is just fresh *)
+       (* if List.mem n' (fv es) then raise (Error.Violation "Duplicate variable name would be captured.") ; *)
+       Pi (Some n', s, subst (x, es) (refresh_free_var (n, n') t))
     | Pi (None, s, t) -> Pi (None, f s, f t)
     | Arr (t, e) -> Arr(f t, f e)
     | Box (ctx, e) -> Box(f ctx, f e)
-    | Fn (f, e) -> assert false
+    | Fn (y, e) ->
+       let y' = refresh_name y in
+       (* the following cannot happen because y' is just fresh *)
+       (* if List.mem y' (fv es) then raise (Error.Violation "Duplicate variable name would be captured.") ; *)
+       Fn(y', subst (x, es) (refresh_free_var (y, y') e))
     | Lam (x, e) -> Lam(x, f e)
     | App (e1, e2) -> Arr(f e1, f e1)
     | AppL (e1, e2) -> Arr(f e1, f e1)
