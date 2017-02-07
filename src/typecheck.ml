@@ -12,7 +12,11 @@ let rec infer_universe (sign : signature) : exp -> int =
   function
   | Star -> 0
   | Set n -> n + 1
-  | Box (ctx, e) -> 0
+  | Box (ctx, e) ->
+     (* TODO we need to check that e is of a syntactic type
+        with another judgement (aka function)
+      *)
+     0
   | Pi (_, s, Star) -> 0
   | Pi (_, s, t) -> max (infer_universe sign s) (infer_universe sign t)
 
