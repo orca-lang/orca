@@ -82,7 +82,9 @@ module Int = struct
     let state = ref 0 in
     fun () -> state := !state + 1 ; !state - 1
 
-  let gen_name s = (s, 0) (* gen_sym ()) *)
+  let gen_name s = (s, gen_sym ())
+
+  let refresh_name (s, _) = (s, gen_sym())
 
   type pats = name list
 
@@ -120,13 +122,46 @@ module Int = struct
 
   (* Generate fresh names for all the variables, to keep names unique *)
 
-  let rec refresh (e : exp) : exp = assert false
+  let refresh (e : exp) : exp =
+    let rec refresh (rep : (name * name) list) : exp -> exp =
+      let f x = refresh rep x in
+      function
+      | Star -> Star
+      | Set n ->  Set n
+      | Pi (Some n, s, t) ->
+         let n' = refresh_name n in
+         Pi (Some n', s, refresh ((n, n')::rep) t)
+      | Pi (None, s, t) -> Pi (None, f s, f t)
+      | Arr (t, e) -> Arr(f t, f e)
+      | Box (ctx, e) -> Box(f ctx, f e)
+      | Fn (x, e) ->
+         let x' = refresh_name x in
+         Fn (x', refresh ((x, x')::rep) e)
+      | Lam (x, e) ->
+         Lam(x, f e)
+      | App (e1, e2) -> Arr(f e1, f e1)
+      | AppL (e1, e2) -> Arr(f e1, f e1)
+      | Const n -> Const n
+      | Var n ->
+         (try
+           Var (List.assoc n rep)
+         with
+           Not_found -> Var n)
+      | BVar i -> BVar i
+      | Clos (e1, e2) -> Clos(f e1, f e1)
+      | EmptyS -> EmptyS
+      | Shift n -> Shift n
+      | Comma (e1, e2) -> Comma(f e1, f e1)
+      | Nil -> Nil
+      | Annot (e1, e2) -> Annot(f e1, f e1)
+    in
+    refresh [] e
 
   (* Substitution of regular variables *)
 
-  let rec subst ((x, es) : name * exp) (e : exp) : exp =
+  let rec subst ((x, es) : name * exp) : exp ->  exp =
     let f e = subst (x, refresh es) e in
-    match e with
+    function
     | Star -> Star
     | Set n ->  Set n
     | Pi (Some n, s, t) -> assert false
@@ -138,7 +173,8 @@ module Int = struct
     | App (e1, e2) -> Arr(f e1, f e1)
     | AppL (e1, e2) -> Arr(f e1, f e1)
     | Const n -> Const n
-    | Var n -> assert false ; Var n
+    | Var n  when x = n -> refresh es
+    | Var n -> Var n
     | BVar i -> BVar i
     | Clos (e1, e2) -> Clos(f e1, f e1)
     | EmptyS -> EmptyS
@@ -146,8 +182,6 @@ module Int = struct
     | Comma (e1, e2) -> Comma(f e1, f e1)
     | Nil -> Nil
     | Annot (e1, e2) -> Annot(f e1, f e1)
-
-
 
   (* Pretty printer -- could be prettier *)
 
