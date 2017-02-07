@@ -1,4 +1,17 @@
+(**
+   This module processes the external syntax into internal syntax.
 
+   Its duties are:
+
+   * Refine the tree for ambiguous constructs, like:
+     - add pi types
+     - remove "term boxes" as they only are needed for indexing
+     - remove all arrows into nameless pis
+   * Ensure that are variables and constructors are well-scoped
+   * Index bound variables to de Bruijn indices
+   * Manage repeated names (TO BE DONE)
+
+ *)
 module E = Syntax.Ext
 module I = Syntax.Int
 
