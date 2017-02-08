@@ -7,45 +7,83 @@ type ctx = (name * exp) list
 
 let rec infer (sign , cG : signature * ctx) (e : exp) : exp =
   match e with
-  | Annot (e1, e2) -> assert false
-  | Const n -> assert false
-  | Var n -> assert false
-  | App (e1, e2) -> assert false
+  | Annot (e, t) ->
+     check (sign, cG) e t ; t
+  | Const n ->
+     lookup_sign n sign
+  | Var n -> List.assoc n cG
+  | App (e1, e2) ->
+     begin match infer (sign, cG) e1 with
+     | Pi (None, s, t) ->
+        check (sign, cG) e2 t ;
+        t
+     | Pi (Some n, s, t) ->
+        check (sign, cG) e2 t ;
+        subst (n, e2) t
+     | _ -> raise (Error.Error "Unexpected type")
+     end
 
   | _ -> raise (Error.Error "Cannot infer the type of this expression")
 
 and check (sign , cG : signature * ctx) (e : exp) (t : exp) : unit =
-  match e with
+  match e, Whnf.whnf t with
   (* types and checkable terms *)
-  | Star -> assert false
-  | Set n -> assert false
-  | Pi (Some n, s, t) -> assert false
-  | Pi (None, s, t) -> assert false
-  | Arr (t, e) -> assert false
-  | Box (ctx, e) -> assert false
+  | Star, Set 0 -> ()
+  | Set n, Set n' ->
+     if n+1 = n' then ()        (* Non cummulative universes *)
+     else raise (Error.Error "Wrong universe")
+  | Pi (Some n, s, t), Star ->
+     let _ = infer_universe sign s in
+     check (sign, (n , s) :: cG) t Star
 
-  | Fn (f, e) -> assert false
+  | Pi (Some x, s, t), Set n ->
+     let n' = infer_universe sign s in
+     if n' <= n
+     then check (sign, (x , s) :: cG) t (Set n)
+     else raise (Error.Error "Size problem in a π type.")
+
+  | Pi (None, s, t), Star ->
+     let _ = infer_universe sign s in
+     check (sign, cG) t Star
+  | Pi (None, s, t), Set n ->
+     let n' = infer_universe sign s in
+     if n' <= n
+     then check (sign, cG) t (Set n)
+     else raise (Error.Error "Size problem in a function type.")
+
+  | Box (ctx, e), Set 0 ->
+     (* TODO: only if ctx is a context and e is a syntactic type *)
+     ()
+
+  | Fn (f, e), Pi(None, s, t) ->
+     check (sign, (f, s)::cG) e t
+  | Fn (f, e), Pi(Some n, s, t) ->
+     check (sign, (f, s)::cG) e (subst (n, Var f) t)
 
   (* terms from the syntactic framework *)
-  | Lam (f, e) -> assert false
-  | AppL (e1, e2) -> assert false
-  | BVar i -> assert false
-  | Clos (e1, e2) -> assert false
-  | EmptyS -> assert false
-  | Shift n -> assert false
-  | Comma (e1, e2) -> assert false
-  | Subst (e1, e2) -> assert false
-  | Nil -> assert false
+  | Lam (f, e), _ -> assert false
+  | AppL (e1, e2), _ -> assert false
+  | BVar i, _ -> assert false
+  | Clos (e1, e2), _ -> assert false
+  | EmptyS, _ -> assert false
+  | Shift n, _ -> assert false
+  | Comma (e1, e2), _ -> assert false
+  | Subst (e1, e2), _ -> assert false
+  | Nil, _ -> assert false
+  | Arr (t, e), _ -> assert false
 
   | _ ->
-     let t' = infer (sign, cG) e in
+     let t' =
+       try infer (sign, cG) e
+       with Error.Error _ -> raise (Error.Error "Cannot check expression")
+     in
      if Eq.eq t t'
      then ()
      else raise (Error.Error "Term's inferred type is not equal to checked type.")
 
 (* infers the type of e, and it has to be something of kind set_n *)
 (* no normalization happens here *)
-let rec infer_universe (sign : signature) : exp -> int =
+and infer_universe (sign : signature) : exp -> int =
   function
   | Star -> 0
   | Set n -> n + 1
