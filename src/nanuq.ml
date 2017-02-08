@@ -53,11 +53,12 @@ let () =
       print_string ("The external tree is:\n" ^ ext_pp ^ "\n")
     end;
 
-    let _, int_rep = (List.fold_left
+    let _, int_rep = List.fold_left
                            (fun (s, ds) d -> let s', d' = Preproc.pre_process s d in s', (d' :: ds))
                            ([], [])
-                           program)
+                           program
     in
+    let int_rep = List.rev int_rep in (* Because the fold inverts them. TODO consider a right fold? *)
 
     begin if get_run_tc () then
             let _sign' = List.fold_left Typecheck.tc_program [] int_rep in
