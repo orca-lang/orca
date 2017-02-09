@@ -3,9 +3,7 @@ type icit = Explicit | Implicit
 module Ext = struct
 
   type name = string
-
-  type pats = name list
-
+    
   type exp =
     | Star
     | Set of int
@@ -25,6 +23,21 @@ module Ext = struct
     | Semicolon of exp * exp
     | Nil
     | Annot of exp * exp
+
+  type pat =
+    | PIdent of name
+    | Innac of exp
+    | PLam of name * pat
+    | PConst of name * pat list
+    | PAnnot of pat * exp
+    | PClos of pat * pat
+    | PEmptyS
+    | PShift of int
+    | PSubst of pat * pat
+    | PNil
+    | PComma of pat * pat
+        
+  type pats = pat list        
 
   type decls = (name * exp) list
   type def_decls = (pats * exp) list
@@ -58,7 +71,7 @@ module Ext = struct
     | Annot (e1, e2) -> "(: " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
 
   let print_decls decls = String.concat "\n" (List.map (fun (n, e) -> "(" ^ n ^ " " ^ print_exp e ^ ")") decls )
-  let print_pats pats = String.concat " " pats
+  let print_pats pats = "(patterns)"
   let print_def_decls decls = String.concat "\n" (List.map (fun (pats, e) -> "(" ^ print_pats pats ^ " " ^ print_exp e ^ ")") decls)
 
   let print_param = function
@@ -89,8 +102,6 @@ module Int = struct
 
   let refresh_name (s, _) = (s, gen_sym())
 
-  type pats = name list
-
   type exp =
     | Star
     | Set of int
@@ -111,6 +122,21 @@ module Int = struct
     | Subst of exp * exp
     | Nil
     | Annot of exp * exp
+
+  type pat =
+    | PVar of name
+    | Innac of exp
+    (* | PLam of name * pat *)
+    | PConst of def_name * pat list
+    | PAnnot of pat * exp
+    | PClos of pat * pat
+    | PEmptyS
+    | PShift of int
+    | PSubst of pat * pat
+    | PNil
+    | PComma of pat * pat
+
+  type pats = pat list
 
   type decls = (def_name * exp) list
   type pat_decls = (pats * exp) list
@@ -280,7 +306,7 @@ module Int = struct
     | Annot (e1, e2) -> "(: " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
 
   let print_decls decls = String.concat "\n" (List.map (fun (n, e) -> "(" ^ n ^ " " ^ print_exp e ^ ")") decls )
-  let print_pats pats = String.concat " " (List.map print_name pats)
+  let print_pats pats = "(patterns)"
   let print_def_decls decls = String.concat "\n" (List.map (fun (pats, e) -> "(" ^ print_pats pats ^ " " ^ print_exp e ^ ")") decls)
 
   let print_param = function

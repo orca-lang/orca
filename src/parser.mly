@@ -57,12 +57,12 @@ decl:
 | s = IDENT COLON t = exp {s, t}
 
 def_decl:
-| p = pattern+ RARR e = exp {p, e}
+| p = simple_pattern+ RARR e = exp {p, e}
 
 exp:
 | g = exp TURNSTILE e = exp {Box (g, e)}
 | g = exp TTS e = exp {TBox (g, e)}
-| e1 = exp e2 = simple_exp {App (e1, e2)}
+| e1 = exp e2 = almost_simple_exp {App (e1, e2)}
 | e1 = exp APPL e2 = exp {AppL (e1, e2)}
 | e1 = exp COLON e2 = exp {Annot (e1, e2)}
 | FN x = IDENT RARR e = exp {Fn (x, e)}
@@ -71,6 +71,10 @@ exp:
 | s = exp SARR t = exp {SArr (s, t)}
 | s = exp COMMA e = exp {Comma (s, e)}
 | s = exp SEMICOLON e = exp {Semicolon (s, e)}
+| e = almost_simple_exp {e}
+
+almost_simple_exp:
+| e1 = almost_simple_exp LSQUARE e2 = exp RSQUARE {Clos (e1, e2)}
 | e = simple_exp {e}
 
 simple_exp:
@@ -81,8 +85,20 @@ simple_exp:
 | EMPTYS {EmptyS}
 | n = SHIFT {Shift n}
 | NIL {Nil}
-| e1 = simple_exp LSQUARE e2 = exp RSQUARE {Clos (e1, e2)}
-
+ 
+simple_pattern:
+| x = IDENT {PIdent x}
+| DOT e = simple_exp {Innac e}
+| LPAREN p = pattern RPAREN {p}
+| EMPTYS {PEmptyS}
+| n = SHIFT {PShift n}
+| NIL {PNil}
 
 pattern:
-| s = IDENT {s}
+| LAM x = IDENT DOT p = pattern {PLam (x, p)}
+| c = IDENT ps = simple_pattern+ {PConst (c, ps)}
+| p = pattern COLON t = exp {PAnnot (p, t)}
+| p1 = simple_pattern LSQUARE p2 = pattern RSQUARE {PClos (p1, p2)}
+| p1 = pattern SEMICOLON p2 = pattern {PSubst (p1, p2)}
+| s = pattern COMMA e = pattern {PComma (s, e)}
+| p = simple_pattern {p}

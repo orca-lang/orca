@@ -100,9 +100,44 @@ let pproc_param s cG (icit, n, e) =
   let cG', n' = add_name_ctx cG n in
   cG', (icit, n', pproc_exp s cG [] e)
 
-let pproc_pat s cG n =
-  let cG', n' = add_name_ctx cG n in
-  cG', n' (* this is convoluted, but it will be like this once patterns are really defined *)
+let rec pproc_pat (s : sign) cG =
+  let f pat = pproc_pat s cG pat in
+  function
+  | E.PIdent n ->
+    if List.mem n s then
+      cG, I.PConst (n, [])
+    else
+      begin
+        match lookup n cG with
+        | Some _ -> raise (Error.Error ("Repeated variable " ^ n ^ " in pattern spine"))
+        | None -> 
+          let cG', n' = add_name_ctx cG n in
+          cG', I.PVar n'
+      end
+  | E.Innac e -> cG, I.Innac (pproc_exp s cG [] e)
+  | E.PLam (x, p) -> assert false
+  | E.PConst (c, ps) ->
+    let g (cG, ps) p =
+      let cG', p' = pproc_pat s cG p in
+      cG', p' :: ps
+    in
+    let cG', ps' = List.fold_left g (cG, []) ps in
+    cG', I.PConst (c, List.rev ps')
+  | E.PAnnot (p, t) ->
+    let cG', p' = f p in
+    cG', I.PAnnot (p', pproc_exp s [] [] t)
+  | E.PClos (p1, p2) ->
+    let cG', p1' = f p1 in
+    let cG'', p2' = pproc_pat s cG' p2 in
+    cG'', I.PClos (p1', p2')
+  | E.PEmptyS -> cG, I.PEmptyS
+  | E.PShift i -> cG, I.PShift i
+  | E.PSubst (p1, p2) ->
+    let cG', p1' = f p1 in
+    let cG'', p2' = pproc_pat s cG' p2 in
+    cG'', I.PSubst (p1', p2')
+  | E.PNil -> cG, I.PNil
+  | E.PComma (p1, p2) -> assert false
 
 let pproc_def_decl s (pats, e) =
   let
