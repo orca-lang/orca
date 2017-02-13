@@ -12,7 +12,7 @@ let regexp lower = ['a'-'z']
 let regexp upper = ['A'-'Z']
 
 (* Old regexp: (lower | upper) (lower | upper | digit)* *)
-let regexp identifier = [^ '\x09'-'\x0a' '\x20' '\x0d' '(' ')' ':' ',']+
+let regexp identifier = [^ '\x09'-'\x0a' '\x20' '\x0d' '(' ')' ':' ',' '\\' '.']+
 
 (* Managing source code positions *)
 
@@ -54,7 +54,7 @@ let rec main_scanner pos = lexer
   | "[" -> add_word pos (Ulexing.lexeme_length lexbuf), LSQUARE
   | "]" -> add_word pos (Ulexing.lexeme_length lexbuf), RSQUARE
   | "fn" -> add_word pos (Ulexing.lexeme_length lexbuf), FN
-  | "\\" -> add_word pos (Ulexing.lexeme_length lexbuf), LAM
+  | '\\' -> add_word pos (Ulexing.lexeme_length lexbuf), LAM
   | "." -> add_word pos (Ulexing.lexeme_length lexbuf), DOT
   | "'" -> add_word pos (Ulexing.lexeme_length lexbuf), APPL
   | "*" -> add_word pos (Ulexing.lexeme_length lexbuf), STAR
@@ -64,6 +64,7 @@ let rec main_scanner pos = lexer
   | ")" -> add_word pos (Ulexing.lexeme_length lexbuf), RPAREN
   | "{" -> add_word pos (Ulexing.lexeme_length lexbuf), LCURLY
   | "}" -> add_word pos (Ulexing.lexeme_length lexbuf), RCURLY
+  | "_" -> add_word pos (Ulexing.lexeme_length lexbuf), UNDERSCORE
   | "where" -> add_word pos (Ulexing.lexeme_length lexbuf), WHERE
   | "=" -> add_word pos (Ulexing.lexeme_length lexbuf), EQ
   | "set" numeral -> add_word pos (Ulexing.lexeme_length lexbuf), SET (int_of_string (remove_set (Ulexing.utf8_lexeme lexbuf)))

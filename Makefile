@@ -8,7 +8,7 @@ test: default
 	utils/tests.sh
 
 menhir:
-	menhir --explain --infer src/parser.mly
+	menhir --explain src/parser.mly
 
 clean:
 	$(OCAMLBUILD) -clean

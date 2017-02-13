@@ -48,18 +48,46 @@ let add_name_sign sign n = n :: sign
 let add_name_ctx c n = let nn = I.gen_name n in ((n, nn) :: c), nn
 let add_name_bvar c n : bctx = n :: c
 
+let isEmpty = (=) []
+                 
+let find_pat_name (s : sign) (cG : ctx) (cP : bctx) (n : E.name) : ctx * I.pat =
+    begin
+      match index n cP with
+      | Some i -> cG, I.PBVar i
+      | None -> 
+        if List.mem n s then
+          cG, I.PConst (n, [])
+        else
+          begin
+            match lookup n cG with
+            | Some _ -> raise (Error.Error ("Repeated variable " ^ n ^ " in pattern spine"))
+            | None -> 
+              let cG', n' = add_name_ctx cG n in
+              cG', I.PVar n'
+          end
+    end
+                 
 let rec get_bound_var_ctx (e: E.exp) : bctx =
   match e with
   | E.Comma (g, E.Annot(E.Ident n, _)) -> n :: (get_bound_var_ctx g)
-  | E.EmptyS -> []
+  | E.Nil -> []
   | _ -> []
 
-let rec get_bound_var_ctx_no_annot (e: E.exp) : bctx =
+let rec get_bound_var_ctx_no_annot (e : E.exp) : bctx =
   match e with
   | E.Comma (g, E.Annot(E.Ident n, _)) -> n :: (get_bound_var_ctx_no_annot g)
   | E.Comma (g, E.Ident n) -> n :: (get_bound_var_ctx_no_annot g)
-  | E.EmptyS -> []
-  | _ -> []
+  | E.Nil -> []
+  | E.Ident _ -> []
+  | e -> raise (Error.Error (E.print_exp e ^ " is a forbidden expression on the left hand side of :>"))
+
+let rec get_bound_var_ctx_in_pat (p : E.pat) : bctx =
+  match p with
+  | E.PComma (g, E.PAnnot(E.PIdent n, _)) -> n :: (get_bound_var_ctx_in_pat g)
+  | E.PComma (g, E.PIdent n) -> n :: (get_bound_var_ctx_in_pat g)
+  | E.PNil -> []
+  | E.PIdent _ -> []
+  | p -> raise (Error.Error (E.print_pat p ^ " is a forbidden pattern on the left hand side of :>"))
 
 let rec pproc_exp (s : sign) (cG : ctx) (cP : bctx) : E.exp -> I.exp =
   let f e = pproc_exp s cG cP e in
@@ -72,11 +100,17 @@ let rec pproc_exp (s : sign) (cG : ctx) (cP : bctx) : E.exp -> I.exp =
   | E.Arr (s, t) -> I.Pi(None, f s, f t)
   | E.SArr (s, t) -> I.Arr(f s, f t)
   | E.Box (g, e) ->
+    if isEmpty cP then
      let cP' = get_bound_var_ctx g in
      I.Box(pproc_exp s cG cP' g, pproc_exp s cG cP' e)
+    else
+      raise (Error.Error "Bound variables bindings (|-) cannot be nested")
   | E.TBox (g, e) ->
-     let cP' = get_bound_var_ctx_no_annot g in
-     pproc_exp s cG cP' e
+    if isEmpty cP then
+      let cP' = get_bound_var_ctx_no_annot g in
+      pproc_exp s cG cP' e
+    else
+      raise (Error.Error "Bound variables bindings (:>) cannot be nested")
   | E.Fn (n, e) ->
      let cG', n' = add_name_ctx cG n in
      I.Fn(n', pproc_exp s cG' cP e)
@@ -92,7 +126,8 @@ let rec pproc_exp (s : sign) (cG : ctx) (cP : bctx) : E.exp -> I.exp =
   | E.Semicolon (e1, e2) -> I.Subst(f e1, f e2)
   | E.Nil -> I.Nil
   | E.Annot (e1, e2) -> I.Annot(f e1, f e2)
-
+  | E.Under -> I.Under
+    
 let pproc_decl s (n, e) =
   add_name_sign s n, (n, pproc_exp s [] [] e)
 
@@ -100,25 +135,17 @@ let pproc_param s cG (icit, n, e) =
   let cG', n' = add_name_ctx cG n in
   cG', (icit, n', pproc_exp s cG [] e)
 
-let rec pproc_pat (s : sign) cG =
-  let f pat = pproc_pat s cG pat in
+let rec pproc_pat (s : sign) cG cP =
+  let f pat = pproc_pat s cG cP pat in
   function
-  | E.PIdent n ->
-    if List.mem n s then
-      cG, I.PConst (n, [])
-    else
-      begin
-        match lookup n cG with
-        | Some _ -> raise (Error.Error ("Repeated variable " ^ n ^ " in pattern spine"))
-        | None -> 
-          let cG', n' = add_name_ctx cG n in
-          cG', I.PVar n'
-      end
+  | E.PIdent n -> find_pat_name s cG cP n
   | E.Innac e -> cG, I.Innac (pproc_exp s cG [] e)
-  | E.PLam (x, p) -> assert false
-  | E.PConst (c, ps) ->
+  | E.PLam (x, p) ->
+    let cG', p' = pproc_pat s cG (add_name_bvar cP x) p in
+    cG', I.PLam (x,  p')
+  | E.PConst (c, ps) -> 
     let g (cG, ps) p =
-      let cG', p' = pproc_pat s cG p in
+      let cG', p' = pproc_pat s cG cP p in
       cG', p' :: ps
     in
     let cG', ps' = List.fold_left g (cG, []) ps in
@@ -126,22 +153,32 @@ let rec pproc_pat (s : sign) cG =
   | E.PAnnot (p, t) ->
     let cG', p' = f p in
     cG', I.PAnnot (p', pproc_exp s [] [] t)
-  | E.PClos (p1, p2) ->
-    let cG', p1' = f p1 in
-    let cG'', p2' = pproc_pat s cG' p2 in
-    cG'', I.PClos (p1', p2')
+  | E.PClos (x, p) ->
+    begin match find_pat_name s cG cP x with
+    | cG', I.PVar n ->
+      let cG'', p2' = pproc_pat s cG' cP p in
+      cG'', I.PClos (n, p2')
+    | cG', _ -> raise (Error.Error "Substitution can only be applied to pattern variables")
+    end
   | E.PEmptyS -> cG, I.PEmptyS
   | E.PShift i -> cG, I.PShift i
   | E.PSubst (p1, p2) ->
     let cG', p1' = f p1 in
-    let cG'', p2' = pproc_pat s cG' p2 in
+    let cG'', p2' = pproc_pat s cG' cP p2 in
     cG'', I.PSubst (p1', p2')
   | E.PNil -> cG, I.PNil
   | E.PComma (p1, p2) -> assert false
-
+  | E.PBox (g, p) ->
+    if isEmpty cP then
+      let cP' = get_bound_var_ctx_in_pat g in
+      pproc_pat s cG cP' p
+    else
+      raise (Error.Error "Bound variables bindings (:>) cannot be nested")
+  | E.PUnder -> cG, I.PUnder
+        
 let pproc_def_decl s (pats, e) =
   let
-    cG', pats' = List.fold_left (fun (cG, pats) pat -> let cG', pat' = pproc_pat s cG pat in cG', (pat'::pats)) ([], []) pats
+    cG', pats' = List.fold_left (fun (cG, pats) pat -> let cG', pat' = pproc_pat s cG [] pat in cG', (pat'::pats)) ([], []) pats
   in
   (pats', pproc_exp s cG' [] e)
 

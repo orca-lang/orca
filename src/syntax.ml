@@ -23,6 +23,7 @@ module Ext = struct
     | Semicolon of exp * exp
     | Nil
     | Annot of exp * exp
+    | Under
 
   type pat =
     | PIdent of name
@@ -30,13 +31,15 @@ module Ext = struct
     | PLam of name * pat
     | PConst of name * pat list
     | PAnnot of pat * exp
-    | PClos of pat * pat
+    | PClos of name * pat
     | PEmptyS
     | PShift of int
     | PSubst of pat * pat
     | PNil
     | PComma of pat * pat
-        
+    | PBox of pat * pat
+    | PUnder
+         
   type pats = pat list        
 
   type decls = (name * exp) list
@@ -69,9 +72,26 @@ module Ext = struct
     | Semicolon (e1, e2) -> "(; " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
     | Nil -> "0"
     | Annot (e1, e2) -> "(: " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
+    | Under -> "_"
 
-  let print_decls decls = String.concat "\n" (List.map (fun (n, e) -> "(" ^ n ^ " " ^ print_exp e ^ ")") decls )
-  let print_pats pats = "(patterns)"
+  let rec print_pat (p : pat) : string = match p with
+    | PIdent n -> n
+    | Innac e -> "(. " ^ print_exp e ^ ")"
+    | PLam (f, p) -> "(\ " ^ f ^ " " ^ print_pat p ^ ")"
+    | PConst (n, ps) -> "(Const " ^ n ^ " " ^ (String.concat " " (List.map (fun p -> "(" ^ print_pat p ^ ")") ps)) ^ ")"
+    | PAnnot (p, e) -> "(: " ^ print_pat p ^ " " ^ print_exp e ^ ")"
+    | PClos (n, p) -> "([] " ^ n ^ " " ^ print_pat p ^ ")"
+    | PBox (p1, p2) -> "(:> " ^ print_pat p1 ^ " " ^ print_pat p2 ^ ")"
+    | PEmptyS -> "^"
+    | PShift i -> "(^ " ^ string_of_int i ^ ")"
+    | PSubst (p1, p2) -> "(; " ^ print_pat p1 ^ " " ^ print_pat p2 ^ ")"
+    | PNil -> "0"
+    | PComma (p1, p2) -> "(, " ^ print_pat p1 ^ " " ^ print_pat p2 ^ ")"
+    | PUnder -> "_"
+
+      
+  let print_decls decls = String.concat "\n" (List.map (fun (n, e) -> "(" ^ n ^ " " ^ print_exp e ^ ")") decls)
+  let print_pats pats = String.concat " " (List.map (fun p -> "(" ^ print_pat p ^ ")") (List.rev pats))
   let print_def_decls decls = String.concat "\n" (List.map (fun (pats, e) -> "(" ^ print_pats pats ^ " " ^ print_exp e ^ ")") decls)
 
   let print_param = function
@@ -122,19 +142,22 @@ module Int = struct
     | Subst of exp * exp
     | Nil
     | Annot of exp * exp
+    | Under
 
   type pat =
     | PVar of name
+    | PBVar of index
     | Innac of exp
-    (* | PLam of name * pat *)
+    | PLam of string * pat
     | PConst of def_name * pat list
     | PAnnot of pat * exp
-    | PClos of pat * pat
+    | PClos of name * pat
     | PEmptyS
     | PShift of int
     | PSubst of pat * pat
     | PNil
     | PComma of pat * pat
+    | PUnder
 
   type pats = pat list
 
@@ -173,6 +196,7 @@ module Int = struct
     | Subst (e1, e2) -> fv e1 @ fv e2
     | Nil -> []
     | Annot (e1, e2) -> fv e1 @ fv e2
+    | Under -> []
 
   (* Generate fresh names for all the bound variables,
      to keep names unique *)
@@ -210,6 +234,7 @@ module Int = struct
       | Subst (e1, e2) -> Subst(f e1, f e1)
       | Nil -> Nil
       | Annot (e1, e2) -> Annot(f e1, f e1)
+      | Under -> Under
     in
     refresh [] e
 
@@ -239,6 +264,7 @@ module Int = struct
     | Subst (e1, e2) -> Subst(f e1, f e1)
     | Nil -> Nil
     | Annot (e1, e2) -> Annot(f e1, f e1)
+    | Under -> Under
 
   (* Substitution of regular variables *)
 
@@ -278,6 +304,7 @@ module Int = struct
     | Subst (e1, e2) -> Subst(f e1, f e1)
     | Nil -> Nil
     | Annot (e1, e2) -> Annot(f e1, f e1)
+    | Under -> Under
 
   (* Pretty printer -- could be prettier *)
 
@@ -304,9 +331,25 @@ module Int = struct
     | Subst (e1, e2) -> "(; " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
     | Nil -> "0"
     | Annot (e1, e2) -> "(: " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
+    | Under -> "_"
 
+  let rec print_pat (p : pat) : string = match p with
+    | PVar n -> print_name n
+    | PBVar i -> "(i " ^ string_of_int i ^ ")"
+    | Innac e -> "(. " ^ print_exp e ^ ")"
+    | PLam (f, p) -> "(\ " ^ f ^ " " ^ print_pat p ^ ")"
+    | PConst (n, ps) -> "(Const " ^ n ^ " " ^ (String.concat " " (List.map (fun p -> "(" ^ print_pat p ^ ")") ps)) ^ ")"
+    | PAnnot (p, e) -> "(: " ^ print_pat p ^ " " ^ print_exp e ^ ")"
+    | PClos (n, p) -> "([] " ^ print_name n ^ " " ^ print_pat p ^ ")"
+    | PEmptyS -> "^"
+    | PShift i -> "(^ " ^ string_of_int i ^ ")"
+    | PSubst (p1, p2) -> "(; " ^ print_pat p1 ^ " " ^ print_pat p2 ^ ")"
+    | PNil -> "0"
+    | PComma (p1, p2) -> "(, " ^ print_pat p1 ^ " " ^ print_pat p1 ^ ")"
+    | PUnder -> "_"
+      
   let print_decls decls = String.concat "\n" (List.map (fun (n, e) -> "(" ^ n ^ " " ^ print_exp e ^ ")") decls )
-  let print_pats pats = "(patterns)"
+  let print_pats pats = String.concat " " (List.map (fun p -> "(" ^ print_pat p ^ ")") (List.rev pats))
   let print_def_decls decls = String.concat "\n" (List.map (fun (pats, e) -> "(" ^ print_pats pats ^ " " ^ print_exp e ^ ")") decls)
 
   let print_param = function

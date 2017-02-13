@@ -5,7 +5,7 @@ open Syntax.Ext
 
 %}
 
-%token DATA SYN DEF MID RARR COLON SEMICOLON WHERE EQ
+%token DATA SYN DEF MID RARR COLON SEMICOLON WHERE EQ UNDERSCORE
 %token LPAREN RPAREN LCURLY RCURLY LSQUARE RSQUARE
 %token FN LAM APPL
 %token STAR ARR SARR TURNSTILE TTS (* term turnstile *)
@@ -22,7 +22,7 @@ open Syntax.Ext
 %right ARR SARR
 %left APPL
 
-%nonassoc STAR SHIFT SET EMPTYS IDENT NIL
+%nonassoc STAR SHIFT SET EMPTYS IDENT NIL UNDERSCORE
 %right LPAREN
 
 %start <Syntax.Ext.program list>program
@@ -61,6 +61,7 @@ def_decl:
 
 exp:
 | g = exp TURNSTILE e = exp {Box (g, e)}
+| TURNSTILE e = exp {Box (Nil, e)}
 | g = exp TTS e = exp {TBox (g, e)}
 | e1 = exp e2 = almost_simple_exp {App (e1, e2)}
 | e1 = exp APPL e2 = exp {AppL (e1, e2)}
@@ -85,6 +86,7 @@ simple_exp:
 | EMPTYS {EmptyS}
 | n = SHIFT {Shift n}
 | NIL {Nil}
+| UNDERSCORE {Under}
  
 simple_pattern:
 | x = IDENT {PIdent x}
@@ -93,12 +95,14 @@ simple_pattern:
 | EMPTYS {PEmptyS}
 | n = SHIFT {PShift n}
 | NIL {PNil}
+| UNDERSCORE {PUnder}
 
 pattern:
 | LAM x = IDENT DOT p = pattern {PLam (x, p)}
 | c = IDENT ps = simple_pattern+ {PConst (c, ps)}
 | p = pattern COLON t = exp {PAnnot (p, t)}
-| p1 = simple_pattern LSQUARE p2 = pattern RSQUARE {PClos (p1, p2)}
+| x = IDENT LSQUARE p = pattern RSQUARE {PClos (x, p)}
 | p1 = pattern SEMICOLON p2 = pattern {PSubst (p1, p2)}
 | s = pattern COMMA e = pattern {PComma (s, e)}
+| p1 = pattern TTS p2 = pattern {PBox (p1, p2)}
 | p = simple_pattern {p}
