@@ -34,8 +34,8 @@ let set_run_tc, get_run_tc =
 
 let usage_msg = "Bears ahead"
 let file = ref ""
-let args = [("-ext", Arg.Unit set_print_external, "Activates printing external syntax before preprocessing")
-           ;("-tc", Arg.Unit set_run_tc, "Run the incomplete typechecker")
+let args = [("-ext", Arg.Unit set_print_external, "Print external syntax before preprocessing.")
+           ;("-tc", Arg.Unit set_run_tc, "Run the incomplete typechecker.")
            ]
 
 let () =
