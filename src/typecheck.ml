@@ -8,13 +8,20 @@ let lookup_sign n sign =
 
 type ctx = (name * exp) list
 
-let rec infer (sign , cG : signature * ctx) (e : exp) : exp =
+let rec infer (sign, cG : signature * ctx) (e : exp) : exp =
   match e with
   | Annot (e, t) ->
      check (sign, cG) e t ; t
   | Const n ->
      lookup_sign n sign
-  | Var n -> List.assoc n cG
+  | Var n ->
+     let string_ctx = ">>>" ^ (String.concat "," (List.map (fun (x, e) -> print_name n ^ ": " ^ print_exp e) cG)) ^ "<<<" in
+     begin
+       try List.assoc n cG
+       with Not_found ->
+         raise (Error.Violation
+                  ("Unbound var after preprocessing, this cannot happen. (Var: " ^ print_name n ^ ")\n" ^ string_ctx))
+     end
   | App (e1, e2) ->
      begin match infer (sign, cG) e1 with
      | Pi (None, s, t) ->
@@ -34,22 +41,22 @@ and check (sign , cG : signature * ctx) (e : exp) (t : exp) : unit =
   | Star, Set 0 -> ()
   | Set n, Set n' ->
      if n+1 = n' then ()        (* Non cummulative universes *)
-     else raise (Error.Error "Wrong universe")
-  | Pi (Some n, s, t), Star ->
-     let _ = infer_universe sign s in
-     check (sign, (n , s) :: cG) t Star
+     else raise (Error.Error "Wrong universe. That's a huge mistake fella!")
+  | Pi (Some x, s, t), Star ->
+     let _ = infer_universe (sign, cG) s in
+     check (sign, (x , s) :: cG) t Star
 
   | Pi (Some x, s, t), Set n ->
-     let n' = infer_universe sign s in
+     let n' = infer_universe (sign, cG) s in
      if n' <= n
      then check (sign, (x , s) :: cG) t (Set n)
-     else raise (Error.Error "Size problem in a π type.")
+     else raise (Error.Error "Size problem in a Π type.")
 
   | Pi (None, s, t), Star ->
-     let _ = infer_universe sign s in
+     let _ = infer_universe (sign, cG) s in
      check (sign, cG) t Star
   | Pi (None, s, t), Set n ->
-     let n' = infer_universe sign s in
+     let n' = infer_universe (sign, cG) s in
      if n' <= n
      then check (sign, cG) t (Set n)
      else raise (Error.Error "Size problem in a function type.")
@@ -93,7 +100,8 @@ and check (sign , cG : signature * ctx) (e : exp) (t : exp) : unit =
 
 (* infers the type of e, and it has to be something of kind set_n *)
 (* no normalization happens here *)
-and infer_universe (sign : signature) : exp -> int =
+and infer_universe (sign, cG : signature * ctx) : exp -> int =
+  let f e = infer_universe (sign, cG) e in
   function
   | Star -> 0
   | Set n -> n + 1
@@ -103,18 +111,18 @@ and infer_universe (sign : signature) : exp -> int =
       *)
      0
   | Pi (_, s, Star) -> 0
-  | Pi (_, s, t) -> max (infer_universe sign s) (infer_universe sign t)
+  | Pi (_, s, t) -> max (f s) (f t)
 
-  | Const n -> infer_universe sign (lookup_sign n sign)
+  | Const n -> f (lookup_sign n sign)
   | App(e1, e2) ->
-     begin match infer (sign, []) e1 with (* TODO empty cG context? *)
+     begin match infer (sign, cG) e1 with
      | Pi (Some x, s, t) ->
-        let _  = check (sign, []) e2 s in
+        let _  = check (sign, cG) e2 s in
         (* we infer the type after substituting for e in the pitype *)
-        infer_universe sign (subst (x, e2) t)
+        infer_universe (sign, cG) (subst (x, e2) t)
      | Pi (None, s, t) ->
-        let _  = check (sign, []) e2 s in
-        infer_universe sign t
+        let _  = check (sign, cG) e2 s in
+        infer_universe (sign, cG) t
 
      | _ -> raise (Error.Error "Element in function position not of function type")
      end
@@ -137,7 +145,7 @@ and infer_universe (sign : signature) : exp -> int =
   (* | Annot (e1, e2) -> "(: " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")" *)
 
 
-let tc_constructor (sign : signature) (universe : exp) ((n , ct) : def_name * exp) : signature =
+let tc_constructor (sign : signature) (universe : exp) (n , ct : def_name * exp) : signature =
   check (sign, []) ct universe ;
   (n, ct) :: sign
 
@@ -145,7 +153,7 @@ let tc_constructor (sign : signature) (universe : exp) ((n , ct) : def_name * ex
 let tc_program (sign : signature) : program -> signature = function
   | Data (n, ps, e, ds) ->
      let t = List.fold_left (fun t2 (_, n, t1) -> Pi(Some n, t1, t2)) e ps in
-     let univ = infer_universe sign t in
+     let univ = infer_universe (sign, []) t in
      let u = if univ == 0 then Star else Set (univ - 1) in (* MMMMM Hack alert this may be wrong! *)
      List.fold_left (fun sign decl -> tc_constructor sign u decl) ((n, t)::sign) ds
 
