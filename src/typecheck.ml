@@ -80,9 +80,16 @@ and check (sign , cG : signature * ctx) (e : exp) (t : exp) : unit =
        try infer (sign, cG) e
        with Error.Error _ -> raise (Error.Error "Cannot check expression")
      in
-     if Eq.eq t t'
-     then ()
-     else raise (Error.Error "Term's inferred type is not equal to checked type.")
+     if Eq.eq t t' then ()
+     else
+       let string_e = print_exp e in
+       let string_t = print_exp t in
+       let string_t' = print_exp t' in
+       let message = "Expression: " ^ string_e
+                     ^ "\nwas inferred type: " ^ string_t'
+                     ^ "\nwhich is not equal to: " ^ string_t ^ " that was checked against."
+       in
+       raise (Error.Error ("Term's inferred type is not equal to checked type.\n" ^ message))
 
 (* infers the type of e, and it has to be something of kind set_n *)
 (* no normalization happens here *)
@@ -130,8 +137,8 @@ and infer_universe (sign : signature) : exp -> int =
   (* | Annot (e1, e2) -> "(: " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")" *)
 
 
-let tc_constructor (sign : signature) (universe : int) ((n , ct) : def_name * exp) : signature =
-  check (sign, []) ct (Set universe) ;
+let tc_constructor (sign : signature) (universe : exp) ((n , ct) : def_name * exp) : signature =
+  check (sign, []) ct universe ;
   (n, ct) :: sign
 
 
@@ -139,7 +146,8 @@ let tc_program (sign : signature) : program -> signature = function
   | Data (n, ps, e, ds) ->
      let t = List.fold_left (fun t2 (_, n, t1) -> Pi(Some n, t1, t2)) e ps in
      let univ = infer_universe sign t in
-     List.fold_left (fun sign decl -> tc_constructor sign univ decl) ((n, t)::sign) ds
+     let u = if univ == 0 then Star else Set (univ - 1) in (* MMMMM Hack alert this may be wrong! *)
+     List.fold_left (fun sign decl -> tc_constructor sign u decl) ((n, t)::sign) ds
 
   | Syn (n, ps, e, ds) ->
      assert false
