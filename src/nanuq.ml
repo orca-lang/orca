@@ -76,3 +76,5 @@ let () =
     Printf.printf "Scanning error in line %d, col %d\nMessage:%s\n"
       pos.Lexing.pos_lnum pos.Lexing.pos_cnum s
   | Ulexing.Error -> Printf.printf "Ulexing Error\n"
+  | Error.Error msg -> Printf.printf "An error occured while processing your input.\n\t%s\n" msg
+  | Error.Violation msg -> Printf.printf "An expected error occured, report this as a bug.\n\t%s\n" msg
