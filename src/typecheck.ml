@@ -1,7 +1,10 @@
 open Syntax.Int
 
 type signature = (def_name * exp) list
-let lookup_sign n sign = List.assoc n sign
+let lookup_sign n sign =
+  try
+    List.assoc n sign
+  with Not_found -> raise (Error.Violation ("Unable to find " ^ n ^ " in the signature"))
 
 type ctx = (name * exp) list
 
@@ -127,15 +130,16 @@ and infer_universe (sign : signature) : exp -> int =
   (* | Annot (e1, e2) -> "(: " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")" *)
 
 
-let tc_constructor ((n , t) : name * exp) : unit =
-  assert false
+let tc_constructor (sign : signature) (universe : int) ((n , ct) : def_name * exp) : signature =
+  check (sign, []) ct (Set universe) ;
+  (n, ct) :: sign
+
 
 let tc_program (sign : signature) : program -> signature = function
   | Data (n, ps, e, ds) ->
      let t = List.fold_left (fun t2 (_, n, t1) -> Pi(Some n, t1, t2)) e ps in
-     let _ = infer_universe sign t in
-     (* typecheck ds *)
-     assert false
+     let univ = infer_universe sign t in
+     List.fold_left (fun sign decl -> tc_constructor sign univ decl) ((n, t)::sign) ds
 
   | Syn (n, ps, e, ds) ->
      assert false

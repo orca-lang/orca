@@ -3,7 +3,7 @@ type icit = Explicit | Implicit
 module Ext = struct
 
   type name = string
-    
+
   type exp =
     | Star
     | Set of int
@@ -39,8 +39,8 @@ module Ext = struct
     | PComma of pat * pat
     | PBox of pat * pat
     | PUnder
-         
-  type pats = pat list        
+
+  type pats = pat list
 
   type decls = (name * exp) list
   type def_decls = (pats * exp) list
@@ -89,7 +89,7 @@ module Ext = struct
     | PComma (p1, p2) -> "(, " ^ print_pat p1 ^ " " ^ print_pat p2 ^ ")"
     | PUnder -> "_"
 
-      
+
   let print_decls decls = String.concat "\n" (List.map (fun (n, e) -> "(" ^ n ^ " " ^ print_exp e ^ ")") decls)
   let print_pats pats = String.concat " " (List.map (fun p -> "(" ^ print_pat p ^ ")") (List.rev pats))
   let print_def_decls decls = String.concat "\n" (List.map (fun (pats, e) -> "(" ^ print_pats pats ^ " " ^ print_exp e ^ ")") decls)
@@ -347,7 +347,7 @@ module Int = struct
     | PNil -> "0"
     | PComma (p1, p2) -> "(, " ^ print_pat p1 ^ " " ^ print_pat p1 ^ ")"
     | PUnder -> "_"
-      
+
   let print_decls decls = String.concat "\n" (List.map (fun (n, e) -> "(" ^ n ^ " " ^ print_exp e ^ ")") decls )
   let print_pats pats = String.concat " " (List.map (fun p -> "(" ^ print_pat p ^ ")") (List.rev pats))
   let print_def_decls decls = String.concat "\n" (List.map (fun (pats, e) -> "(" ^ print_pats pats ^ " " ^ print_exp e ^ ")") decls)
@@ -363,6 +363,4 @@ module Int = struct
     | Syn (n, ps, e, decls) -> "(syn " ^ n ^ " " ^ print_params ps ^ "  " ^ print_exp e ^ "\n" ^ print_decls decls ^ ")"
     | DefPM (n, e, decls) -> "(def " ^ n ^ " " ^ print_exp e ^ "\n" ^ print_def_decls decls ^ ")"
     | Def (n, e1, e2) -> "(def " ^ n ^ " " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
-
-
 end
