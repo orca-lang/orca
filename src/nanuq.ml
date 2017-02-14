@@ -36,15 +36,22 @@ let usage_msg = "Bears ahead"
 let file = ref ""
 let args = [("-ext", Arg.Unit set_print_external, "Print external syntax before preprocessing.")
            ;("-tc", Arg.Unit set_run_tc, "Run the incomplete typechecker.")
+           ;("-debug", Arg.Unit Debug.set_debug_on, "Generates a log file with information about the file that was checked")
            ]
 
 let () =
   try
     Arg.parse args (fun s -> file := s) usage_msg;
+
+    Debug.print (fun () -> "Processing file: " ^ !file) ;
     let ch = if !file = "" then stdin else open_in !file in
     let lexbuf = Ulexing.from_utf8_channel ch in
 
     let program = parse Parser.program lexbuf in
+
+    Debug.print (fun () -> "* The external tree is:");
+    Debug.print (fun () -> String.concat "\n"
+        (List.rev (List.map Syntax.Ext.print_program program)));
 
     begin if get_print_external() then
       let ext_pp = String.concat "\n"
@@ -60,16 +67,19 @@ let () =
     in
     let int_rep = List.rev int_rep in (* Because the fold inverts them. TODO consider a right fold? *)
 
-    begin if get_run_tc () then
-            let _sign' = List.fold_left Typecheck.tc_program [] int_rep in
-            print_string "Typechecked"
-    end;
-
     let int_pp = String.concat "\n"
         (List.rev (List.map Syntax.Int.print_program int_rep))
     in
 
-    print_string ("The internal tree is:\n" ^ int_pp ^ "\n")
+    print_string ("* The internal tree is:\n" ^ int_pp ^ "\n");
+    Debug.print (fun () -> "The internal tree is:\n" ^ int_pp ^ "\n");
+
+    begin if get_run_tc () then
+            let _sign' = List.fold_left Typecheck.tc_program [] int_rep in
+            Debug.print (fun () -> "The file was typechecked") ;
+            print_string "Typechecked"
+    end;
+
   with
   | Syntax_error pos -> Printf.printf "Syntax error in line %d, col %d\n" pos.Lexing.pos_lnum pos.Lexing.pos_cnum
   | Scanning_error (pos, s) ->
