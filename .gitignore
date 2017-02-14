@@ -20,3 +20,5 @@ setup.data
 setup.log
 
 *.conflicts
+
+*.out
