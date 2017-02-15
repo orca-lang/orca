@@ -42,8 +42,8 @@ let eq e1 e2 =
     | Under, Under -> true
 
     | _, _ ->
-       print_string (">>> " ^ print_exp e1) ; print_newline ();
-       print_string ("<<< " ^ print_exp e2) ; print_newline ();
+       (* print_string (">>> " ^ print_exp e1) ; print_newline (); *)
+       (* print_string ("<<< " ^ print_exp e2) ; print_newline (); *)
        false
   in
   Debug.print (fun () -> "Comparing: " ^ print_exp e1 ^ " and " ^ print_exp e2) ;
