@@ -75,8 +75,9 @@ let () =
     Debug.print (fun () -> "The internal tree is:\n" ^ int_pp ^ "\n");
 
     begin if get_run_tc () then
+            Debug.print_string "Starting typechecking" ;
             let _sign' = List.fold_left Typecheck.tc_program [] int_rep in
-            Debug.print (fun () -> "The file was typechecked") ;
+            Debug.print_string "The file was typechecked";
             print_string "Typechecked"
     end;
 

@@ -19,6 +19,8 @@ let print (f : unit -> string) : unit =
      flush (get_ch()))
   else ()
 
+let print_string s = print (fun () -> s)
+
 let print_and_ret (f : unit -> string) (value : 'a) (pf : 'a -> string) : 'a =
   print f ;
   print (fun () -> pf value) ;

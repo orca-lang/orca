@@ -46,4 +46,7 @@ let eq e1 e2 =
        print_string ("<<< " ^ print_exp e2) ; print_newline ();
        false
   in
-  eq [] e1 e2
+  Debug.print (fun () -> "Comparing: " ^ print_exp e1 ^ " and " ^ print_exp e2) ;
+  let res = eq [] e1 e2 in
+  Debug.print (fun () -> "Resulted in: " ^ string_of_bool res) ;
+  res

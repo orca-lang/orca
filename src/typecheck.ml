@@ -146,18 +146,24 @@ and infer_universe (sign, cG : signature * ctx) : exp -> int =
 
 
 let tc_constructor (sign : signature) (universe : exp) (n , ct : def_name * exp) : signature =
+  Debug.print_string ("Typechecking constructor: " ^ n) ;
   check (sign, []) ct universe ;
   (n, ct) :: sign
 
-
 let tc_program (sign : signature) : program -> signature = function
   | Data (n, ps, e, ds) ->
+     Debug.print_string ("Typechecking data declaration: " ^ n);
      let t = List.fold_left (fun t2 (_, n, t1) -> Pi(Some n, t1, t2)) e ps in
      let univ = infer_universe (sign, []) t in
      let u = if univ == 0 then Star else Set (univ - 1) in (* MMMMM Hack alert this may be wrong! *)
      List.fold_left (fun sign decl -> tc_constructor sign u decl) ((n, t)::sign) ds
 
   | Syn (n, ps, e, ds) ->
+     Debug.print_string ("Typechecking syn declaration: " ^ n);
      assert false
-  | DefPM (n, e, ds) -> assert false
-  | Def (n, t, e) -> assert false
+  | DefPM (n, e, ds) ->
+     Debug.print_string ("Typechecking pattern matching definition: " ^ n);
+     assert false
+  | Def (n, t, e) ->
+     Debug.print_string ("Typechecking definition: " ^ n);
+     assert false
