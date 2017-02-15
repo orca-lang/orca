@@ -49,7 +49,7 @@ let () =
 
     let program = parse Parser.program lexbuf in
 
-    Debug.print (fun () -> "* The external tree is:");
+    Debug.print_string "* The external tree is:";
     Debug.print (fun () -> String.concat "\n"
         (List.rev (List.map Syntax.Ext.print_program program)));
 
@@ -74,15 +74,14 @@ let () =
     print_string ("* The internal tree is:\n" ^ int_pp ^ "\n");
     Debug.print (fun () -> "The internal tree is:\n" ^ int_pp ^ "\n");
 
-    begin if get_run_tc () then
-            Debug.print_string "Starting typechecking" ;
+    if get_run_tc () then begin
+           Debug.print_string "Starting typechecking." ;
             let _sign' = List.fold_left Typecheck.tc_program [] int_rep in
-            Debug.print_string "The file was typechecked";
-            print_string "Typechecked"
-    end;
-
+            Debug.print_string "The file was typechecked.";
+            print_string "Typechecked."
+      end;
   with
-  | Syntax_error pos -> Printf.printf "Syntax error in line %d, col %d\n" pos.Lexing.pos_lnum pos.Lexing.pos_cnum
+  | Syntax_error pos -> Printf.printf "Syntax error in line %d, col %d.\n" pos.Lexing.pos_lnum pos.Lexing.pos_cnum
   | Scanning_error (pos, s) ->
     Printf.printf "Scanning error in line %d, col %d\nMessage:%s\n"
       pos.Lexing.pos_lnum pos.Lexing.pos_cnum s
