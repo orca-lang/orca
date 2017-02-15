@@ -28,6 +28,7 @@ let add_line pos = { pos with
 		   }
 let add_word pos length = { pos with Lexing.pos_cnum = pos.Lexing.pos_cnum + length }
 
+let remove_set_ s = String.sub s 4 (String.length s - 4)
 let remove_set s = String.sub s 3 (String.length s - 3)
 
 let rec main_scanner pos = lexer
@@ -67,6 +68,7 @@ let rec main_scanner pos = lexer
   | "_" -> add_word pos (Ulexing.lexeme_length lexbuf), UNDERSCORE
   | "where" -> add_word pos (Ulexing.lexeme_length lexbuf), WHERE
   | "=" -> add_word pos (Ulexing.lexeme_length lexbuf), EQ
+  | "set_" numeral -> add_word pos (Ulexing.lexeme_length lexbuf), SET (int_of_string (remove_set_ (Ulexing.utf8_lexeme lexbuf)))
   | "set" numeral -> add_word pos (Ulexing.lexeme_length lexbuf), SET (int_of_string (remove_set (Ulexing.utf8_lexeme lexbuf)))
   | "set" -> add_word pos (Ulexing.lexeme_length lexbuf), SET 0
   | identifier -> add_word pos (Ulexing.lexeme_length lexbuf), IDENT (Ulexing.utf8_lexeme lexbuf)
