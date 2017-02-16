@@ -273,7 +273,7 @@ module Int = struct
 
   let rec subst ((x, es) : name * exp) (e : exp) :  exp =
     let f e = subst (x, es) e in
-    if List.mem x (fv e) then raise (Error.Violation "Duplicate variable name in substitution.") ;
+    if List.mem x (fv es) then raise (Error.Violation "Duplicate variable name in substitution.") ;
     match e with
     | Star -> Star
     | Set n ->  Set n
@@ -291,19 +291,19 @@ module Int = struct
        (* if List.mem y' (fv es) then raise (Error.Violation "Duplicate variable name would be captured.") ; *)
        Fn(y', subst (x, es) (refresh_free_var (y, y') e))
     | Lam (x, e) -> Lam(x, f e)
-    | App (e1, e2) -> Arr(f e1, f e1)
-    | AppL (e1, e2) -> Arr(f e1, f e1)
+    | App (e1, e2) -> App(f e1, f e2)
+    | AppL (e1, e2) -> AppL(f e1, f e2)
     | Const n -> Const n
     | Var n  when x = n -> refresh es
     | Var n -> Var n
     | BVar i -> BVar i
-    | Clos (e1, e2) -> Clos(f e1, f e1)
+    | Clos (e1, e2) -> Clos(f e1, f e2)
     | EmptyS -> EmptyS
     | Shift n -> Shift n
-    | Comma (e1, e2) -> Comma(f e1, f e1)
-    | Subst (e1, e2) -> Subst(f e1, f e1)
+    | Comma (e1, e2) -> Comma(f e1, f e2)
+    | Subst (e1, e2) -> Subst(f e1, f e2)
     | Nil -> Nil
-    | Annot (e1, e2) -> Annot(f e1, f e1)
+    | Annot (e1, e2) -> Annot(f e1, f e2)
     | Under -> Under
 
   (* Pretty printer -- could be prettier *)
