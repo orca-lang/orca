@@ -175,6 +175,7 @@ let rec pproc_pat (s : sign) cG cP =
     else
       raise (Error.Error "Bound variables bindings (:>) cannot be nested")
   | E.PUnder -> cG, I.PUnder
+  | E.PWildcard -> cG, I.PWildcard
 
 let pproc_def_decl s (pats, e) =
   let

@@ -5,7 +5,7 @@ open Syntax.Ext
 
 %}
 
-%token DATA SYN DEF MID RARR COLON SEMICOLON WHERE EQ UNDERSCORE
+%token DATA SYN DEF MID RARR COLON SEMICOLON WHERE EQ UNDERSCORE PATTERNWILD
 %token LPAREN RPAREN LCURLY RCURLY LSQUARE RSQUARE
 %token FN LAM APPL
 %token STAR ARR SARR TURNSTILE TTS (* term turnstile *)
@@ -15,7 +15,7 @@ open Syntax.Ext
 %token COMMA EMPTYS DOT NIL
 %token <int>SHIFT
 
-%nonassoc TURNSTILE TTS
+%nonassoc TURNSTILE TTS PATTERNWILD
 %nonassoc DOT RARR
 %left COMMA SEMICOLON
 %nonassoc COLON
@@ -87,7 +87,7 @@ simple_exp:
 | n = SHIFT {Shift n}
 | NIL {Nil}
 | UNDERSCORE {Under}
- 
+
 simple_pattern:
 | x = IDENT {PIdent x}
 | DOT e = simple_exp {Innac e}
@@ -96,6 +96,7 @@ simple_pattern:
 | n = SHIFT {PShift n}
 | NIL {PNil}
 | UNDERSCORE {PUnder}
+| PATTERNWILD  {PWildcard}
 
 pattern:
 | LAM x = IDENT DOT p = pattern {PLam (x, p)}

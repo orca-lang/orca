@@ -39,6 +39,7 @@ module Ext = struct
     | PComma of pat * pat
     | PBox of pat * pat
     | PUnder
+    | PWildcard                 (* Inaccessible pattern wildcard *)
 
   type pats = pat list
 
@@ -88,6 +89,7 @@ module Ext = struct
     | PNil -> "0"
     | PComma (p1, p2) -> "(, " ^ print_pat p1 ^ " " ^ print_pat p2 ^ ")"
     | PUnder -> "_"
+    | PWildcard -> "._"
 
 
   let print_decls decls = String.concat "\n" (List.map (fun (n, e) -> "(" ^ n ^ " " ^ print_exp e ^ ")") decls)
@@ -158,6 +160,7 @@ module Int = struct
     | PNil
     | PComma of pat * pat
     | PUnder
+    | PWildcard
 
   type pats = pat list
 
@@ -349,6 +352,7 @@ module Int = struct
     | PNil -> "0"
     | PComma (p1, p2) -> "(, " ^ print_pat p1 ^ " " ^ print_pat p1 ^ ")"
     | PUnder -> "_"
+    | PWildcard -> "._"
 
   let print_decls decls = String.concat "\n" (List.map (fun (n, e) -> "(" ^ n ^ " " ^ print_exp e ^ ")") decls )
   let print_pats pats = String.concat " " (List.map (fun p -> "(" ^ print_pat p ^ ")") (List.rev pats))

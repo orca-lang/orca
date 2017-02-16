@@ -71,6 +71,7 @@ let rec main_scanner pos = lexer
   | "set_" numeral -> add_word pos (Ulexing.lexeme_length lexbuf), SET (int_of_string (remove_set_ (Ulexing.utf8_lexeme lexbuf)))
   | "set" numeral -> add_word pos (Ulexing.lexeme_length lexbuf), SET (int_of_string (remove_set (Ulexing.utf8_lexeme lexbuf)))
   | "set" -> add_word pos (Ulexing.lexeme_length lexbuf), SET 0
+  | "._" -> add_word pos (Ulexing.lexeme_length lexbuf), PATTERNWILD
   | identifier -> add_word pos (Ulexing.lexeme_length lexbuf), IDENT (Ulexing.utf8_lexeme lexbuf)
 
 
