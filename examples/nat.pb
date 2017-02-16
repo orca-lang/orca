@@ -2,9 +2,6 @@ data nat where
 | zero: nat
 | suc: nat -> nat
 
-data big_nat : set_0 where
-| big_zero : big_nat
-| big_suc : big_nat -> big_nat
 
 data fin : nat -> * where
 | fZ : fin zero
@@ -13,15 +10,25 @@ data fin : nat -> * where
 def Z : nat = zero
 def 1 : nat = suc Z
 
+data list : * -> * where (*) no parameters here
+| nil: (A : *) -> list A
+| cons: (A : *) -> A -> list A -> list A
+
+def empty_nat_list : list nat = nil nat
+def unary_nat_list : list nat = cons nat 1 (nil nat)
+
+(* Big things ahead *)
+
+data big_nat : set_0 where
+| big_zero : big_nat
+| big_suc : big_nat -> big_nat
+
+
 def big_1 : big_nat = big_suc big_zero
 
-data list (A : set) : * where
-| nil: (A : set) -> list A
-| cons: (A : set) -> A -> list A -> list A
+data big_list (A : set) : * where (*) we use parameters here
+| big_nil: big_list A
+| big_cons: A -> big_list A -> big_list A
 
-data big_list (A : set) : * where
-| big_nil: (A : set) -> big_list A
-| big_cons: (A : set) -> A -> big_list A -> big_list A
-
-def big_empty_nat_list : big_list big_nat = big_nil big_nat
-def big_unary_nat_list : big_list big_nat = big_cons big_nat big_1 (big_nil big_nat)
+def big_empty_nat_list : big_list big_nat = big_nil
+def big_unary_nat_list : big_list big_nat = big_cons big_1 big_nil
