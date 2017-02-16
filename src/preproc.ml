@@ -49,24 +49,24 @@ let add_name_ctx c n = let nn = I.gen_name n in ((n, nn) :: c), nn
 let add_name_bvar c n : bctx = n :: c
 
 let isEmpty = (=) []
-                 
+
 let find_pat_name (s : sign) (cG : ctx) (cP : bctx) (n : E.name) : ctx * I.pat =
     begin
       match index n cP with
       | Some i -> cG, I.PBVar i
-      | None -> 
+      | None ->
         if List.mem n s then
           cG, I.PConst (n, [])
         else
           begin
             match lookup n cG with
             | Some _ -> raise (Error.Error ("Repeated variable " ^ n ^ " in pattern spine"))
-            | None -> 
+            | None ->
               let cG', n' = add_name_ctx cG n in
               cG', I.PVar n'
           end
     end
-                 
+
 let rec get_bound_var_ctx (e: E.exp) : bctx =
   match e with
   | E.Comma (g, E.Annot(E.Ident n, _)) -> n :: (get_bound_var_ctx g)
@@ -127,9 +127,9 @@ let rec pproc_exp (s : sign) (cG : ctx) (cP : bctx) : E.exp -> I.exp =
   | E.Nil -> I.Nil
   | E.Annot (e1, e2) -> I.Annot(f e1, f e2)
   | E.Under -> I.Under
-    
-let pproc_decl s (n, e) =
-  add_name_sign s n, (n, pproc_exp s [] [] e)
+
+let pproc_decl s cG (n, e) =
+  add_name_sign s n, (n, pproc_exp s cG [] e)
 
 let pproc_param s cG (icit, n, e) =
   let cG', n' = add_name_ctx cG n in
@@ -143,7 +143,7 @@ let rec pproc_pat (s : sign) cG cP =
   | E.PLam (x, p) ->
     let cG', p' = pproc_pat s cG (add_name_bvar cP x) p in
     cG', I.PLam (x,  p')
-  | E.PConst (c, ps) -> 
+  | E.PConst (c, ps) ->
     let g (cG, ps) p =
       let cG', p' = pproc_pat s cG cP p in
       cG', p' :: ps
@@ -175,25 +175,29 @@ let rec pproc_pat (s : sign) cG cP =
     else
       raise (Error.Error "Bound variables bindings (:>) cannot be nested")
   | E.PUnder -> cG, I.PUnder
-        
+
 let pproc_def_decl s (pats, e) =
   let
     cG', pats' = List.fold_left (fun (cG, pats) pat -> let cG', pat' = pproc_pat s cG [] pat in cG', (pat'::pats)) ([], []) pats
   in
   (pats', pproc_exp s cG' [] e)
 
+let params_to_ctx = List.map2 (fun (_, n, _) (_, n', _) -> n, n')
+
 let pre_process s = function
   | E.Data (n, ps, e, ds) ->
      let _, ps' = List.fold_left (fun (cG, ps) p -> let cG', p' = pproc_param s cG p in cG', (p'::ps)) ([], []) ps in
-     let e' = pproc_exp s [] [] e in
+     let cG = params_to_ctx ps ps' in
+     let e' = pproc_exp s cG [] e in
      let s' = add_name_sign s n in
-     let s'', ds' = List.fold_left (fun (s, dos) d -> let ss, dd = pproc_decl s d in ss, (dd :: dos)) (s', []) ds in
+     let s'', ds' = List.fold_left (fun (s, dos) d -> let ss, dd = pproc_decl s cG d in ss, (dd :: dos)) (s', []) ds in
      s'', I.Data (n, ps', e', ds')
   | E.Syn (n, ps, e, ds) ->
      let _, ps' = List.fold_left (fun (cG, ps) p -> let cG', p' = pproc_param s cG p in cG', (p'::ps)) ([], []) ps in
-     let e' = pproc_exp s [] [] e in
+     let cG = params_to_ctx ps ps' in
+     let e' = pproc_exp s cG [] e in
      let s' = add_name_sign s n in
-     let s'', ds' = List.fold_left (fun (s, dos) d -> let ss, dd = pproc_decl s d in ss, (dd :: dos)) (s', []) ds in
+     let s'', ds' = List.fold_left (fun (s, dos) d -> let ss, dd = pproc_decl s cG d in ss, (dd :: dos)) (s', []) ds in
      s'', I.Syn (n, ps', e', ds')
   | E.DefPM (n, e, ds) ->
      let s' = add_name_sign s n in

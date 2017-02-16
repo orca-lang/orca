@@ -271,9 +271,10 @@ module Int = struct
   (* TODO: do the refreshing while substituting, otherwise it
      might be really slow. *)
 
+  let print_name (n, i) = n ^ "_" ^ string_of_int i
+
   let rec subst ((x, es) : name * exp) (e : exp) :  exp =
     let f e = subst (x, es) e in
-    if List.mem x (fv es) then raise (Error.Violation "Duplicate variable name in substitution.") ;
     match e with
     | Star -> Star
     | Set n ->  Set n
@@ -306,9 +307,10 @@ module Int = struct
     | Annot (e1, e2) -> Annot(f e1, f e2)
     | Under -> Under
 
-  (* Pretty printer -- could be prettier *)
+  let subst_list sigma e =
+    List.fold_left (fun e s -> subst s e) e sigma
 
-  let print_name (n, i) = n ^ "_" ^ string_of_int i
+  (* Pretty printer -- could be prettier *)
 
   let rec print_exp = function
     | Star -> "*"

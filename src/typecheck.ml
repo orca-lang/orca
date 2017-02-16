@@ -55,7 +55,7 @@ let rec infer (sign, cG : signature * ctx) (e : exp) : exp =
      | Pi (Some n, s, t) ->
         check (sign, cG) e2 s ;
         subst (n, e2) t
-     | _ -> raise (Error.Error "Unexpected type")
+     | _ -> raise (Error.Error "The left hand side of the application was not of function type")
      end
 
   | Star -> Set 0
@@ -95,38 +95,15 @@ let rec infer (sign, cG : signature * ctx) (e : exp) : exp =
        raise (Error.Error "Cannot infer the type of this expression")
      end
     end in
-  Debug.print(fun() -> "Result for " ^ print_exp e ^ " was " ^ print_exp res) ;
+  Debug.print(fun() -> "Result of infer for " ^ print_exp e ^ " was " ^ print_exp res) ;
   res
 
 and check (sign , cG : signature * ctx) (e : exp) (t : exp) : unit =
-  match e, Whnf.whnf t with
+  Debug.print (fun () ->
+      let string_ctx = ">>>" ^ (String.concat "," (List.map (fun (x, e) -> print_name x ^ ": " ^ print_exp e) cG)) ^ "<<<" in
+      "Check called with: " ^ print_exp e ^ ":" ^ print_exp t ^ " in context: " ^ string_ctx );
+  begin match e, Whnf.whnf t with
   (* types and checkable terms *)
-  (* | Star, Set 0 -> () *)
-  (* | Set n, Set n' -> *)
-  (*    if n+1 = n' then ()        (\* Non cummulative universes *\) *)
-  (*    else raise (Error.Error "Wrong universe. That's a huge mistake fella!") *)
-  (* | Pi (Some x, s, t), Star -> *)
-  (*    let _ = infer_universe (sign, cG) s in *)
-  (*    check (sign, (x , s) :: cG) t Star *)
-
-  (* | Pi (Some x, s, t), u -> *)
-  (*    let n' = infer_universe (sign, cG) s in *)
-  (*    if le_universe n' u *)
-  (*    then check (sign, (x , s) :: cG) t u *)
-  (*    else raise (Error.Error "Size problem in a Π type.") *)
-
-  (* | Pi (None, s, t), Star -> *)
-  (*    let _ = infer_universe (sign, cG) s in *)
-  (*    check (sign, cG) t Star *)
-  (* | Pi (None, s, t), u -> *)
-  (*    let n' = infer_universe (sign, cG) s in *)
-  (*    if le_universe n' u *)
-  (*    then check (sign, cG) t u *)
-  (*    else raise (Error.Error "Size problem in a function type.") *)
-
-  (* | Box (ctx, e), Star  -> *)
-  (*    (\* TODO: only if ctx is a context and e is a syntactic type *\) *)
-  (*    () *)
 
   | Fn (f, e), Pi(None, s, t) ->
      check (sign, (f, s)::cG) e t
@@ -148,18 +125,28 @@ and check (sign , cG : signature * ctx) (e : exp) (t : exp) : unit =
   | _ ->
      let t' =
        try infer (sign, cG) e
-       with Error.Error _ -> raise (Error.Error "Cannot check expression")
+       with Error.Error msg ->
+         Debug.print_string msg;
+         raise (Error.Error "Cannot check expression")
      in
-     if Eq.eq t t' then ()
-     else
+     try
+       let sigma = Unify.unify t t' in
+       Debug.print (fun () -> "Unification for " ^ print_exp t ^ " with " ^ print_exp t' ^ " succeeded with substitution "
+                            ^ Unify.print_subst sigma ^ ".")
+     with
+     | Error.Error msg ->
        let string_e = print_exp e in
        let string_t = print_exp t in
        let string_t' = print_exp t' in
        let message = "Expression: " ^ string_e
                      ^ "\nwas inferred type: " ^ string_t'
-                     ^ "\nwhich is not equal to: " ^ string_t ^ " that was checked against."
+                     ^ "\nwhich is not equal to: " ^ string_t ^ " that was checked against.\n\nUnification failed with " ^ msg
        in
+       Debug.print_string message;
        raise (Error.Error ("Term's inferred type is not equal to checked type.\n" ^ message))
+  end ;
+  Debug.print (fun() -> "Finished check for " ^ print_exp e) ;
+  ()
 
 let tc_constructor (sign : signature) (universe : exp) (n , ct : def_name * exp) : unit =
   Debug.print_string ("Typechecking constructor: " ^ n) ;
@@ -177,11 +164,12 @@ let tc_constructor (sign : signature) (universe : exp) (n , ct : def_name * exp)
 
 let tc_program (sign : signature) : program -> signature = function
   | Data (n, ps, e, ds) ->
-     let t = List.fold_left (fun t2 (_, n, t1) -> Pi(Some n, t1, t2)) e ps in
+     let add_params e = List.fold_left (fun t2 (_, n, t1) -> Pi(Some n, t1, t2)) e ps in
+     let t = add_params e in
      Debug.print_string ("Typechecking data declaration: " ^ n ^ ":" ^ print_exp t ^ "\n");
      let u = assert_universe (infer (sign, []) t) in
      let sign' = (n,t)::sign in
-     let _ = List.map (fun decl -> tc_constructor sign' u decl) ds in
+     let _ = List.map (fun (n, ct) -> tc_constructor sign' u (n, add_params ct)) ds in
      ds @ sign'
 
   | Syn (n, ps, e, ds) ->
