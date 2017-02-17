@@ -5,7 +5,7 @@ open Signature
 let rec whnf (sign : signature) : exp -> exp = function
   | Const n ->
      begin match lookup_sign_def n sign with
-     | Some e -> e
+     | Some e -> Annot (e, lookup_sign n sign)
      | None -> Const n
      end
   | App(Const n, e) ->
