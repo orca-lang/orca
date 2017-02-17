@@ -1,29 +1,5 @@
 open Syntax.Int
-
-type signature_entry
-  = Definition of def_name * exp * exp (* the name, the type, and the definition *)
-  | Constructor of def_name * exp
-
-type signature = signature_entry list
-
-let rec lookup_sign_entry (n : def_name) (sign : signature) : signature_entry =
-  let el = function
-    | Definition (n', _, _)
-      | Constructor (n', _) -> n = n'
-  in
-    try
-      List.find el sign
-    with Not_found ->
-      raise (Error.Violation ("Unable to find " ^ n ^ " in the signature"))
-
-let lookup_sign n sign =
-  match lookup_sign_entry n sign with
-  | Definition (_, t, _) -> t
-  | Constructor (_, t) -> t
-
-type ctx = (name * exp) list
-
-let print_ctx c = "[" ^ (String.concat "," (List.map (fun (x, e) -> print_name x ^ ": " ^ print_exp e) c)) ^ "]"
+open Signature
 
 let max_universe (e1 : exp) (e2 : exp) : exp =
   match e1, e2 with
@@ -110,7 +86,7 @@ let rec infer (sign, cG : signature * ctx) (e : exp) : exp =
 and check (sign , cG : signature * ctx) (e : exp) (t : exp) : unit =
   Debug.print (fun () ->
       "Check called with: " ^ print_exp e ^ ":" ^ print_exp t ^ " in context: " ^ print_ctx cG);
-  begin match e, Whnf.whnf t with
+  begin match e, Whnf.whnf (sign, cG) t with
   (* types and checkable terms *)
 
   | Fn (f, e), Pi(None, s, t) ->
