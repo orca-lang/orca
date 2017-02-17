@@ -26,7 +26,7 @@ let set_print_external, get_print_external =
   (fun () -> print := true),
   (fun () -> !print)
 
-let set_run_tc, get_run_tc =
+let set_parse_only, get_parse_only =
   let print = ref false in
   (fun () -> print := true),
   (fun () -> !print)
@@ -35,7 +35,7 @@ let set_run_tc, get_run_tc =
 let usage_msg = "Bears ahead"
 let file = ref ""
 let args = [("-ext", Arg.Unit set_print_external, "Print external syntax before preprocessing.")
-           ;("-tc", Arg.Unit set_run_tc, "Run the incomplete typechecker.")
+           ;("-po", Arg.Unit set_parse_only, "Only parse and preprocess the input (Do not run the typechecker).")
            ;("-debug", Arg.Unit Debug.set_debug_on, "Generates a log file with information about the file that was checked")
            ]
 
@@ -74,11 +74,11 @@ let () =
     print_string ("* The internal tree is:\n" ^ int_pp ^ "\n");
     Debug.print (fun () -> "The internal tree is:\n" ^ int_pp ^ "\n");
 
-    if get_run_tc () then begin
+    if not (get_parse_only ()) then begin
            Debug.print_string "Starting typechecking." ;
             let _sign' = List.fold_left Typecheck.tc_program [] int_rep in
             Debug.print_string "The file was typechecked.";
-            print_string "Typechecked."
+            print_string "File type-checked successfully.\n"
       end;
   with
   | Syntax_error pos ->

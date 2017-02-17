@@ -2,7 +2,10 @@
 
 for f in examples/*
 do
-    echo $f
-    ./orca.byte $f
-    echo "---------------"
+    if [ -f $f ]
+    then
+	echo $f
+	./orca.byte $f
+	echo "---------------"
+    fi
 done
