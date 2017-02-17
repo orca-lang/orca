@@ -221,8 +221,8 @@ module Int = struct
          Fn (x', refresh ((x, x')::rep) e)
       | Lam (x, e) ->
          Lam(x, f e)
-      | App (e1, e2) -> Arr(f e1, f e1)
-      | AppL (e1, e2) -> Arr(f e1, f e1)
+      | App (e1, e2) -> App(f e1, f e2)
+      | AppL (e1, e2) -> AppL(f e1, f e2)
       | Const n -> Const n
       | Var n ->
          (try
@@ -230,13 +230,13 @@ module Int = struct
          with
            Not_found -> Var n)
       | BVar i -> BVar i
-      | Clos (e1, e2) -> Clos(f e1, f e1)
+      | Clos (e1, e2) -> Clos(f e1, f e2)
       | EmptyS -> EmptyS
       | Shift n -> Shift n
-      | Comma (e1, e2) -> Comma(f e1, f e1)
-      | Subst (e1, e2) -> Subst(f e1, f e1)
+      | Comma (e1, e2) -> Comma(f e1, f e2)
+      | Subst (e1, e2) -> Subst(f e1, f e2)
       | Nil -> Nil
-      | Annot (e1, e2) -> Annot(f e1, f e1)
+      | Annot (e1, e2) -> Annot(f e1, f e2)
       | Under -> Under
     in
     refresh [] e
@@ -254,19 +254,19 @@ module Int = struct
     | Fn (n, _) when n = x -> raise (Error.Violation "Duplicate variable name")
     | Fn (x, e) -> Fn (x, f e)
     | Lam (x, e) -> Lam(x, f e)
-    | App (e1, e2) -> Arr(f e1, f e1)
-    | AppL (e1, e2) -> Arr(f e1, f e1)
+    | App (e1, e2) -> App(f e1, f e2)
+    | AppL (e1, e2) -> AppL(f e1, f e2)
     | Const n -> Const n
     | Var n when n = x -> Var y
     | Var n -> Var n
     | BVar i -> BVar i
-    | Clos (e1, e2) -> Clos(f e1, f e1)
+    | Clos (e1, e2) -> Clos(f e1, f e2)
     | EmptyS -> EmptyS
     | Shift n -> Shift n
-    | Comma (e1, e2) -> Comma(f e1, f e1)
-    | Subst (e1, e2) -> Subst(f e1, f e1)
+    | Comma (e1, e2) -> Comma(f e1, f e2)
+    | Subst (e1, e2) -> Subst(f e1, f e2)
     | Nil -> Nil
-    | Annot (e1, e2) -> Annot(f e1, f e1)
+    | Annot (e1, e2) -> Annot(f e1, f e2)
     | Under -> Under
 
   (* Substitution of regular variables *)
