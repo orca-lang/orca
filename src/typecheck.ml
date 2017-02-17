@@ -86,7 +86,7 @@ let rec infer (sign, cG : signature * ctx) (e : exp) : exp =
 and check (sign , cG : signature * ctx) (e : exp) (t : exp) : unit =
   Debug.print (fun () ->
       "Check called with: " ^ print_exp e ^ ":" ^ print_exp t ^ " in context: " ^ print_ctx cG);
-  begin match e, Whnf.whnf (sign, cG) t with
+  begin match e, Whnf.whnf sign t with
   (* types and checkable terms *)
 
   | Fn (f, e), Pi(None, s, t) ->
@@ -114,7 +114,7 @@ and check (sign , cG : signature * ctx) (e : exp) (t : exp) : unit =
          raise (Error.Error "Cannot check expression")
      in
      try
-       let sigma = Unify.unify t t' in
+       let sigma = Unify.unify sign t t' in
        Debug.print (fun () -> "Unification for " ^ print_exp t ^ " with " ^
                                 print_exp t' ^ " succeeded with substitution "
                                 ^ Unify.print_subst sigma ^ ".")
