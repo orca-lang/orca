@@ -63,7 +63,7 @@ module Ext = struct
     | TBox (ctx, e) -> "(:> " ^ print_exp ctx ^ " " ^ print_exp e ^ ")"
     | Fn (f, e) -> "(fn " ^ f ^ " " ^ print_exp e ^ ")"
     | Lam (f, e) -> "(\ " ^ f ^ " " ^ print_exp e ^ ")"
-    | App (e1, e2) -> "(app " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
+    | App (e1, e2) -> "(" ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
     | AppL (e1, e2) -> "(' " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
     | Ident n -> n
     | Clos (e1, e2) -> "([] " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
@@ -79,7 +79,7 @@ module Ext = struct
     | PIdent n -> n
     | Innac e -> "(. " ^ print_exp e ^ ")"
     | PLam (f, p) -> "(\ " ^ f ^ " " ^ print_pat p ^ ")"
-    | PConst (n, ps) -> "(Const " ^ n ^ " " ^ (String.concat " " (List.map (fun p -> "(" ^ print_pat p ^ ")") ps)) ^ ")"
+    | PConst (n, ps) -> "(" ^ n ^ " " ^ (String.concat " " (List.map (fun p -> "(" ^ print_pat p ^ ")") ps)) ^ ")"
     | PAnnot (p, e) -> "(: " ^ print_pat p ^ " " ^ print_exp e ^ ")"
     | PClos (n, p) -> "([] " ^ n ^ " " ^ print_pat p ^ ")"
     | PBox (p1, p2) -> "(:> " ^ print_pat p1 ^ " " ^ print_pat p2 ^ ")"
@@ -324,7 +324,7 @@ module Int = struct
     | Box (ctx, e) -> "(|- " ^ print_exp ctx ^ " " ^ print_exp e ^ ")"
     | Fn (f, e) -> "(fn " ^ print_name f ^ " " ^ print_exp e ^ ")"
     | Lam (f, e) -> "(\ " ^ f ^ " " ^ print_exp e ^ ")"
-    | App (e1, e2) -> "(app " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
+    | App (e1, e2) -> "(" ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
     | AppL (e1, e2) -> "(' " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
     | Const n -> n
     | Var n -> print_name n
@@ -343,7 +343,7 @@ module Int = struct
     | PBVar i -> "(i " ^ string_of_int i ^ ")"
     | Innac e -> "(. " ^ print_exp e ^ ")"
     | PLam (f, p) -> "(\ " ^ f ^ " " ^ print_pat p ^ ")"
-    | PConst (n, ps) -> "(Const " ^ n ^ " " ^ (String.concat " " (List.map (fun p -> "(" ^ print_pat p ^ ")") ps)) ^ ")"
+    | PConst (n, ps) -> "(" ^ n ^ " " ^ (String.concat " " (List.map (fun p -> "(" ^ print_pat p ^ ")") ps)) ^ ")"
     | PAnnot (p, e) -> "(: " ^ print_pat p ^ " " ^ print_exp e ^ ")"
     | PClos (n, p) -> "([] " ^ print_name n ^ " " ^ print_pat p ^ ")"
     | PEmptyS -> "^"
