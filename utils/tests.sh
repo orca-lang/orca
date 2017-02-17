@@ -3,6 +3,6 @@
 for f in examples/*
 do
     echo $f
-    ./nanuq.byte $f
+    ./orca.byte $f
     echo "---------------"
 done

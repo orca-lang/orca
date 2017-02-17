@@ -4,7 +4,7 @@ module Menhir = MenhirLib.Convert.Simplified
 exception Syntax_error of Lexing.position
 exception Scanning_error of Lexing.position * string
 
-let file_name = "nanuq"
+let file_name = "orca"
 
 let parse menhir_parser lexbuf =
   let position = ref (Lexer.initial_pos file_name) in

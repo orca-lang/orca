@@ -2,7 +2,7 @@ OCAMLBUILD = ocamlbuild -use-ocamlfind -yaccflags --infer
 
 default:
 	utils/menhir-clean.sh
-	$(OCAMLBUILD) src/nanuq.byte
+	$(OCAMLBUILD) src/orca.byte
 
 test: default
 	utils/tests.sh
