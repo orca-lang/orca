@@ -23,7 +23,7 @@ let lookup_sign n sign =
 
 let lookup_sign_def n sign =
   match lookup_sign_entry n sign with
-  | Definition (_, _, e) -> Some e
+  | Definition (_, t, e) -> Some (Annot(e, t))
   | Constructor _ -> None
 
 type ctx = (name * exp) list
