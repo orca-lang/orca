@@ -11,11 +11,11 @@ let rec whnf (sign : signature) (e : exp) : exp =
      | Some e -> whnf sign e
      | None -> Const n
      end
-  | App(e, e') ->
-     begin match whnf sign e with
-     | Fn(x, e) -> whnf sign (subst (x, e') e) (* Beta reduction *)
-     | e -> e
-     end
+  | App(e, e') -> assert false
+  (*    begin match whnf sign e with *)
+  (*    | Fn(x, e) -> whnf sign (subst (x, e') e) (\* Beta reduction *\) *)
+  (*    | e -> e *)
+  (*    end *)
   | Annot(e, _) -> e
 
   | e -> e (* No reduction necessary *)

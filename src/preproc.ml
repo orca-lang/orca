@@ -94,10 +94,9 @@ let rec pproc_exp (s : sign) (cG : ctx) (cP : bctx) : E.exp -> I.exp =
   function
   | E.Star -> I.Star
   | E.Set n -> I.Set n
-  | E.Arr (E.Annot (E.Ident n, t0), t1) ->
-     let cG', n' = add_name_ctx cG n in
-     I.Pi (Some n', f t0, pproc_exp s cG' cP t1)
-  | E.Arr (s, t) -> I.Pi(None, f s, f t)
+  | E.Arr (t0, t1) ->
+     let tel, t' = pproc_tel s cG cP (E.Arr (t0, t1)) in
+     I.Pi (tel, t')
   | E.SArr (s, t) -> I.Arr(f s, f t)
   | E.Box (g, e) ->
     if isEmpty cP then
@@ -116,7 +115,9 @@ let rec pproc_exp (s : sign) (cG : ctx) (cP : bctx) : E.exp -> I.exp =
      I.Fn(n', pproc_exp s cG' cP e)
   | E.Lam (n, e) ->
      I.Lam(n, pproc_exp s cG (add_name_bvar cP n) e)
-  | E.App (e1, e2) -> I.App(f e1, f e2)
+  | E.App (e1, e2) ->
+     let h, sp = pproc_app s cG cP (E.App(e1, e2)) in
+     I.App(h, sp)
   | E.AppL (e1, e2) -> I.AppL(f e1, f e2)
   | E.Ident n -> find_name s cG cP n
   | E.Clos (e, s) -> I.Clos(f e, f s)
@@ -127,6 +128,24 @@ let rec pproc_exp (s : sign) (cG : ctx) (cP : bctx) : E.exp -> I.exp =
   | E.Nil -> I.Nil
   | E.Annot (e1, e2) -> I.Annot(f e1, f e2)
   | E.Under -> I.Under
+
+and pproc_tel (s : sign) (cG : ctx) (cP : bctx) : E.exp -> I.tel * I.exp =
+  function
+  | E.Arr (E.Annot (E.Ident n, t0), t1) ->
+     let cG', n' = add_name_ctx cG n in
+     let tel, t = pproc_tel s cG' cP t1 in
+     I.Named (n', pproc_exp s cG cP t0) :: tel, t
+  | E.Arr (t0, t1) ->
+     let tel, t = pproc_tel s cG cP t1 in
+     I.Unnamed (pproc_exp s cG cP t0) :: tel , t
+  | t -> [], pproc_exp s cG cP t
+
+and pproc_app (s : sign) (cG : ctx) (cP : bctx) : E.exp -> I.exp * I.exp list =
+  function
+  | E.App(e1, e2) ->
+     let h, sp = pproc_app s cG cP e1 in
+     h, sp @[pproc_exp s cG cP e2]
+  | e -> pproc_exp s cG cP e, []
 
 let pproc_decl s cG (n, e) =
   add_name_sign s n, (n, pproc_exp s cG [] e)

@@ -39,36 +39,37 @@ let rec infer (sign, cG : signature * ctx) (e : exp) : exp =
          raise (Error.Violation
                   ("Unbound var after preprocessing, this cannot happen. (Var: " ^ print_name n ^ ")"))
      end
-    | App (e1, e2) ->
-     begin match infer (sign, cG) e1 with
-     | Pi (None, s, t) ->
-        check (sign, cG) e2 s ;
-        t
-     | Pi (Some n, s, t) ->
-        check (sign, cG) e2 s ;
-        subst (n, e2) t
-     | _ -> raise (Error.Error "The left hand side of the application was not of function type")
-     end
+    | App (e1, e2) -> assert false
+     (* begin match infer (sign, cG) e1 with *)
+     (* | Pi (None, s, t) -> *)
+     (*    check (sign, cG) e2 s ; *)
+     (*    t *)
+     (* | Pi (Some n, s, t) -> *)
+     (*    check (sign, cG) e2 s ; *)
+     (*    subst (n, e2) t *)
+     (* | _ -> raise (Error.Error "The left hand side of the application was not of function type") *)
+     (* end *)
 
   | Star -> Set 0
   | Set n -> Set (n + 1)
-  | Pi (Some x, s, t) ->
-     let ts = assert_universe (infer (sign, cG) s) in
-     let tt = assert_universe (infer (sign, (x , s) :: cG) t) in
-     begin match tt with
-     | Star -> Star             (* Star is impredicative. *)
-     | Set n -> max_universe ts tt
-     | _ -> raise (Error.Violation "Impossible case, we asserted universe!")
-     end
+  (* | Pi (Some x, s, t) -> *)
+  (*    let ts = assert_universe (infer (sign, cG) s) in *)
+  (*    let tt = assert_universe (infer (sign, (x , s) :: cG) t) in *)
+  (*    begin match tt with *)
+  (*    | Star -> Star             (\* Star is impredicative. *\) *)
+  (*    | Set n -> max_universe ts tt *)
+  (*    | _ -> raise (Error.Violation "Impossible case, we asserted universe!") *)
+  (*    end *)
 
-  | Pi (None, s, t) ->
-     let ts = assert_universe (infer (sign, cG) s) in
-     let tt = assert_universe (infer (sign, cG) t) in
-     begin match tt with
-     | Star -> Star             (* Star is impredicative. *)
-     | Set n -> max_universe ts tt
-     | _ -> raise (Error.Violation "Impossible case, we asserted universe!")
-     end
+  (* | Pi (None, s, t) -> *)
+  (*    let ts = assert_universe (infer (sign, cG) s) in *)
+  (*    let tt = assert_universe (infer (sign, cG) t) in *)
+  (*    begin match tt with *)
+  (*    | Star -> Star             (\* Star is impredicative. *\) *)
+  (*    | Set n -> max_universe ts tt *)
+  (*    | _ -> raise (Error.Violation "Impossible case, we asserted universe!") *)
+  (*    end *)
+  | Pi (tel, t) -> assert false
 
   | Box (ctx, e) ->
      (* TODO: only if ctx is a context and e is a syntactic type *)
@@ -92,10 +93,11 @@ and check (sign , cG : signature * ctx) (e : exp) (t : exp) : unit =
   begin match e, Whnf.whnf sign t with
   (* types and checkable terms *)
 
-  | Fn (f, e), Pi(None, s, t) ->
-     check (sign, (f, s)::cG) e t
-  | Fn (f, e), Pi(Some n, s, t) ->
-     check (sign, (f, s)::cG) e (subst (n, Var f) t)
+  (* | Fn (f, e), Pi(None, s, t) -> *)
+  (*    check (sign, (f, s)::cG) e t *)
+  (* | Fn (f, e), Pi(Some n, s, t) -> *)
+  (*    check (sign, (f, s)::cG) e (subst (n, Var f) t) *)
+  | Fn (f, e), _ -> assert false
 
   (* terms from the syntactic framework *)
   | Lam (f, e), _ -> assert false
@@ -156,13 +158,14 @@ let decls_to_constructors = List.map (fun (n, e) -> Constructor (n, e))
 
 let tc_program (sign : signature) : program -> signature = function
   | Data (n, ps, e, ds) ->
-     let add_params e = List.fold_left (fun t2 (_, n, t1) -> Pi(Some n, t1, t2)) e ps in
-     let t = add_params e in
-     Debug.print_string ("Typechecking data declaration: " ^ n ^ ":" ^ print_exp t ^ "\n");
-     let u = assert_universe (infer (sign, []) t) in
-     let sign' = (Constructor(n,t))::sign in
-     let _ = List.map (fun (n, ct) -> tc_constructor sign' u (n, add_params ct)) ds in
-     (decls_to_constructors ds) @ sign'
+     (* let add_params e = List.fold_left (fun t2 (_, n, t1) -> Pi(Some n, t1, t2)) e ps in *)
+     (* let t = add_params e in *)
+     (* Debug.print_string ("Typechecking data declaration: " ^ n ^ ":" ^ print_exp t ^ "\n"); *)
+     (* let u = assert_universe (infer (sign, []) t) in *)
+     (* let sign' = (Constructor(n,t))::sign in *)
+     (* let _ = List.map (fun (n, ct) -> tc_constructor sign' u (n, add_params ct)) ds in *)
+  (* (decls_to_constructors ds) @ sign' *)
+     assert false
 
   | Syn (n, ps, e, ds) ->
      Debug.print_string ("Typechecking syn declaration: " ^ n);

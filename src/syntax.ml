@@ -124,15 +124,17 @@ module Int = struct
 
   let refresh_name (s, _) = (s, gen_sym())
 
+  let (--) l n = List.filter ((!=) n) l
+
   type exp =
     | Star
     | Set of int
-    | Pi of name option * exp * exp (* A pi type *)
-    | Arr of exp * exp       (* A syntactic type *)
+    | Pi of tel * exp  (* A pi type *)
+    | Arr of exp * exp (* A syntactic type *)
     | Box of exp * exp
     | Fn of name * exp
     | Lam of string * exp
-    | App of exp * exp
+    | App of exp * exp list
     | AppL of exp * exp
     | Const of def_name (* The name of a constant *)
     | Var of name
@@ -145,6 +147,12 @@ module Int = struct
     | Nil
     | Annot of exp * exp
     | Under
+
+   and tel_entry
+     = Named of name * exp
+     | Unnamed of exp
+
+   and tel = tel_entry list
 
   type pat =
     | PVar of name
@@ -177,17 +185,15 @@ module Int = struct
     | Def of def_name * exp * exp
 
   let rec fv =
-    let (--) l n = List.filter ((!=) n) l in
     function
     | Star -> []
     | Set n ->  []
-    | Pi (Some n, s, t) -> fv s @ (fv t -- n)
-    | Pi (None, s, t) -> fv s @ fv t
+    | Pi (tel, t) ->fv_tel tel t
     | Arr (t, e) -> fv t @ fv e
     | Box (ctx, e) -> fv ctx @ fv e
     | Fn (x, e) -> (fv e -- x)
     | Lam (x, e) -> fv e
-    | App (e1, e2) -> fv e1 @ fv e2
+    | App (e1, es) -> fv e1 @ List.concat (List.map fv es)
     | AppL (e1, e2) -> fv e1 @ fv e2
     | Const n -> []
     | Var n -> [n]
@@ -201,6 +207,11 @@ module Int = struct
     | Annot (e1, e2) -> fv e1 @ fv e2
     | Under -> []
 
+  and fv_tel (tel : tel) (t : exp) = match tel with
+    | [] -> fv t
+    | Named(n, e)::tel -> fv e @ (fv_tel tel t -- n)
+    | Unnamed e :: tel -> fv e @ fv_tel tel t
+
   (* Generate fresh names for all the bound variables,
      to keep names unique *)
 
@@ -210,10 +221,7 @@ module Int = struct
       function
       | Star -> Star
       | Set n ->  Set n
-      | Pi (Some n, s, t) ->
-         let n' = refresh_name n in
-         Pi (Some n', s, refresh ((n, n')::rep) t)
-      | Pi (None, s, t) -> Pi (None, f s, f t)
+      | Pi (tel, t) -> let tel', t' = refresh_tel rep tel t in Pi(tel', t')
       | Arr (t, e) -> Arr(f t, f e)
       | Box (ctx, e) -> Box(f ctx, f e)
       | Fn (x, e) ->
@@ -221,7 +229,7 @@ module Int = struct
          Fn (x', refresh ((x, x')::rep) e)
       | Lam (x, e) ->
          Lam(x, f e)
-      | App (e1, e2) -> App(f e1, f e2)
+      | App (e1, es) -> App(f e1, List.map f es)
       | AppL (e1, e2) -> AppL(f e1, f e2)
       | Const n -> Const n
       | Var n ->
@@ -238,6 +246,18 @@ module Int = struct
       | Nil -> Nil
       | Annot (e1, e2) -> Annot(f e1, f e2)
       | Under -> Under
+
+    and refresh_tel (rep : (name * name) list) (tel : tel) (t : exp) : tel * exp =
+      match tel with
+      | [] -> [], refresh rep t
+      | Named (n, e) :: tel ->
+         let n' = refresh_name n in
+         let tel', t' = refresh_tel ((n, n')::rep) tel t in
+         (Named (n', refresh rep e)::tel'), t'
+      | Unnamed e :: tel ->
+         let tel', t' = refresh_tel rep tel t in
+         ((Unnamed (refresh rep e)) :: tel'), t
+
     in
     refresh [] e
 
@@ -247,14 +267,15 @@ module Int = struct
     match e with
     | Star -> Star
     | Set n ->  Set n
-    | Pi (Some n, _, _) when n = x -> raise (Error.Violation "Duplicate variable name")
-    | Pi (n, s, t) -> Pi (n, f s, f t)
+    | Pi (tel, t) ->
+       let tel', t' = refresh_free_var_tel (x, y) tel t in
+       Pi (tel', t')
     | Arr (t, e) -> Arr(f t, f e)
     | Box (ctx, e) -> Box(f ctx, f e)
     | Fn (n, _) when n = x -> raise (Error.Violation "Duplicate variable name")
     | Fn (x, e) -> Fn (x, f e)
     | Lam (x, e) -> Lam(x, f e)
-    | App (e1, e2) -> App(f e1, f e2)
+    | App (e1, es) -> App(f e1, List.map f es)
     | AppL (e1, e2) -> AppL(f e1, f e2)
     | Const n -> Const n
     | Var n when n = x -> Var y
@@ -268,6 +289,17 @@ module Int = struct
     | Nil -> Nil
     | Annot (e1, e2) -> Annot(f e1, f e2)
     | Under -> Under
+  and refresh_free_var_tel (x, y) tel t =
+    match tel with
+    | [] -> [], refresh_free_var (x, y) t
+    | Named (n, e) :: tel when n = x ->  raise (Error.Violation "Duplicate variable name")
+    | Named (n, e) :: tel ->
+       let tel', t' = refresh_free_var_tel (x, y) tel t in
+       Named (n, refresh_free_var (x, y) e) :: tel', t'
+    | Unnamed e :: tel ->
+       let tel', t' = refresh_free_var_tel (x, y) tel t in
+       Unnamed (refresh_free_var (x, y) e) :: tel', t'
+
 
   (* Substitution of regular variables *)
 
@@ -276,17 +308,14 @@ module Int = struct
 
   let print_name (n, i) = n ^ "_" ^ string_of_int i
 
-  let rec subst ((x, es) : name * exp) (e : exp) :  exp =
+  let rec subst (x, es : name * exp) (e : exp) :  exp =
     let f e = subst (x, es) e in
     match e with
     | Star -> Star
     | Set n ->  Set n
-    | Pi (Some n, s, t) ->
-       let n' = refresh_name n in
-       (* the following cannot happen because n' is just fresh *)
-       (* if List.mem n' (fv es) then raise (Error.Violation "Duplicate variable name would be captured.") ; *)
-       Pi (Some n', s, subst (x, es) (refresh_free_var (n, n') t))
-    | Pi (None, s, t) -> Pi (None, f s, f t)
+    | Pi (tel, t) ->
+       let tel', t' = subst_tel (x, es) tel t in
+       Pi(tel', t')
     | Arr (t, e) -> Arr(f t, f e)
     | Box (ctx, e) -> Box(f ctx, f e)
     | Fn (y, e) ->
@@ -295,7 +324,7 @@ module Int = struct
        (* if List.mem y' (fv es) then raise (Error.Violation "Duplicate variable name would be captured.") ; *)
        Fn(y', subst (x, es) (refresh_free_var (y, y') e))
     | Lam (x, e) -> Lam(x, f e)
-    | App (e1, e2) -> App(f e1, f e2)
+    | App (e1, es) -> App(f e1, List.map f es)
     | AppL (e1, e2) -> AppL(f e1, f e2)
     | Const n -> Const n
     | Var n  when x = n -> refresh es
@@ -309,6 +338,20 @@ module Int = struct
     | Nil -> Nil
     | Annot (e1, e2) -> Annot(f e1, f e2)
     | Under -> Under
+  and subst_tel (x, es) tel t =
+    match tel with
+    | [] -> [], subst (x, es) t
+    | Named (n, e) :: tel ->
+       let n' = refresh_name n in
+       (* the following cannot happen because n' is just fresh *)
+       (* if List.mem n' (fv es) then raise (Error.Violation "Duplicate variable name would be captured.") ; *)
+       let tel', t' = refresh_free_var_tel (n, n') tel t in
+       let tel'', t'' = subst_tel (x, es) tel' t' in
+       Named(n', subst (x, es) e) :: tel'', t''
+
+    | Unnamed e :: tel ->
+       let tel', t' = subst_tel (x, es) tel t in
+       Unnamed (subst (x, es) e) :: tel', t'
 
   let subst_list sigma e =
     List.fold_left (fun e s -> subst s e) e sigma
@@ -318,13 +361,12 @@ module Int = struct
   let rec print_exp = function
     | Star -> "*"
     | Set n -> "set" ^ string_of_int n
-    | Pi (Some n, s, t) -> "(pi " ^ print_name n ^ " " ^ print_exp s ^ " " ^ print_exp t ^ ")"
-    | Pi (None, s, t) -> "(-> " ^ print_exp s ^ " " ^ print_exp t ^ ")"
+    | Pi (tel, t) -> print_tel tel t
     | Arr (t, e) -> "(->> " ^ print_exp t ^ " " ^ print_exp e ^ ")"
     | Box (ctx, e) -> "(|- " ^ print_exp ctx ^ " " ^ print_exp e ^ ")"
     | Fn (f, e) -> "(fn " ^ print_name f ^ " " ^ print_exp e ^ ")"
     | Lam (f, e) -> "(\ " ^ f ^ " " ^ print_exp e ^ ")"
-    | App (e1, e2) -> "(" ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
+    | App (e, es) -> "(" ^ print_exp e ^ " " ^ String.concat " " (List.map print_exp es) ^ ")"
     | AppL (e1, e2) -> "(' " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
     | Const n -> n
     | Var n -> print_name n
@@ -337,6 +379,10 @@ module Int = struct
     | Nil -> "0"
     | Annot (e1, e2) -> "(: " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
     | Under -> "_"
+  and print_tel tel t = match tel with
+    | [] -> print_exp t
+    | Unnamed e :: tel -> "(-> " ^ print_exp e ^ " " ^ print_tel tel t ^ ")"
+    | Named (x, e) :: tel -> "(pi " ^ print_name x ^ " " ^ print_exp e ^ " " ^ print_tel tel t ^ ")"
 
   let rec print_pat (p : pat) : string = match p with
     | PVar n -> print_name n
