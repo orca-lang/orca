@@ -167,9 +167,11 @@ let tc_program (sign : signature) : program -> signature = function
   | Syn (n, ps, e, ds) ->
      Debug.print_string ("Typechecking syn declaration: " ^ n);
      assert false
-  | DefPM (n, e, ds) ->
+  | DefPM (n, t, ds) ->
      Debug.print_string ("Typechecking pattern matching definition: " ^ n);
-     assert false
+     let _u = assert_universe(infer (sign, []) t) in
+     List.iter (fun (p, rhs) -> Matching.check_clause n p rhs t) ds;
+     sign                       (* TODO add the new equations to the signature *)
   | Def (n, t, e) ->
      Debug.print_string ("Typechecking definition: " ^ n);
      let _ = assert_universe(infer (sign, []) t) in
