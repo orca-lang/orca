@@ -24,6 +24,7 @@ let assert_universe : exp -> exp =
 
 let rec infer (sign, cG : signature * ctx) (e : exp) : exp =
   Debug.print (fun () -> "Infer called with: " ^ print_exp e ^ " in context: " ^ print_ctx cG);
+  Debug.indent() ;
   let res =
     begin match e with
     | Annot (e, t) ->
@@ -80,12 +81,14 @@ let rec infer (sign, cG : signature * ctx) (e : exp) : exp =
        raise (Error.Error "Cannot infer the type of this expression")
      end
     end in
+  Debug.deindent ();
   Debug.print(fun() -> "Result of infer for " ^ print_exp e ^ " was " ^ print_exp res) ;
   res
 
 and check (sign , cG : signature * ctx) (e : exp) (t : exp) : unit =
   Debug.print (fun () ->
       "Check called with: " ^ print_exp e ^ ":" ^ print_exp t ^ " in context: " ^ print_ctx cG);
+  Debug.indent();
   begin match e, Whnf.whnf sign t with
   (* types and checkable terms *)
 
@@ -131,6 +134,7 @@ and check (sign , cG : signature * ctx) (e : exp) (t : exp) : unit =
        Debug.print_string message;
        raise (Error.Error ("Term's inferred type is not equal to checked type.\n" ^ message))
   end ;
+  Debug.deindent();
   Debug.print (fun() -> "Finished check for " ^ print_exp e) ;
   ()
 
