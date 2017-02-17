@@ -67,6 +67,7 @@ let print_subst sigma = "[" ^ String.concat ", " (List.map (fun (x, e) -> print_
 
 let rec unify sign e1 e2 =
   Debug.print (fun () -> "Comparing: " ^ print_exp e1 ^ " and " ^ print_exp e2) ;
+  Debug.indent() ;
   let sigma = match Whnf.whnf sign e1, Whnf.whnf sign e2 with
     | Star, Star -> []
     | Set n , Set n' when n = n' -> []
@@ -112,6 +113,7 @@ let rec unify sign e1 e2 =
     | _, _ ->
        raise (Error.Error ("Expression " ^ print_exp e1 ^ " does not unify with " ^ print_exp e2 ^ "."))
   in
+  Debug.deindent();
   Debug.print (fun () -> "Resulted in: " ^ print_subst sigma);
   sigma
 
