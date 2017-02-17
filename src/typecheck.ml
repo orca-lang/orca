@@ -8,12 +8,14 @@ let lookup_sign n sign =
 
 type ctx = (name * exp) list
 
+let print_ctx c = "[" ^ (String.concat "," (List.map (fun (x, e) -> print_name x ^ ": " ^ print_exp e) c)) ^ "]"
+
 let max_universe (e1 : exp) (e2 : exp) : exp =
   match e1, e2 with
   | Set n, Set n' -> Set (max n n')
   | Star, u -> u
   | u, Star -> u
-  | _,_ -> raise (Error.Violation "max_universe called with something is not a universe")
+  | _,_ -> raise (Error.Violation "max_universe called with something that is not a universe")
 
 (* <= for universes *)
 let le_universe (e1 : exp) (e2 : exp) : bool =
@@ -21,7 +23,7 @@ let le_universe (e1 : exp) (e2 : exp) : bool =
   | Set n, Set n' -> n <= n'
   | Star, _ -> true
   | _, Star -> false
-  | _,_ -> raise (Error.Violation "le_universe called with something is not a universe")
+  | _,_ -> raise (Error.Violation "le_universe called with something that is not a universe")
 
 let assert_universe : exp -> exp =
   function
@@ -30,9 +32,7 @@ let assert_universe : exp -> exp =
   | _ -> raise (Error.Error "Not a universe.")
 
 let rec infer (sign, cG : signature * ctx) (e : exp) : exp =
-  Debug.print (fun () ->
-      let string_ctx = ">>>" ^ (String.concat "," (List.map (fun (x, e) -> print_name x ^ ": " ^ print_exp e) cG)) ^ "<<<" in
-      "Infer called with: " ^ print_exp e ^ " in context: " ^ string_ctx );
+  Debug.print (fun () -> "Infer called with: " ^ print_exp e ^ " in context: " ^ print_ctx cG);
   let res =
     begin match e with
     | Annot (e, t) ->
@@ -69,7 +69,6 @@ let rec infer (sign, cG : signature * ctx) (e : exp) : exp =
      | _ -> raise (Error.Violation "Impossible case, we asserted universe!")
      end
 
-
   | Pi (None, s, t) ->
      let ts = assert_universe (infer (sign, cG) s) in
      let tt = assert_universe (infer (sign, cG) t) in
@@ -79,19 +78,14 @@ let rec infer (sign, cG : signature * ctx) (e : exp) : exp =
      | _ -> raise (Error.Violation "Impossible case, we asserted universe!")
      end
 
-  (* | Pi (None, s, t), u -> *)
-  (*    let n' = infer_universe (sign, cG) s in *)
-  (*    if le_universe n' u *)
-  (*    then check (sign, cG) t u *)
-  (*    else raise (Error.Error "Size problem in a function type.") *)
-
   | Box (ctx, e) ->
      (* TODO: only if ctx is a context and e is a syntactic type *)
      Star
 
   | _ ->
      begin
-       Debug.print (fun() -> "Was asked to infer the type of " ^ print_exp e ^ "but the type is not inferrable") ;
+       Debug.print (fun() -> "Was asked to infer the type of " ^ print_exp e
+                             ^ "but the type is not inferrable") ;
        raise (Error.Error "Cannot infer the type of this expression")
      end
     end in
@@ -100,8 +94,7 @@ let rec infer (sign, cG : signature * ctx) (e : exp) : exp =
 
 and check (sign , cG : signature * ctx) (e : exp) (t : exp) : unit =
   Debug.print (fun () ->
-      let string_ctx = ">>>" ^ (String.concat "," (List.map (fun (x, e) -> print_name x ^ ": " ^ print_exp e) cG)) ^ "<<<" in
-      "Check called with: " ^ print_exp e ^ ":" ^ print_exp t ^ " in context: " ^ string_ctx );
+      "Check called with: " ^ print_exp e ^ ":" ^ print_exp t ^ " in context: " ^ print_ctx cG);
   begin match e, Whnf.whnf t with
   (* types and checkable terms *)
 
@@ -131,8 +124,9 @@ and check (sign , cG : signature * ctx) (e : exp) (t : exp) : unit =
      in
      try
        let sigma = Unify.unify t t' in
-       Debug.print (fun () -> "Unification for " ^ print_exp t ^ " with " ^ print_exp t' ^ " succeeded with substitution "
-                            ^ Unify.print_subst sigma ^ ".")
+       Debug.print (fun () -> "Unification for " ^ print_exp t ^ " with " ^
+                                print_exp t' ^ " succeeded with substitution "
+                                ^ Unify.print_subst sigma ^ ".")
      with
      | Error.Error msg ->
        let string_e = print_exp e in
@@ -140,7 +134,8 @@ and check (sign , cG : signature * ctx) (e : exp) (t : exp) : unit =
        let string_t' = print_exp t' in
        let message = "Expression: " ^ string_e
                      ^ "\nwas inferred type: " ^ string_t'
-                     ^ "\nwhich is not equal to: " ^ string_t ^ " that was checked against.\n\nUnification failed with " ^ msg
+                     ^ "\nwhich is not equal to: " ^ string_t ^ " that was checked against.\n"
+                     ^"Unification failed with " ^ msg
        in
        Debug.print_string message;
        raise (Error.Error ("Term's inferred type is not equal to checked type.\n" ^ message))
