@@ -1,10 +1,25 @@
 open Syntax.Int
 
-type signature = (def_name * exp) list
+type signature_entry
+  = Definition of def_name * exp * exp (* the name, the type, and the definition *)
+  | Constructor of def_name * exp
+
+type signature = signature_entry list
+
+let rec lookup_sign_entry (n : def_name) (sign : signature) : signature_entry =
+  let el = function
+    | Definition (n', _, _)
+      | Constructor (n', _) -> n = n'
+  in
+    try
+      List.find el sign
+    with Not_found ->
+      raise (Error.Violation ("Unable to find " ^ n ^ " in the signature"))
+
 let lookup_sign n sign =
-  try
-    List.assoc n sign
-  with Not_found -> raise (Error.Violation ("Unable to find " ^ n ^ " in the signature"))
+  match lookup_sign_entry n sign with
+  | Definition (_, t, _) -> t
+  | Constructor (_, t) -> t
 
 type ctx = (name * exp) list
 
@@ -157,15 +172,17 @@ let tc_constructor (sign : signature) (universe : exp) (n , ct : def_name * exp)
       raise (Error.Error ("The constructor " ^ n ^" is in the wrong universe."))
     end
 
+let decls_to_constructors = List.map (fun (n, e) -> Constructor (n, e))
+
 let tc_program (sign : signature) : program -> signature = function
   | Data (n, ps, e, ds) ->
      let add_params e = List.fold_left (fun t2 (_, n, t1) -> Pi(Some n, t1, t2)) e ps in
      let t = add_params e in
      Debug.print_string ("Typechecking data declaration: " ^ n ^ ":" ^ print_exp t ^ "\n");
      let u = assert_universe (infer (sign, []) t) in
-     let sign' = (n,t)::sign in
+     let sign' = (Constructor(n,t))::sign in
      let _ = List.map (fun (n, ct) -> tc_constructor sign' u (n, add_params ct)) ds in
-     ds @ sign'
+     (decls_to_constructors ds) @ sign'
 
   | Syn (n, ps, e, ds) ->
      Debug.print_string ("Typechecking syn declaration: " ^ n);
@@ -177,4 +194,4 @@ let tc_program (sign : signature) : program -> signature = function
      Debug.print_string ("Typechecking definition: " ^ n);
      let _ = assert_universe(infer (sign, []) t) in
      check (sign, []) e t ;
-     (n, t)::sign
+     (Definition (n, t, e))::sign
