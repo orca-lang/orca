@@ -41,13 +41,16 @@ let rec unify sign e1 e2 =
     (*    sigma1 @ sigma2 *)
     (* | Pi(_, s, t), Pi(_, s',t') -> unify2 sign s s' t t' *)
     | Pi (tel, t), _ -> assert false
-    | Arr(e1, e2), Arr(e1', e2') -> unify2 sign e1 e1' e2 e2'
-    | Box(g, e), Box(g', e') -> unify2 sign g g' e e'
+    | Arr(e1, e2), Arr(e1', e2') -> unify_many sign [e1;e2] [e1';e2']
+    | Box(g, e), Box(g', e') -> unify_many sign [g; e] [g'; e']
     | Fn(n, e), Fn(n', e') -> (n, Var n') :: unify sign (subst (n, Var n') e) (subst (n, Var n') e')
     | Lam(_,e), Lam(_, e') -> unify sign e e'
-    | App(e, es), App(e', es') ->
-       unify sign e e' @ unify_many sign es es'
-    | AppL(e1, e2), AppL(e1', e2') -> unify2 sign e1 e1' e2 e2'
+    | App(e, es1), App(e', es2) ->
+       let sigma = unify sign e e' in
+       let es1' = List.map (subst_list sigma) es1 in
+       let es2' = List.map (subst_list sigma) es2 in
+       unify sign e e' @ unify_many sign es1' es2'
+    | AppL(e1, e2), AppL(e1', e2') -> unify_many sign [e1;e2] [e1';e2']
     | Const n, Const n' ->
        if n = n' then
          []
@@ -66,13 +69,13 @@ let rec unify sign e1 e2 =
        else
          raise (Error.Error ("Occur check failed for " ^ print_name n ^ " in term " ^ print_exp e1 ^ "."))
     | BVar i, BVar i' -> assert (i = i'); []
-    | Clos(e1, e2), Clos(e1', e2') -> unify2 sign e1 e1' e2 e2'
+    | Clos(e1, e2), Clos(e1', e2') -> unify_many sign [e1;e2] [e1';e2']
     | EmptyS, EmptyS -> []
     | Shift n, Shift n' -> []
-    | Comma(e1, e2), Comma(e1', e2') -> unify2 sign e1 e1' e2 e2'
-    | Subst(e1, e2), Subst(e1', e2') -> unify2 sign e1 e1' e2 e2'
+    | Comma(e1, e2), Comma(e1', e2') -> unify_many sign [e1;e2] [e1';e2']
+    | Subst(e1, e2), Subst(e1', e2') -> unify_many sign [e1;e2] [e1';e2']
     | Nil, Nil -> []
-    | Annot(e1, e2), Annot(e1', e2') -> unify2 sign e1 e1' e2 e2'
+    | Annot(e1, e2), Annot(e1', e2') -> unify_many sign [e1;e2] [e1';e2']
     | Under, _ -> []
     | _, Under -> []
     | _, _ ->
@@ -82,14 +85,13 @@ let rec unify sign e1 e2 =
   Debug.print (fun () -> "Resulted in: " ^ print_subst sigma);
   sigma
 
-and unify2 sign e1 e1' e2 e2' =
-  let sigma1 = unify sign e1 e1' in
-  let sigma2 = unify sign (subst_list sigma1 e2) (subst_list sigma1 e2') in
-  sigma1 @ sigma2
-
 and unify_many sign es1 es2 =
+  let unify_each sigma1 e1 e2 =
+    unify sign (subst_list sigma1 e1) (subst_list sigma1 e2)
+  in
   if List.length es1 = List.length es2
-  then List.concat (List.map2 (unify sign) es1 es2) (* THIS IS VERY WRONG, you need to apply substitutions *)
+  then
+    List.fold_left2 unify_each [] es1 es2
   else raise (Error.Error "Unequal number of parameters during unification.")
 
 and unify_tel sign tel1 t1 tel2 t2 =
