@@ -87,7 +87,7 @@ let rec unify sign e1 e2 =
 
 and unify_many sign es1 es2 =
   let unify_each sigma1 e1 e2 =
-    unify sign (subst_list sigma1 e1) (subst_list sigma1 e2)
+    sigma1 @ unify sign (subst_list sigma1 e1) (subst_list sigma1 e2)
   in
   if List.length es1 = List.length es2
   then
@@ -95,11 +95,26 @@ and unify_many sign es1 es2 =
   else raise (Error.Error "Unequal number of parameters during unification.")
 
 and unify_tel sign tel1 t1 tel2 t2 =
+  let subst_list_in_tel sigma tel =
+    let f = function
+      | Unnamed e -> Unnamed (subst_list sigma e)
+      | Named (n, e) -> Named (n, subst_list sigma e)
+    in
+    List.map f tel
+  in
   match tel1, tel2 with
   | [], [] -> unify sign t1 t2
   | tel1, [] -> assert false    (* if t2 is a variables it unifies with the rest of the telescope *)
   | [], tel2 -> assert false    (* if t1 is a variables it unifies with the rest of the telescope *)
-  | Unnamed e1::tel1, Unnamed e2::tel2 -> assert false
+  | Unnamed e1::tel1, Unnamed e2::tel2 ->
+     let sigma = unify sign e1 e2 in
+     let tel1' = subst_list_in_tel sigma tel1 in
+     let tel2' = subst_list_in_tel sigma tel2 in
+     let sigma' =
+       unify_tel sign tel1' (subst_list sigma t1) tel2' (subst_list sigma t2)
+     in
+     sigma @ sigma'
+
   | Unnamed e1::tel1, Named (n2, e2)::tel2 -> assert false
   | Named (n1, e1)::tel1, Named (n, e)::tel -> assert false
   | Named (n1, e1)::tel1, Unnamed e2::tel2 -> assert false
