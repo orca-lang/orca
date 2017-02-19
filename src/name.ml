@@ -1,14 +1,19 @@
 (* Unique name generation module *)
 
-type name = string * int
+(* The original name * a unique int * a flag for free names *)
+type name = string * int * bool
 
 let gen_sym =
   let state = ref 0 in
   fun () -> state := !state + 1 ; !state - 1
 
+let gen_name s = (s, gen_sym (), false)
 
-let gen_name s = (s, gen_sym ())
+(* A floating name is one that is not used in a term *)
+let gen_floating_name () = ("G", gen_sym(), true)
 
-let refresh_name (s, _) = (s, gen_sym())
+let refresh_name (s, _, fl) = (s, gen_sym(), fl)
 
-let print_name (n, i) = n ^ "_" ^ string_of_int i
+let print_name (n, i, _) = n ^ "_" ^ string_of_int i
+
+let is_name_floating (_, _, x) = x
