@@ -4,6 +4,8 @@ type name
 
 val gen_name : string -> name
 
+val gen_floating_name : unit -> name
+
 val refresh_name : name -> name
 
 val print_name : name -> string

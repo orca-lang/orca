@@ -140,10 +140,7 @@ module Int = struct
     | Annot of exp * exp
     | Under
 
-   and tel_entry
-     = Named of name * exp
-     | Unnamed of exp
-
+   and tel_entry = name * exp
    and tel = tel_entry list
 
   type pat =
@@ -201,8 +198,7 @@ module Int = struct
 
   and fv_tel (tel : tel) (t : exp) = match tel with
     | [] -> fv t
-    | Named(n, e)::tel -> fv e @ (fv_tel tel t -- n)
-    | Unnamed e :: tel -> fv e @ fv_tel tel t
+    | (n, e)::tel -> fv e @ (fv_tel tel t -- n)
 
   (* Generate fresh names for all the bound variables,
      to keep names unique *)
@@ -242,14 +238,10 @@ module Int = struct
     and refresh_tel (rep : (name * name) list) (tel : tel) (t : exp) : tel * exp =
       match tel with
       | [] -> [], refresh rep t
-      | Named (n, e) :: tel ->
+      | (n, e) :: tel ->
          let n' = refresh_name n in
          let tel', t' = refresh_tel ((n, n')::rep) tel t in
-         (Named (n', refresh rep e)::tel'), t'
-      | Unnamed e :: tel ->
-         let tel', t' = refresh_tel rep tel t in
-         ((Unnamed (refresh rep e)) :: tel'), t
-
+         ((n', refresh rep e)::tel'), t'
     in
     refresh [] e
 
@@ -284,14 +276,10 @@ module Int = struct
   and refresh_free_var_tel (x, y) tel t =
     match tel with
     | [] -> [], refresh_free_var (x, y) t
-    | Named (n, e) :: tel when n = x ->  raise (Error.Violation "Duplicate variable name")
-    | Named (n, e) :: tel ->
+    | (n, e) :: tel when n = x ->  raise (Error.Violation "Duplicate variable name")
+    | (n, e) :: tel ->
        let tel', t' = refresh_free_var_tel (x, y) tel t in
-       Named (n, refresh_free_var (x, y) e) :: tel', t'
-    | Unnamed e :: tel ->
-       let tel', t' = refresh_free_var_tel (x, y) tel t in
-       Unnamed (refresh_free_var (x, y) e) :: tel', t'
-
+       (n, refresh_free_var (x, y) e) :: tel', t'
 
   (* Substitution of regular variables *)
 
@@ -328,17 +316,13 @@ module Int = struct
   and subst_tel (x, es) tel t =
     match tel with
     | [] -> [], subst (x, es) t
-    | Named (n, e) :: tel ->
+    | (n, e) :: tel ->
        let n' = refresh_name n in
        (* the following cannot happen because n' is just fresh *)
        (* if List.mem n' (fv es) then raise (Error.Violation "Duplicate variable name would be captured.") ; *)
        let tel', t' = refresh_free_var_tel (n, n') tel t in
        let tel'', t'' = subst_tel (x, es) tel' t' in
-       Named(n', subst (x, es) e) :: tel'', t''
-
-    | Unnamed e :: tel ->
-       let tel', t' = subst_tel (x, es) tel t in
-       Unnamed (subst (x, es) e) :: tel', t'
+       (n', subst (x, es) e) :: tel'', t''
 
   let subst_list sigma e =
     List.fold_left (fun e s -> subst s e) e sigma
@@ -368,8 +352,9 @@ module Int = struct
     | Under -> "_"
   and print_tel tel t = match tel with
     | [] -> print_exp t
-    | Unnamed e :: tel -> "(-> " ^ print_exp e ^ " " ^ print_tel tel t ^ ")"
-    | Named (x, e) :: tel -> "(pi " ^ print_name x ^ " " ^ print_exp e ^ " " ^ print_tel tel t ^ ")"
+    | (x, e) :: tel when is_name_floating x ->
+       "(-> " ^ print_exp e ^ " " ^ print_tel tel t ^ ")"
+    | (x, e) :: tel -> "(pi " ^ print_name x ^ " " ^ print_exp e ^ " " ^ print_tel tel t ^ ")"
 
   let rec print_pat (p : pat) : string = match p with
     | PVar n -> print_name n
