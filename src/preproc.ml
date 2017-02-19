@@ -12,11 +12,13 @@
    * Manage repeated names (TO BE DONE)
 
  *)
+
 module E = Syntax.Ext
 module I = Syntax.Int
 
+
 type sign = E.name list (* The signature for types *)
-type ctx = (E.name * I.name) list  (* The context for regular variables *)
+type ctx = (E.name * Name.name) list  (* The context for regular variables *)
 type bctx = E.name list            (* The context for bound variables *)
 
 let rec lookup n = function
@@ -45,7 +47,7 @@ let find_name (sign : sign) (cG : ctx) (cP : bctx) (n : E.name) : I.exp =
                else raise (Error.Error ("Unbound variable: " ^ n))
 
 let add_name_sign sign n = n :: sign
-let add_name_ctx c n = let nn = I.gen_name n in ((n, nn) :: c), nn
+let add_name_ctx c n = let nn = Name.gen_name n in ((n, nn) :: c), nn
 let add_name_bvar c n : bctx = n :: c
 
 let isEmpty = (=) []

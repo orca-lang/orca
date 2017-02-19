@@ -1,5 +1,6 @@
 open Syntax.Int
 open Signature
+open Name
 
 let max_universe (e1 : exp) (e2 : exp) : exp =
   match e1, e2 with

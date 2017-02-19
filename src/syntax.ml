@@ -111,18 +111,19 @@ module Ext = struct
 end
 
 module Int = struct
+  open Name
 
-  type name = string * int
+  (* type name = string * int *)
   type index = int
   type def_name = string
 
-  let gen_sym =
-    let state = ref 0 in
-    fun () -> state := !state + 1 ; !state - 1
+  (* let gen_sym = *)
+  (*   let state = ref 0 in *)
+  (*   fun () -> state := !state + 1 ; !state - 1 *)
 
-  let gen_name s = (s, gen_sym ())
+  (* let gen_name s = (s, gen_sym ()) *)
 
-  let refresh_name (s, _) = (s, gen_sym())
+  (* let refresh_name (s, _) = (s, gen_sym()) *)
 
   let (--) l n = List.filter ((!=) n) l
 
@@ -303,11 +304,6 @@ module Int = struct
 
   (* Substitution of regular variables *)
 
-  (* TODO: do the refreshing while substituting, otherwise it
-     might be really slow. *)
-
-  let print_name (n, i) = n ^ "_" ^ string_of_int i
-
   let rec subst (x, es : name * exp) (e : exp) :  exp =
     let f e = subst (x, es) e in
     match e with
@@ -369,7 +365,7 @@ module Int = struct
     | App (e, es) -> "(" ^ print_exp e ^ " " ^ String.concat " " (List.map print_exp es) ^ ")"
     | AppL (e1, e2) -> "(' " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
     | Const n -> n
-    | Var n -> print_name n
+    | Var n -> Name.print_name n
     | BVar i -> "(i " ^ string_of_int i ^ ")"
     | Clos (e1, e2) -> "([] " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
     | EmptyS -> "^"

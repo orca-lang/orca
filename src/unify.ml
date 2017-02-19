@@ -1,4 +1,5 @@
 open Syntax.Int
+open Name
 
 let rec occur_check n e =
   let f e = occur_check n e in

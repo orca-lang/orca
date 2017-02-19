@@ -1,4 +1,5 @@
 open Syntax.Int
+open Name
 
 type signature_entry
   = Definition of def_name * exp * exp (* the name, the type, and the definition *)
