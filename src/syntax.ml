@@ -113,17 +113,8 @@ end
 module Int = struct
   open Name
 
-  (* type name = string * int *)
   type index = int
   type def_name = string
-
-  (* let gen_sym = *)
-  (*   let state = ref 0 in *)
-  (*   fun () -> state := !state + 1 ; !state - 1 *)
-
-  (* let gen_name s = (s, gen_sym ()) *)
-
-  (* let refresh_name (s, _) = (s, gen_sym()) *)
 
   let (--) l n = List.filter ((!=) n) l
 
