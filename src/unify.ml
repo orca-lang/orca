@@ -36,12 +36,7 @@ let rec unify sign e1 e2 =
     | Star, Star -> []
     | Set n , Set n' when n = n' -> []
     | Set n, Set n' -> raise (Error.Error ("Universes don't match: " ^ string_of_int n ^ " != " ^ string_of_int n'))
-    (* | Pi(Some n, s, t), Pi(Some n',s',t') -> *)
-    (*    let sigma1 = (n, Var n') :: unify sign s s' in *)
-    (*    let sigma2 = unify sign (subst_list sigma1 t) (subst_list sigma1 t') in *)
-    (*    sigma1 @ sigma2 *)
-    (* | Pi(_, s, t), Pi(_, s',t') -> unify2 sign s s' t t' *)
-    | Pi (tel, t), _ -> assert false
+    | Pi (tel, t), Pi(tel', t') -> unify_tel sign tel t tel' t'
     | Arr(e1, e2), Arr(e1', e2') -> unify_many sign [e1;e2] [e1';e2']
     | Box(g, e), Box(g', e') -> unify_many sign [g; e] [g'; e']
     | Fn(n, e), Fn(n', e') -> (n, Var n') :: unify sign (subst (n, Var n') e) (subst (n, Var n') e')
@@ -69,7 +64,7 @@ let rec unify sign e1 e2 =
          [n, e1]
        else
          raise (Error.Error ("Occur check failed for " ^ print_name n ^ " in term " ^ print_exp e1 ^ "."))
-    | BVar i, BVar i' -> assert (i = i'); []
+    | BVar i, BVar i' when i = i' -> []
     | Clos(e1, e2), Clos(e1', e2') -> unify_many sign [e1;e2] [e1';e2']
     | EmptyS, EmptyS -> []
     | Shift n, Shift n' -> []
@@ -96,26 +91,15 @@ and unify_many sign es1 es2 =
   else raise (Error.Error "Unequal number of parameters during unification.")
 
 and unify_tel sign tel1 t1 tel2 t2 =
-  let _subst_list_in_tel sigma tel =
-    (* let f = function *)
-    (*   (\* | Unnamed e -> Unnamed (subst_list sigma e) *\) *)
-    (*   | (n, e) -> (n, subst_list sigma e) *)
-    (* in *)
+  let subst_list_in_tel sigma tel =
     List.map (fun (n, e) -> n, subst_list sigma e) tel
   in
   match tel1, tel2 with
   | [], [] -> unify sign t1 t2
   | tel1, [] -> unify sign (Pi (tel1, t1)) t2
   | [], tel2 -> unify sign t1 (Pi (tel2, t2))
-  (* | Unnamed e1::tel1, Unnamed e2::tel2 -> *)
-  (*    let sigma = unify sign e1 e2 in *)
-  (*    let tel1' = subst_list_in_tel sigma tel1 in *)
-  (*    let tel2' = subst_list_in_tel sigma tel2 in *)
-  (*    let sigma' = *)
-  (*      unify_tel sign tel1' (subst_list sigma t1) tel2' (subst_list sigma t2) *)
-  (*    in *)
-  (*    sigma @ sigma' *)
-
-  (* | Unnamed e1::tel1, Named (n2, e2)::tel2 -> assert false *)
-  | (n1, e1)::tel1, (n, e)::tel -> assert false
-  (* | Named (n1, e1)::tel1, Unnamed e2::tel2 -> assert false *)
+  | (n1, e1)::tel1, (n2, e2)::tel2 ->
+     let sigma = (n1, Var n2) :: (unify sign e1 e2) in
+     let tel1' = subst_list_in_tel sigma tel1 in
+     let tel2' = subst_list_in_tel sigma tel2 in
+     sigma @ (unify_tel sign tel1' t1 tel2' t2)
