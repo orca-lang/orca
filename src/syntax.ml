@@ -356,7 +356,7 @@ module Int = struct
     | Annot (e1, e2) -> "(: " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
     | Under -> "_"
   and print_tel tel t = match tel with
-    | [] -> "(pil " ^ print_exp t ^ ")"
+    | [] -> print_exp t
     | (_, x, e) :: tel when is_name_floating x ->
        "(-> " ^ print_exp e ^ " " ^ print_tel tel t ^ ")"
     | (_, x, e) :: tel -> "(pi " ^ print_name x ^ " " ^ print_exp e ^ " " ^ print_tel tel t ^ ")"
