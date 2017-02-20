@@ -164,12 +164,14 @@ module Int = struct
     | PWildcard
 
   type pats = pat list
-
-  type decls = (def_name * exp) list
+  (* name of the constructed type, the type parameters, and the indices *)
+  type dsig = def_name * exp list
+  type decls = (def_name * tel * dsig) list
   type pat_decls = (pats * exp) list
 
   type program =
-    | Data of def_name * tel * exp * decls
+    (* name, parameters, indices, universe *)
+    | Data of def_name * tel * tel * universe * decls
     | Syn of def_name * tel * exp * decls
     | DefPM of def_name * exp * pat_decls
     | Def of def_name * exp * exp
@@ -338,7 +340,7 @@ module Int = struct
 
   let rec print_exp = function
     | Univ u -> print_universe u
-    | Pi (tel, t) -> print_tel tel t
+    | Pi (tel, t) -> print_pi tel t
     | Arr (t, e) -> "(->> " ^ print_exp t ^ " " ^ print_exp e ^ ")"
     | Box (ctx, e) -> "(|- " ^ print_exp ctx ^ " " ^ print_exp e ^ ")"
     | Fn (fs, e) -> "(fn " ^ (String.concat " " (List.map print_name fs)) ^ " " ^ print_exp e ^ ")"
@@ -356,11 +358,11 @@ module Int = struct
     | Nil -> "0"
     | Annot (e1, e2) -> "(: " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
     | Under -> "_"
-  and print_tel tel t = match tel with
+  and print_pi tel t = match tel with
     | [] -> print_exp t
     | (_, x, e) :: tel when is_name_floating x ->
-       "(-> " ^ print_exp e ^ " " ^ print_tel tel t ^ ")"
-    | (_, x, e) :: tel -> "(pi " ^ print_name x ^ " " ^ print_exp e ^ " " ^ print_tel tel t ^ ")"
+       "(-> " ^ print_exp e ^ " " ^ print_pi tel t ^ ")"
+    | (_, x, e) :: tel -> "(pi " ^ print_name x ^ " " ^ print_exp e ^ " " ^ print_pi tel t ^ ")"
 
   let rec print_pat (p : pat) : string = match p with
     | PVar n -> print_name n
@@ -378,7 +380,13 @@ module Int = struct
     | PUnder -> "_"
     | PWildcard -> "._"
 
-  let print_decls decls = String.concat "\n" (List.map (fun (n, e) -> "(" ^ n ^ " " ^ print_exp e ^ ")") decls )
+  let print_tel (tel : tel) : string =
+    String.concat ", " (List.map (fun (_, x, e) -> "(" ^ print_name x ^ ", " ^ print_exp e ^ ")") tel)
+
+  let print_dsig ((d, es) : dsig) = "(" ^ d ^ " " ^ String.concat " " (List.map print_exp es) ^ ")"
+
+  let print_decls (decls : decls) : string =
+    String.concat "\n" (List.map (fun (n, tel, dsig) -> "(" ^ n ^ " " ^ print_tel tel ^ " " ^ print_dsig dsig ^ ")") decls)
   let print_pats pats = String.concat " " (List.map (fun p -> "(" ^ print_pat p ^ ")") (List.rev pats))
   let print_def_decls decls = String.concat "\n" (List.map (fun (pats, e) -> "(" ^ print_pats pats ^ " " ^ print_exp e ^ ")") decls)
 
@@ -389,7 +397,8 @@ module Int = struct
   let print_params ps = String.concat " " (List.map print_param ps)
 
   let print_program = function
-    | Data (n, ps, e, decls) -> "(data " ^ n ^ " " ^ print_params ps ^ "  " ^ print_exp e ^ "\n" ^ print_decls decls ^ ")"
+    | Data (n, ps, is, u, decls) ->
+       "(data " ^ n ^ " (" ^ print_params ps ^ ") (" ^ print_params is ^ ") " ^ print_universe u  ^ "\n" ^ print_decls decls ^ ")"
     | Syn (n, ps, e, decls) -> "(syn " ^ n ^ " " ^ print_params ps ^ "  " ^ print_exp e ^ "\n" ^ print_decls decls ^ ")"
     | DefPM (n, e, decls) -> "(def " ^ n ^ " " ^ print_exp e ^ "\n" ^ print_def_decls decls ^ ")"
     | Def (n, e1, e2) -> "(def " ^ n ^ " " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"

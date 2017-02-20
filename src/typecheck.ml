@@ -15,13 +15,6 @@ let le_universe (u1 : universe) (u2 : universe) : bool =
   | Star, _ -> true
   | _, Star -> false
 
-let assert_universe : exp -> universe =
-  function
-  | Univ u -> u
-  | e ->
-     Debug.print (fun () -> "Assert universe failed for " ^ print_exp e ^ ".") ;
-     raise (Error.Error "Not a universe.")
-
 let rec infer (sign, cG : signature * ctx) (e : exp) : exp =
   Debug.print (fun () -> "Infer called with: " ^ print_exp e ^ " in context: " ^ print_ctx cG);
   Debug.indent() ;
@@ -43,12 +36,13 @@ let rec infer (sign, cG : signature * ctx) (e : exp) : exp =
        begin match infer (sign, cG) h with
        | Pi (tel, t) ->
           check_spine (sign, cG) sp tel t
-       | _ -> raise (Error.Error "The left hand side of the application was not of function type")
+       | t -> raise (Error.Error ("The left hand side (" ^ print_exp h ^ ") of the application was of type "
+                                  ^ print_exp t ^ " which is not of function type"))
        end
 
     | Univ u -> Univ (infer_universe u)
     | Pi (tel, t) ->
-       check_tel (sign, cG) tel t
+       check_pi (sign, cG) tel t
 
     | Box (ctx, e) ->
        (* TODO: only if ctx is a context and e is a syntactic type *)
@@ -68,6 +62,13 @@ let rec infer (sign, cG : signature * ctx) (e : exp) : exp =
 and infer_universe = function
   | Star -> Set 0
   | Set n -> Set (n + 1)
+
+and check_type (sign, cG : signature * ctx) (s : exp) : universe =
+  match infer (sign, cG) s with
+  | Univ u -> u
+  | e ->
+     Debug.print (fun () -> "Assert universe failed for " ^ print_exp e ^ ".") ;
+     raise (Error.Error "Not a universe.")
 
 and check (sign , cG : signature * ctx) (e : exp) (t : exp) : unit =
   Debug.print (fun () ->
@@ -103,7 +104,7 @@ and check (sign , cG : signature * ctx) (e : exp) (t : exp) : unit =
        try infer (sign, cG) e
        with Error.Error msg ->
          Debug.print_string msg;
-         raise (Error.Error "Cannot check expression")
+         raise (Error.Error ("Cannot check expression " ^ print_exp e))
      in
      try
        let sigma = Unify.unify sign t t' in
@@ -136,50 +137,64 @@ and check_spine (sign, cG) sp tel t =
   | [], [] -> t
   | _ -> raise (Error.Error "Spine and telescope of different lengths while type checking.")
 
-and check_tel (sign, cG) tel t =
+and check_pi (sign, cG) tel t =
   match tel with
   | [] -> infer (sign, cG) t
   | (_, x, s)::tel' ->
-     let us = assert_universe (infer (sign, cG) s) in
-     let ut = assert_universe (infer (sign, (x, s)::cG) (Pi(tel', t))) in
+     let us = check_type (sign, cG) s in
+     let ut = check_type (sign, (x, s)::cG) (Pi(tel', t)) in
      begin match ut with
      | Star -> Univ Star (* Star is impredicative *)
      | Set n -> Univ (max_universe us ut)
      end
 
-let tc_constructor (sign : signature) (u : universe) (n , ct : def_name * exp) : unit =
-  Debug.print_string ("Typechecking constructor: " ^ n) ;
-  let u' = assert_universe(infer (sign, []) ct) in
-  if le_universe u' u then (* MMMM *)
-    (* TODO additionally we should check that
-       it really is a constructor for the type *)
-    ()
-  else
-    begin
-      Debug.print_string ("Constructor " ^ n ^ " is in universe: " ^ print_universe u');
-      Debug.print_string ("but is expected " ^ print_universe u);
-      raise (Error.Error ("The constructor " ^ n ^" is in the wrong universe."))
-    end
+let rec check_tel (sign, cG) u tel =
+  match tel with
+  | [] -> u
+  | (_, x, s) :: tel' ->
+     if u = Star then
+       check_tel (sign, (x, s) :: cG) u tel'
+     else
+       let us = check_type (sign, cG) s in
+       let u' = max_universe us u in
+       check_tel (sign, (x, s) :: cG) u' tel'
 
-let decls_to_constructors = List.map (fun (n, e) -> Constructor (n, e))
+     (* else raise (Error.Error ("Parameter " ^ print_name x ^ " has universe " ^ print_universe us *)
+     (*                          ^ " which does not fit in universe " ^ print_universe u)) *)
+
+let tc_constructor (sign , cG : signature * ctx) (u : universe) (tel : tel)
+                   (n , tel', (n', es) : def_name * tel * dsig) : signature_entry =
+  Debug.print_string ("Typechecking constructor: " ^ n) ;
+  check_tel (sign, cG) u tel';
+  List.iter2 (check (sign, (ctx_from_tel tel') @ cG)) es (List.map (fun (_,_,t) -> t) tel);
+  Constructor (n, tel', (n', es))
+  (* else *)
+  (*   begin *)
+  (*     Debug.print_string ("Constructor " ^ n ^ " is in universe: " ^ print_universe u'); *)
+  (*     Debug.print_string ("but is expected " ^ print_universe u); *)
+  (*     raise (Error.Error ("The constructor " ^ n ^" is in the wrong universe.")) *)
+  (*   end *)
+
+(* let decls_to_constructors = List.map (fun (n, e) -> Constructor (n, e)) *)
 
 let add_params_to_tp ps = function
   | Pi (tel, t) -> Pi (ps @ tel, t)
   | t -> Pi (ps, t)
 
 let tc_program (sign : signature) : program -> signature = function
-  | Data (n, ps, e, ds) ->
-     let add_params = function
-       | Pi (tel, t) -> Pi (ps @ tel, t)
-       | t -> if Util.empty_list ps then t else Pi (ps, t)
-     in
-     let t = add_params e in
-     Debug.print_string ("Typechecking data declaration: " ^ n ^ ":" ^ print_exp t ^ "\n");
-     (* TODO Add positivity checking and check that it build a value of the right type *)
-     let u = assert_universe (infer (sign, []) t) in
-     let sign' = (Constructor(n,t))::sign in
-     let _ = List.map (fun (n, ct) -> tc_constructor sign' u (n, add_params ct)) ds in
-     (decls_to_constructors ds) @ sign'
+  | Data (n, ps, is, u, ds) ->
+     Debug.print_string ("Typechecking data declaration: " ^ n ^ "\n");
+     let u' = check_tel (sign, []) u ps in
+     let cG = ctx_from_tel ps in
+     let u'' = check_tel (sign, cG) u' is in
+     let sign' = DataDef (n, ps, is, u'') :: sign in
+     (List.map (tc_constructor (sign', cG) u'' (ps @ is)) ds) @ sign'
+
+     (* TODO Add positivity checking *)
+     (* let u = assert_universe (infer (sign, []) t) in *)
+     (* let sign' = (Data(n,ps, assert false, u))::sign in *)
+     (* let _ = List.map (fun (n, ct) -> tc_constructor sign' u (n, add_params ct)) ds in *)
+     (* (decls_to_constructors ds) @ sign' *)
 
 
   | Syn (n, ps, e, ds) ->
@@ -187,11 +202,11 @@ let tc_program (sign : signature) : program -> signature = function
      assert false
   | DefPM (n, t, ds) ->
      Debug.print_string ("Typechecking pattern matching definition: " ^ n);
-     let _u = assert_universe(infer (sign, []) t) in
+     let _u = check_type (sign, []) t in
      List.iter (fun (p, rhs) -> Matching.check_clause n p rhs t) ds;
      sign                       (* TODO add the new equations to the signature *)
   | Def (n, t, e) ->
      Debug.print_string ("Typechecking definition: " ^ n);
-     let _ = assert_universe(infer (sign, []) t) in
+     let _ = check_type (sign, []) t in
      check (sign, []) e t ;
      (Definition (n, t, e))::sign

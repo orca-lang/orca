@@ -10,6 +10,7 @@
    * Ensure that are variables and constructors are well-scoped
    * Index bound variables to de Bruijn indices
    * Manage repeated names (TO BE DONE)
+   * Checks that constructors build the appropriate type
 
  *)
 
@@ -157,8 +158,17 @@ and pproc_app (s : sign) (cG : ctx) (cP : bctx) : E.exp -> I.exp * I.exp list =
      h, sp @[pproc_exp s cG cP e2]
   | e -> pproc_exp s cG cP e, []
 
-let pproc_decl s cG (n, e) =
-  add_name_sign s n, (n, pproc_exp s cG [] e)
+let pproc_decl s cG (n, e) (d : I.def_name) =
+  let tel, e' = pproc_tel s cG [] e in
+  let (d', args) = match e' with
+    | I.App (I.Const n', ds) -> n', ds
+    | I.Const n' -> n', []
+    | _ -> raise (Error.Error ("Return type of constructor " ^ n ^ " should be " ^ d))
+  in
+  if d = d' then
+    (add_name_sign s n, (n, tel, (d', args)))
+  else
+    raise (Error.Error ("Return type of constructor " ^ n ^ " should be " ^ d))
 
 let pproc_param s cG (icit, n, e) =
   let cG', n' = add_name_ctx cG n in
@@ -218,16 +228,19 @@ let pre_process s = function
   | E.Data (n, ps, e, ds) ->
      let _, ps' = List.fold_left (fun (cG, ps) p -> let cG', p' = pproc_param s cG p in cG', (p'::ps)) ([], []) ps in
      let cG = params_to_ctx ps ps' in
-     let e' = pproc_exp s cG [] e in
+     let is, u = match pproc_tel s cG [] e with
+       | tel, I.Univ u -> tel, u
+       | _, t -> raise (Error.Error ("Expected universe but instead got expression " ^ I.print_exp t))
+     in
      let s' = add_name_sign s n in
-     let s'', ds' = List.fold_left (fun (s, dos) d -> let ss, dd = pproc_decl s cG d in ss, (dd :: dos)) (s', []) ds in
-     s'', I.Data (n, ps', e', ds')
+     let s'', ds' = List.fold_left (fun (s, dos) d -> let ss, dd = pproc_decl s cG d n in ss, (dd :: dos)) (s', []) ds in
+     s'', I.Data (n, ps', is, u, ds')
   | E.Syn (n, ps, e, ds) ->
      let _, ps' = List.fold_left (fun (cG, ps) p -> let cG', p' = pproc_param s cG p in cG', (p'::ps)) ([], []) ps in
      let cG = params_to_ctx ps ps' in
      let e' = pproc_exp s cG [] e in
      let s' = add_name_sign s n in
-     let s'', ds' = List.fold_left (fun (s, dos) d -> let ss, dd = pproc_decl s cG d in ss, (dd :: dos)) (s', []) ds in
+     let s'', ds' = List.fold_left (fun (s, dos) d -> let ss, dd = pproc_decl s cG d n in ss, (dd :: dos)) (s', []) ds in
      s'', I.Syn (n, ps', e', ds')
   | E.DefPM (n, e, ds) ->
      let s' = add_name_sign s n in
