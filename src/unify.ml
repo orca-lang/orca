@@ -8,7 +8,7 @@ let rec occur_check n e =
   | Pi (tel, t) -> occur_check_tel n tel || occur_check n t
   | Arr (s , t) -> f s || f t
   | Box (g, e) -> f g || f e
-  | Fn (x, e) when x != n -> f e
+  | Fn (xs, e) when List.mem n xs -> f e
   | Lam (_, e) -> f e
   | AppL (e1, e2)
   | Clos (e1, e2)
@@ -39,7 +39,9 @@ let rec unify sign e1 e2 =
     | Pi (tel, t), Pi(tel', t') -> unify_tel sign tel t tel' t'
     | Arr(e1, e2), Arr(e1', e2') -> unify_many sign [e1;e2] [e1';e2']
     | Box(g, e), Box(g', e') -> unify_many sign [g; e] [g'; e']
-    | Fn(n, e), Fn(n', e') -> (n, Var n') :: unify sign (subst (n, Var n') e) (subst (n, Var n') e')
+    | Fn(ns, e), Fn(ns', e') ->
+       let sigma = List.map2 (fun n n' -> (n, Var n')) ns ns' in
+       sigma @ unify sign (subst_list sigma e) (subst_list sigma e')
     | Lam(_,e), Lam(_, e') -> unify sign e e'
     | App(e, es1), App(e', es2) ->
        let sigma = unify sign e e' in

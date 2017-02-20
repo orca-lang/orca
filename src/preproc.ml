@@ -48,6 +48,14 @@ let find_name (sign : sign) (cG : ctx) (cP : bctx) (n : E.name) : I.exp =
 
 let add_name_sign sign n = n :: sign
 let add_name_ctx c n = let nn = Name.gen_name n in ((n, nn) :: c), nn
+let rec add_names_ctx c = function
+  | [] -> c, []
+  | n::ns ->
+     let c', n' = add_name_ctx c n in
+     let c'', ns' = add_names_ctx c' ns in
+     c'', n'::ns'
+
+
 let add_name_bvar c n : bctx = n :: c
 
 let isEmpty = (=) []
@@ -112,8 +120,8 @@ let rec pproc_exp (s : sign) (cG : ctx) (cP : bctx) : E.exp -> I.exp =
       pproc_exp s cG cP' e
     else
       raise (Error.Error "Bound variables bindings (:>) cannot be nested")
-  | E.Fn (n, e) ->
-     let cG', n' = add_name_ctx cG n in
+  | E.Fn (ns, e) ->
+     let cG', n' = add_names_ctx cG ns in
      I.Fn(n', pproc_exp s cG' cP e)
   | E.Lam (n, e) ->
      I.Lam(n, pproc_exp s cG (add_name_bvar cP n) e)

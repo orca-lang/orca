@@ -66,7 +66,7 @@ exp:
 | e1 = exp e2 = almost_simple_exp {App (e1, e2)}
 | e1 = exp APPL e2 = exp {AppL (e1, e2)}
 | e1 = exp COLON e2 = exp {Annot (e1, e2)}
-| FN x = IDENT RARR e = exp {Fn (x, e)}
+| FN xs = IDENT+ RARR e = exp {Fn (xs, e)}
 | LAM x = IDENT DOT e = exp {Lam (x, e)}
 | s = exp ARR t = exp {Arr (s, t)}
 | s = exp SARR t = exp {SArr (s, t)}

@@ -11,7 +11,7 @@ module Ext = struct
     | SArr of exp * exp
     | Box of exp * exp
     | TBox of exp * exp (* term box, only in external syntax *)
-    | Fn of name * exp
+    | Fn of name list * exp
     | Lam of name * exp
     | App of exp * exp
     | AppL of exp * exp
@@ -61,7 +61,8 @@ module Ext = struct
     | SArr (t, e) -> "(->> " ^ print_exp t ^ " " ^ print_exp e ^ ")"
     | Box (ctx, e) -> "(|- " ^ print_exp ctx ^ " " ^ print_exp e ^ ")"
     | TBox (ctx, e) -> "(:> " ^ print_exp ctx ^ " " ^ print_exp e ^ ")"
-    | Fn (f, e) -> "(fn " ^ f ^ " " ^ print_exp e ^ ")"
+    | Fn (fs, e) ->
+       "(fn " ^ (String.concat " " fs) ^ " " ^ print_exp e ^ ")"
     | Lam (f, e) -> "(\ " ^ f ^ " " ^ print_exp e ^ ")"
     | App (e1, e2) -> "(" ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
     | AppL (e1, e2) -> "(' " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
@@ -124,7 +125,7 @@ module Int = struct
     | Pi of tel * exp  (* A pi type *)
     | Arr of exp * exp (* A syntactic type *)
     | Box of exp * exp
-    | Fn of name * exp
+    | Fn of name list * exp
     | Lam of string * exp
     | App of exp * exp list
     | AppL of exp * exp
@@ -177,7 +178,8 @@ module Int = struct
     | Pi (tel, t) ->fv_tel tel t
     | Arr (t, e) -> fv t @ fv e
     | Box (ctx, e) -> fv ctx @ fv e
-    | Fn (x, e) -> (fv e -- x)
+    | Fn (xs, e) ->
+       List.fold_left (fun vars x -> vars -- x) (fv e) xs
     | Lam (x, e) -> fv e
     | App (e1, es) -> fv e1 @ List.concat (List.map fv es)
     | AppL (e1, e2) -> fv e1 @ fv e2
@@ -209,9 +211,10 @@ module Int = struct
       | Pi (tel, t) -> let tel', t' = refresh_tel rep tel t in Pi(tel', t')
       | Arr (t, e) -> Arr(f t, f e)
       | Box (ctx, e) -> Box(f ctx, f e)
-      | Fn (x, e) ->
-         let x' = refresh_name x in
-         Fn (x', refresh ((x, x')::rep) e)
+      | Fn (xs, e) ->
+         let xs' = List.map refresh_name xs in
+         let extra = List.map2 (fun x y -> x, y) xs xs in
+         Fn (xs', refresh (extra @ rep) e)
       | Lam (x, e) ->
          Lam(x, f e)
       | App (e1, es) -> App(f e1, List.map f es)
@@ -253,8 +256,8 @@ module Int = struct
        Pi (tel', t')
     | Arr (t, e) -> Arr(f t, f e)
     | Box (ctx, e) -> Box(f ctx, f e)
-    | Fn (n, _) when n = x -> raise (Error.Violation "Duplicate variable name")
-    | Fn (x, e) -> Fn (x, f e)
+    | Fn (xs, _) when List.mem x xs -> raise (Error.Violation "Duplicate variable name")
+    | Fn (xs, e) -> Fn (xs, f e)
     | Lam (x, e) -> Lam(x, f e)
     | App (e1, es) -> App(f e1, List.map f es)
     | AppL (e1, e2) -> AppL(f e1, f e2)
@@ -278,6 +281,9 @@ module Int = struct
        let tel', t' = refresh_free_var_tel (x, y) tel t in
        (i, n, refresh_free_var (x, y) e) :: tel', t'
 
+  let refresh_free_vars (rep : (name * name) list) e =
+    List.fold_left (fun e (y, y') -> refresh_free_var (y, y') e) e rep
+
   (* Substitution of regular variables *)
 
   let rec subst (x, es : name * exp) (e : exp) :  exp =
@@ -290,11 +296,13 @@ module Int = struct
        Pi(tel', t')
     | Arr (t, e) -> Arr(f t, f e)
     | Box (ctx, e) -> Box(f ctx, f e)
-    | Fn (y, e) ->
-       let y' = refresh_name y in
+    | Fn (ys, e) ->
+       let ys' = List.map refresh_name ys in
        (* the following cannot happen because y' is just fresh *)
-       (* if List.mem y' (fv es) then raise (Error.Violation "Duplicate variable name would be captured.") ; *)
-       Fn(y', subst (x, es) (refresh_free_var (y, y') e))
+       (* if List.mem y' (fv es) then raise (Error.Violation
+       "Duplicate variable name would be captured.") ; *)
+       let extra = List.map2 (fun x y -> x, y) ys ys' in
+       Fn(ys', subst (x, es) (refresh_free_vars extra e))
     | Lam (x, e) -> Lam(x, f e)
     | App (e1, es) -> App(f e1, List.map f es)
     | AppL (e1, e2) -> AppL(f e1, f e2)
@@ -332,7 +340,7 @@ module Int = struct
     | Pi (tel, t) -> print_tel tel t
     | Arr (t, e) -> "(->> " ^ print_exp t ^ " " ^ print_exp e ^ ")"
     | Box (ctx, e) -> "(|- " ^ print_exp ctx ^ " " ^ print_exp e ^ ")"
-    | Fn (f, e) -> "(fn " ^ print_name f ^ " " ^ print_exp e ^ ")"
+    | Fn (fs, e) -> "(fn " ^ (String.concat " " (List.map print_name fs)) ^ " " ^ print_exp e ^ ")"
     | Lam (f, e) -> "(\ " ^ f ^ " " ^ print_exp e ^ ")"
     | App (e, es) -> "(" ^ print_exp e ^ " " ^ String.concat " " (List.map print_exp es) ^ ")"
     | AppL (e1, e2) -> "(' " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
