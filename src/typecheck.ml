@@ -40,16 +40,12 @@ let rec infer (sign, cG : signature * ctx) (e : exp) : exp =
          raise (Error.Violation
                   ("Unbound var after preprocessing, this cannot happen. (Var: " ^ print_name n ^ ")"))
      end
-    | App (e1, e2) -> assert false
-     (* begin match infer (sign, cG) e1 with *)
-     (* | Pi (None, s, t) -> *)
-     (*    check (sign, cG) e2 s ; *)
-     (*    t *)
-     (* | Pi (Some n, s, t) -> *)
-     (*    check (sign, cG) e2 s ; *)
-     (*    subst (n, e2) t *)
-     (* | _ -> raise (Error.Error "The left hand side of the application was not of function type") *)
-     (* end *)
+    | App (h, sp) ->
+     begin match infer (sign, cG) h with
+     | Pi (tel, t) ->
+        check_spine (sign, cG) sp tel t
+     | _ -> raise (Error.Error "The left hand side of the application was not of function type")
+     end
 
   | Star -> Set 0
   | Set n -> Set (n + 1)
@@ -140,6 +136,15 @@ and check (sign , cG : signature * ctx) (e : exp) (t : exp) : unit =
   Debug.deindent();
   Debug.print (fun() -> "Finished check for " ^ print_exp e) ;
   ()
+
+and check_spine (sign, cG) sp tel t =
+  match sp, tel with
+  | e::sp', (x, s)::tel ->
+     check (sign, cG) e s ;
+     let tel', t' = subst_tel (x, e) tel t in
+     check_spine (sign, (x, s)::cG) sp' tel' t'
+  | [], [] -> t
+  | _ -> raise (Error.Error "Spine and telescope of different lengths while type checking.")
 
 let tc_constructor (sign : signature) (universe : exp) (n , ct : def_name * exp) : unit =
   Debug.print_string ("Typechecking constructor: " ^ n) ;
