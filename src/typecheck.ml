@@ -80,7 +80,11 @@ and check (sign , cG : signature * ctx) (e : exp) (t : exp) : unit =
   (*    check (sign, (f, s)::cG) e t *)
   (* | Fn (f, e), Pi(Some n, s, t) -> *)
   (*    check (sign, (f, s)::cG) e (subst (n, Var f) t) *)
-  | Fn (f, e), _ -> assert false
+  | Fn (fs, e), Pi(tel, t) ->
+     let t' = List.fold_left2 (fun t f (_, n, s) -> subst(n, Var f) t) t fs tel in
+     let cGext = List.map2 (fun f (_, _, s) -> f, s) fs tel in
+     check (sign, cGext @ cG) e t'
+
 
   (* terms from the syntactic framework *)
   | Lam (f, e), _ -> assert false
