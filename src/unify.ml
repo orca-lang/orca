@@ -21,7 +21,6 @@ let rec occur_check n e =
 and occur_check_tel n tel =
   match tel with
   | [] -> false
-  (* | Unnamed e::tel -> occur_check n e || occur_check_tel n tel *)
   | (_, n', e)::tel when n != n' ->
      occur_check n e || occur_check_tel n tel
   | (_, _, e):: _ ->
@@ -36,7 +35,7 @@ let rec unify sign e1 e2 =
     | Univ Star, Univ Star -> []
     | Univ (Set n) , Univ(Set n') when n = n' -> []
     | Univ (Set n), Univ(Set n') -> raise (Error.Error ("Universes don't match: " ^ string_of_int n ^ " != " ^ string_of_int n'))
-    | Pi (tel, t), Pi(tel', t') -> unify_tel sign tel t tel' t'
+    | Pi (tel, t), Pi(tel', t') -> unify_pi sign tel t tel' t'
     | Arr(e1, e2), Arr(e1', e2') -> unify_many sign [e1;e2] [e1';e2']
     | Box(g, e), Box(g', e') -> unify_many sign [g; e] [g'; e']
     | Fn(ns, e), Fn(ns', e') ->
@@ -92,7 +91,7 @@ and unify_many sign es1 es2 =
     List.fold_left2 unify_each [] es1 es2
   else raise (Error.Error "Unequal number of parameters during unification.")
 
-and unify_tel sign tel1 t1 tel2 t2 =
+and unify_pi sign tel1 t1 tel2 t2 =
   let subst_list_in_tel sigma tel =
     List.map (fun (i, n, e) -> i, n, subst_list sigma e) tel
   in
@@ -104,4 +103,4 @@ and unify_tel sign tel1 t1 tel2 t2 =
      let sigma = (n1, Var n2) :: (unify sign e1 e2) in
      let tel1' = subst_list_in_tel sigma tel1 in
      let tel2' = subst_list_in_tel sigma tel2 in
-     sigma @ (unify_tel sign tel1' t1 tel2' t2)
+     sigma @ (unify_pi sign tel1' t1 tel2' t2)
