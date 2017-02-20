@@ -136,10 +136,10 @@ and pproc_tel (s : sign) (cG : ctx) (cP : bctx) : E.exp -> I.tel * I.exp =
   | E.Arr (E.Annot (E.Ident n, t0), t1) ->
      let cG', n' = add_name_ctx cG n in
      let tel, t = pproc_tel s cG' cP t1 in
-     (n', pproc_exp s cG cP t0) :: tel, t
+     (Syntax.Explicit, n', pproc_exp s cG cP t0) :: tel, t
   | E.Arr (t0, t1) ->
      let tel, t = pproc_tel s cG cP t1 in
-     (Name.gen_floating_name (), pproc_exp s cG cP t0) :: tel , t
+     (Syntax.Explicit, Name.gen_floating_name (), pproc_exp s cG cP t0) :: tel , t
   | t -> [], pproc_exp s cG cP t
 
 and pproc_app (s : sign) (cG : ctx) (cP : bctx) : E.exp -> I.exp * I.exp list =

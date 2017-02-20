@@ -22,9 +22,9 @@ and occur_check_tel n tel =
   match tel with
   | [] -> false
   (* | Unnamed e::tel -> occur_check n e || occur_check_tel n tel *)
-  | (n', e)::tel when n != n' ->
+  | (_, n', e)::tel when n != n' ->
      occur_check n e || occur_check_tel n tel
-  | (_, e):: _ ->
+  | (_, _, e):: _ ->
      occur_check n e
 
 let print_subst sigma = "[" ^ String.concat ", " (List.map (fun (x, e) -> print_exp e ^ "/" ^ print_name x) sigma) ^ "]"
@@ -92,13 +92,13 @@ and unify_many sign es1 es2 =
 
 and unify_tel sign tel1 t1 tel2 t2 =
   let subst_list_in_tel sigma tel =
-    List.map (fun (n, e) -> n, subst_list sigma e) tel
+    List.map (fun (i, n, e) -> i, n, subst_list sigma e) tel
   in
   match tel1, tel2 with
   | [], [] -> unify sign t1 t2
   | tel1, [] -> unify sign (Pi (tel1, t1)) t2
   | [], tel2 -> unify sign t1 (Pi (tel2, t2))
-  | (n1, e1)::tel1, (n2, e2)::tel2 ->
+  | (_, n1, e1)::tel1, (_, n2, e2)::tel2 ->
      let sigma = (n1, Var n2) :: (unify sign e1 e2) in
      let tel1' = subst_list_in_tel sigma tel1 in
      let tel2' = subst_list_in_tel sigma tel2 in

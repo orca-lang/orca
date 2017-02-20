@@ -123,7 +123,7 @@ and check (sign , cG : signature * ctx) (e : exp) (t : exp) : unit =
 
 and check_spine (sign, cG) sp tel t =
   match sp, tel with
-  | e::sp', (x, s)::tel ->
+  | e::sp', (_, x, s)::tel ->
      check (sign, cG) e s ;
      let tel', t' = subst_tel (x, e) tel t in
      check_spine (sign, (x, s)::cG) sp' tel' t'
@@ -133,7 +133,7 @@ and check_spine (sign, cG) sp tel t =
 and check_tel (sign, cG) tel t =
   match tel with
   | [] -> infer (sign, cG) t
-  | (x, s)::tel' ->
+  | (_, x, s)::tel' ->
      let ts = assert_universe (infer (sign, cG) s) in
      let tt = assert_universe (infer (sign, cG) (Pi(tel', t))) in
      begin match tt with
@@ -158,16 +158,23 @@ let tc_constructor (sign : signature) (universe : exp) (n , ct : def_name * exp)
 
 let decls_to_constructors = List.map (fun (n, e) -> Constructor (n, e))
 
+let add_params_to_tp ps = function
+  | Pi (tel, t) -> Pi (ps @ tel, t)
+  | t -> Pi (ps, t)
+
 let tc_program (sign : signature) : program -> signature = function
   | Data (n, ps, e, ds) ->
-     (* let add_params e = List.fold_left (fun t2 (_, n, t1) -> Pi(Some n, t1, t2)) e ps in *)
-     (* let t = add_params e in *)
-     (* Debug.print_string ("Typechecking data declaration: " ^ n ^ ":" ^ print_exp t ^ "\n"); *)
-     (* let u = assert_universe (infer (sign, []) t) in *)
-     (* let sign' = (Constructor(n,t))::sign in *)
-     (* let _ = List.map (fun (n, ct) -> tc_constructor sign' u (n, add_params ct)) ds in *)
-  (* (decls_to_constructors ds) @ sign' *)
-     assert false
+     let add_params = function
+       | Pi (tel, t) -> Pi (ps @ tel, t)
+       | t -> Pi (ps, t)
+     in
+     let t = add_params e in
+     Debug.print_string ("Typechecking data declaration: " ^ n ^ ":" ^ print_exp t ^ "\n");
+     let u = assert_universe (infer (sign, []) t) in
+     let sign' = (Constructor(n,t))::sign in
+     let _ = List.map (fun (n, ct) -> tc_constructor sign' u (n, add_params ct)) ds in
+     (decls_to_constructors ds) @ sign'
+
 
   | Syn (n, ps, e, ds) ->
      Debug.print_string ("Typechecking syn declaration: " ^ n);
