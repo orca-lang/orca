@@ -119,9 +119,12 @@ module Int = struct
 
   let (--) l n = List.filter ((!=) n) l
 
-  type exp =
-    | Star
+  type universe
+    = Star
     | Set of int
+
+  type exp
+    = Univ of universe
     | Pi of tel * exp  (* A pi type *)
     | Arr of exp * exp (* A syntactic type *)
     | Box of exp * exp
@@ -173,8 +176,7 @@ module Int = struct
 
   let rec fv =
     function
-    | Star -> []
-    | Set n ->  []
+    | Univ _ -> []
     | Pi (tel, t) ->fv_tel tel t
     | Arr (t, e) -> fv t @ fv e
     | Box (ctx, e) -> fv ctx @ fv e
@@ -206,8 +208,7 @@ module Int = struct
     let rec refresh (rep : (name * name) list) : exp -> exp =
       let f x = refresh rep x in
       function
-      | Star -> Star
-      | Set n ->  Set n
+      | Univ u -> Univ u
       | Pi (tel, t) -> let tel', t' = refresh_tel rep tel t in Pi(tel', t')
       | Arr (t, e) -> Arr(f t, f e)
       | Box (ctx, e) -> Box(f ctx, f e)
@@ -249,8 +250,7 @@ module Int = struct
   let rec refresh_free_var (x , y : name * name) (e : exp) : exp =
     let f e = refresh_free_var (x, y) e in
     match e with
-    | Star -> Star
-    | Set n ->  Set n
+    | Univ u -> Univ u
     | Pi (tel, t) ->
        let tel', t' = refresh_free_var_tel (x, y) tel t in
        Pi (tel', t')
@@ -289,8 +289,7 @@ module Int = struct
   let rec subst (x, es : name * exp) (e : exp) :  exp =
     let f e = subst (x, es) e in
     match e with
-    | Star -> Star
-    | Set n ->  Set n
+    | Univ u -> Univ u
     | Pi (tel, t) ->
        let tel', t' = subst_tel (x, es) tel t in
        Pi(tel', t')
@@ -333,10 +332,12 @@ module Int = struct
     List.fold_left (fun e s -> subst s e) e sigma
 
   (* Pretty printer -- could be prettier *)
-
-  let rec print_exp = function
+  let print_universe = function
     | Star -> "*"
     | Set n -> "set_" ^ string_of_int n
+
+  let rec print_exp = function
+    | Univ u -> print_universe u
     | Pi (tel, t) -> print_tel tel t
     | Arr (t, e) -> "(->> " ^ print_exp t ^ " " ^ print_exp e ^ ")"
     | Box (ctx, e) -> "(|- " ^ print_exp ctx ^ " " ^ print_exp e ^ ")"

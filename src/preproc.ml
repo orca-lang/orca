@@ -102,8 +102,8 @@ let rec get_bound_var_ctx_in_pat (p : E.pat) : bctx =
 let rec pproc_exp (s : sign) (cG : ctx) (cP : bctx) : E.exp -> I.exp =
   let f e = pproc_exp s cG cP e in
   function
-  | E.Star -> I.Star
-  | E.Set n -> I.Set n
+  | E.Star -> I.Univ I.Star
+  | E.Set n -> I.Univ (I.Set n)
   | E.Arr (t0, t1) ->
      let tel, t' = pproc_tel s cG cP (E.Arr (t0, t1)) in
      I.Pi (tel, t')

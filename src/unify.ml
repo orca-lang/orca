@@ -33,9 +33,9 @@ let rec unify sign e1 e2 =
   Debug.print (fun () -> "Comparing: " ^ print_exp e1 ^ " and " ^ print_exp e2) ;
   Debug.indent() ;
   let sigma = match Whnf.whnf sign e1, Whnf.whnf sign e2 with
-    | Star, Star -> []
-    | Set n , Set n' when n = n' -> []
-    | Set n, Set n' -> raise (Error.Error ("Universes don't match: " ^ string_of_int n ^ " != " ^ string_of_int n'))
+    | Univ Star, Univ Star -> []
+    | Univ (Set n) , Univ(Set n') when n = n' -> []
+    | Univ (Set n), Univ(Set n') -> raise (Error.Error ("Universes don't match: " ^ string_of_int n ^ " != " ^ string_of_int n'))
     | Pi (tel, t), Pi(tel', t') -> unify_tel sign tel t tel' t'
     | Arr(e1, e2), Arr(e1', e2') -> unify_many sign [e1;e2] [e1';e2']
     | Box(g, e), Box(g', e') -> unify_many sign [g; e] [g'; e']

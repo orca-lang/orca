@@ -2,25 +2,22 @@ open Syntax.Int
 open Signature
 open Name
 
-let max_universe (e1 : exp) (e2 : exp) : exp =
-  match e1, e2 with
+let max_universe (u1 : universe) (u2 : universe) : universe =
+  match u1, u2 with
   | Set n, Set n' -> Set (max n n')
   | Star, u -> u
   | u, Star -> u
-  | _,_ -> raise (Error.Violation "max_universe called with something that is not a universe")
 
 (* <= for universes *)
-let le_universe (e1 : exp) (e2 : exp) : bool =
-  match e1, e2 with
+let le_universe (u1 : universe) (u2 : universe) : bool =
+  match u1, u2 with
   | Set n, Set n' -> n <= n'
   | Star, _ -> true
   | _, Star -> false
-  | _,_ -> raise (Error.Violation "le_universe called with something that is not a universe")
 
-let assert_universe : exp -> exp =
+let assert_universe : exp -> universe =
   function
-  | Set n -> Set n
-  | Star -> Star
+  | Univ u -> u
   | e ->
      Debug.print (fun () -> "Assert universe failed for " ^ print_exp e ^ ".") ;
      raise (Error.Error "Not a universe.")
@@ -36,38 +33,41 @@ let rec infer (sign, cG : signature * ctx) (e : exp) : exp =
        lookup_sign n sign
     | Var n ->
 
-     begin
-       try List.assoc n cG
-       with Not_found ->
-         raise (Error.Violation
-                  ("Unbound var after preprocessing, this cannot happen. (Var: " ^ print_name n ^ ")"))
-     end
+       begin
+         try List.assoc n cG
+         with Not_found ->
+           raise (Error.Violation
+                    ("Unbound var after preprocessing, this cannot happen. (Var: " ^ print_name n ^ ")"))
+       end
     | App (h, sp) ->
-     begin match infer (sign, cG) h with
-     | Pi (tel, t) ->
-        check_spine (sign, cG) sp tel t
-     | _ -> raise (Error.Error "The left hand side of the application was not of function type")
-     end
+       begin match infer (sign, cG) h with
+       | Pi (tel, t) ->
+          check_spine (sign, cG) sp tel t
+       | _ -> raise (Error.Error "The left hand side of the application was not of function type")
+       end
 
-  | Star -> Set 0
-  | Set n -> Set (n + 1)
-  | Pi (tel, t) ->
-     check_tel (sign, cG) tel t
+    | Univ u -> Univ (infer_universe u)
+    | Pi (tel, t) ->
+       check_tel (sign, cG) tel t
 
-  | Box (ctx, e) ->
-     (* TODO: only if ctx is a context and e is a syntactic type *)
-     Star
+    | Box (ctx, e) ->
+       (* TODO: only if ctx is a context and e is a syntactic type *)
+       Univ Star
 
-  | _ ->
-     begin
-       Debug.print (fun() -> "Was asked to infer the type of " ^ print_exp e
-                             ^ "but the type is not inferrable") ;
-       raise (Error.Error "Cannot infer the type of this expression")
-     end
+    | _ ->
+       begin
+         Debug.print (fun() -> "Was asked to infer the type of " ^ print_exp e
+                               ^ "but the type is not inferrable") ;
+         raise (Error.Error "Cannot infer the type of this expression")
+       end
     end in
   Debug.deindent ();
   Debug.print(fun() -> "Result of infer for " ^ print_exp e ^ " was " ^ print_exp res) ;
   res
+
+and infer_universe = function
+  | Star -> Set 0
+  | Set n -> Set (n + 1)
 
 and check (sign , cG : signature * ctx) (e : exp) (t : exp) : unit =
   Debug.print (fun () ->
@@ -140,25 +140,24 @@ and check_tel (sign, cG) tel t =
   match tel with
   | [] -> infer (sign, cG) t
   | (_, x, s)::tel' ->
-     let ts = assert_universe (infer (sign, cG) s) in
-     let tt = assert_universe (infer (sign, (x, s)::cG) (Pi(tel', t))) in
-     begin match tt with
-     | Star -> Star (* Star is impredicative *)
-     | Set n -> max_universe ts tt
-     | _ -> raise (Error.Violation "Impossible case, we asserted universe!")
+     let us = assert_universe (infer (sign, cG) s) in
+     let ut = assert_universe (infer (sign, (x, s)::cG) (Pi(tel', t))) in
+     begin match ut with
+     | Star -> Univ Star (* Star is impredicative *)
+     | Set n -> Univ (max_universe us ut)
      end
 
-let tc_constructor (sign : signature) (universe : exp) (n , ct : def_name * exp) : unit =
+let tc_constructor (sign : signature) (u : universe) (n , ct : def_name * exp) : unit =
   Debug.print_string ("Typechecking constructor: " ^ n) ;
   let u' = assert_universe(infer (sign, []) ct) in
-  if le_universe u' universe then (* MMMM *)
+  if le_universe u' u then (* MMMM *)
     (* TODO additionally we should check that
        it really is a constructor for the type *)
     ()
   else
     begin
-      Debug.print_string ("Constructor " ^ n ^ " is in universe: " ^ print_exp u');
-      Debug.print_string ("but is expected " ^ print_exp universe);
+      Debug.print_string ("Constructor " ^ n ^ " is in universe: " ^ print_universe u');
+      Debug.print_string ("but is expected " ^ print_universe u);
       raise (Error.Error ("The constructor " ^ n ^" is in the wrong universe."))
     end
 
@@ -176,6 +175,7 @@ let tc_program (sign : signature) : program -> signature = function
      in
      let t = add_params e in
      Debug.print_string ("Typechecking data declaration: " ^ n ^ ":" ^ print_exp t ^ "\n");
+     (* TODO Add positivity checking and check that it build a value of the right type *)
      let u = assert_universe (infer (sign, []) t) in
      let sign' = (Constructor(n,t))::sign in
      let _ = List.map (fun (n, ct) -> tc_constructor sign' u (n, add_params ct)) ds in
