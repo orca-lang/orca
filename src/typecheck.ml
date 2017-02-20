@@ -49,24 +49,8 @@ let rec infer (sign, cG : signature * ctx) (e : exp) : exp =
 
   | Star -> Set 0
   | Set n -> Set (n + 1)
-  (* | Pi (Some x, s, t) -> *)
-  (*    let ts = assert_universe (infer (sign, cG) s) in *)
-  (*    let tt = assert_universe (infer (sign, (x , s) :: cG) t) in *)
-  (*    begin match tt with *)
-  (*    | Star -> Star             (\* Star is impredicative. *\) *)
-  (*    | Set n -> max_universe ts tt *)
-  (*    | _ -> raise (Error.Violation "Impossible case, we asserted universe!") *)
-  (*    end *)
-
-  (* | Pi (None, s, t) -> *)
-  (*    let ts = assert_universe (infer (sign, cG) s) in *)
-  (*    let tt = assert_universe (infer (sign, cG) t) in *)
-  (*    begin match tt with *)
-  (*    | Star -> Star             (\* Star is impredicative. *\) *)
-  (*    | Set n -> max_universe ts tt *)
-  (*    | _ -> raise (Error.Violation "Impossible case, we asserted universe!") *)
-  (*    end *)
-  | Pi (tel, t) -> assert false
+  | Pi (tel, t) ->
+     check_tel (sign, cG) tel t
 
   | Box (ctx, e) ->
      (* TODO: only if ctx is a context and e is a syntactic type *)
@@ -145,6 +129,18 @@ and check_spine (sign, cG) sp tel t =
      check_spine (sign, (x, s)::cG) sp' tel' t'
   | [], [] -> t
   | _ -> raise (Error.Error "Spine and telescope of different lengths while type checking.")
+
+and check_tel (sign, cG) tel t =
+  match tel with
+  | [] -> infer (sign, cG) t
+  | (x, s)::tel' ->
+     let ts = assert_universe (infer (sign, cG) s) in
+     let tt = assert_universe (infer (sign, cG) (Pi(tel', t))) in
+     begin match tt with
+     | Star -> Star (* Star is impredicative *)
+     | Set n -> max_universe ts tt
+     | _ -> raise (Error.Violation "Impossible case, we asserted universe!")
+     end
 
 let tc_constructor (sign : signature) (universe : exp) (n , ct : def_name * exp) : unit =
   Debug.print_string ("Typechecking constructor: " ^ n) ;
