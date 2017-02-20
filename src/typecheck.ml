@@ -21,7 +21,9 @@ let assert_universe : exp -> exp =
   function
   | Set n -> Set n
   | Star -> Star
-  | _ -> raise (Error.Error "Not a universe.")
+  | e ->
+     Debug.print (fun () -> "Assert universe failed for " ^ print_exp e ^ ".") ;
+     raise (Error.Error "Not a universe.")
 
 let rec infer (sign, cG : signature * ctx) (e : exp) : exp =
   Debug.print (fun () -> "Infer called with: " ^ print_exp e ^ " in context: " ^ print_ctx cG);
@@ -135,7 +137,7 @@ and check_tel (sign, cG) tel t =
   | [] -> infer (sign, cG) t
   | (_, x, s)::tel' ->
      let ts = assert_universe (infer (sign, cG) s) in
-     let tt = assert_universe (infer (sign, cG) (Pi(tel', t))) in
+     let tt = assert_universe (infer (sign, (x, s)::cG) (Pi(tel', t))) in
      begin match tt with
      | Star -> Star (* Star is impredicative *)
      | Set n -> max_universe ts tt
@@ -166,7 +168,7 @@ let tc_program (sign : signature) : program -> signature = function
   | Data (n, ps, e, ds) ->
      let add_params = function
        | Pi (tel, t) -> Pi (ps @ tel, t)
-       | t -> Pi (ps, t)
+       | t -> if Util.empty_list ps then t else Pi (ps, t)
      in
      let t = add_params e in
      Debug.print_string ("Typechecking data declaration: " ^ n ^ ":" ^ print_exp t ^ "\n");

@@ -328,7 +328,7 @@ module Int = struct
 
   let rec print_exp = function
     | Star -> "*"
-    | Set n -> "set" ^ string_of_int n
+    | Set n -> "set_" ^ string_of_int n
     | Pi (tel, t) -> print_tel tel t
     | Arr (t, e) -> "(->> " ^ print_exp t ^ " " ^ print_exp e ^ ")"
     | Box (ctx, e) -> "(|- " ^ print_exp ctx ^ " " ^ print_exp e ^ ")"
@@ -348,7 +348,7 @@ module Int = struct
     | Annot (e1, e2) -> "(: " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
     | Under -> "_"
   and print_tel tel t = match tel with
-    | [] -> print_exp t
+    | [] -> "(pil " ^ print_exp t ^ ")"
     | (_, x, e) :: tel when is_name_floating x ->
        "(-> " ^ print_exp e ^ " " ^ print_tel tel t ^ ")"
     | (_, x, e) :: tel -> "(pi " ^ print_name x ^ " " ^ print_exp e ^ " " ^ print_tel tel t ^ ")"
