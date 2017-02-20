@@ -1,0 +1,6 @@
+* Add syntax for (x: A) (y: B) (z: C) -> D
+* Add syntax for (x y: A)-> B
+* Try the implicit parameters with unification thing
+* Add the syntax for implicit pies
+* change print_tel to print_pi and a proper print_tel
+* negative test cases!
