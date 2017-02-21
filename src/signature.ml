@@ -11,12 +11,14 @@ type signature_entry
 
 type signature = signature_entry list
 
-let rec lookup_sign_entry (n : def_name) (sign : signature) : signature_entry =
-  let el = function
+let signature_entry_name = function
     | Definition (n', _, _)
     | Program (n', _, _)
     | DataDef (n', _, _, _)
-    | Constructor (n', _, _) -> n = n'
+    | Constructor (n', _, _) -> n'
+
+let rec lookup_sign_entry (n : def_name) (sign : signature) : signature_entry =
+  let el en = signature_entry_name en = n
   in
     try
       List.find el sign
@@ -51,6 +53,8 @@ let lookup_sign_def n sign =
   | Constructor _ -> None
   | DataDef _ -> None
   | Program _ -> assert false
+
+let rec print_signature sign = "[" ^ String.concat "; " (List.map signature_entry_name sign) ^ "]"
 
 type ctx = (name * exp) list
 

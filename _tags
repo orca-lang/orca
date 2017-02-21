@@ -1,6 +1,7 @@
-true : use_menhir, annot
+true : use_menhir, use_str, annot
 <src/lexer.ml> : syntax(camlp4o), package(ulex)
 <src/parser.ml> : package(menhirLib, ulex)
+<src/repl.ml> : package(ulex)
 <src/orca.ml> : package(ulex, menhirLib)
 
-<src/*.{native,byte}> : package(ulex, menhirLib)
+<src/*.{native,byte}> : package(ulex, menhirLib), use_unix

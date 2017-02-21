@@ -1,9 +1,6 @@
 
 module Menhir = MenhirLib.Convert.Simplified
 
-exception Syntax_error of Lexing.position
-exception Scanning_error of Lexing.position * string
-
 let file_name = "orca"
 
 let parse menhir_parser lexbuf =
@@ -17,8 +14,8 @@ let parse menhir_parser lexbuf =
   in try
        revised_parser lexer
     with
-      | Lexer.Error x -> raise (Scanning_error (!position, x))
-      | Parser.Error  -> raise (Syntax_error !position)
+      | Lexer.Error x -> raise (Error.Scanning_error (!position, x))
+      | Parser.Error  -> raise (Error.Syntax_error !position)
 
 
 let set_print_external, get_print_external =
@@ -31,24 +28,15 @@ let set_parse_only, get_parse_only =
   (fun () -> print := true),
   (fun () -> !print)
 
-
 let usage_msg = "Bears ahead"
 let file = ref ""
 let args = [("-ext", Arg.Unit set_print_external, "Print external syntax before preprocessing.")
            ;("-po", Arg.Unit set_parse_only, "Only parse and preprocess the input (Do not run the typechecker).")
            ;("-debug", Arg.Unit Debug.set_debug_on, "Generates a log file with information about the file that was checked")
+           ;("-no-wrapper", Arg.Unit Repl.set_no_wrapper, "Turns off using a read line wrapper.")
            ]
 
-let () =
-  try
-    Arg.parse args (fun s -> file := s) usage_msg;
-
-    Debug.print (fun () -> "Processing file: " ^ !file) ;
-    let ch = if !file = "" then stdin else open_in !file in
-    let lexbuf = Ulexing.from_utf8_channel ch in
-
-    let program = parse Parser.program lexbuf in
-
+let execute_code (sign : Signature.signature) (program : Syntax.Ext.program list) : Signature.signature =
     Debug.print_string "* The external tree is:";
     Debug.print (fun () -> String.concat "\n"
         (List.rev (List.map Syntax.Ext.print_program program)));
@@ -59,10 +47,9 @@ let () =
       in
       print_string ("The external tree is:\n" ^ ext_pp ^ "\n")
     end;
-
     let _, int_rep = List.fold_left
                            (fun (s, ds) d -> let s', d' = Preproc.pre_process s d in s', (d' :: ds))
-                           ([], [])
+                           (List.map Signature.signature_entry_name sign, [])
                            program
     in
     let int_rep = List.rev int_rep in (* Because the fold inverts them. TODO consider a right fold? *)
@@ -76,15 +63,37 @@ let () =
 
     if not (get_parse_only ()) then begin
            Debug.print_string "Starting typechecking." ;
-            let _sign' = List.fold_left Typecheck.tc_program [] int_rep in
+            let sign' = List.fold_left Typecheck.tc_program sign int_rep in
             Debug.print_string "The file was typechecked.";
-            print_string "File type-checked successfully.\n"
-      end;
+            print_string "File type-checked successfully.\n";
+            sign'
+      end
+    else
+      sign
+
+let parse_fun : Ulexing.lexbuf -> Syntax.Ext.program list =
+    parse Parser.program
+let () =
+  try
+    Arg.parse args (fun s -> file := s) usage_msg;
+
+    Debug.print (fun () -> "Processing file: " ^ !file) ;
+    if !file = ""
+    then Repl.toplevel [] parse_fun execute_code
+    else
+      begin
+        let ch = open_in !file in
+        let lexbuf = Ulexing.from_utf8_channel ch in
+
+        let program  : Syntax.Ext.program list = parse_fun lexbuf in
+        let _= execute_code [] program in
+        ()
+      end
   with
-  | Syntax_error pos ->
+  | Error.Syntax_error pos ->
      Debug.print_string "There was a syntax error in the file." ;
      Printf.printf "Syntax error in line %d, col %d.\n" pos.Lexing.pos_lnum pos.Lexing.pos_cnum
-  | Scanning_error (pos, s) ->
+  | Error.Scanning_error (pos, s) ->
      Debug.print_string "There was a lexing error in the file." ;
      Printf.printf "Scanning error in line %d, col %d\nMessage:%s\n"
                    pos.Lexing.pos_lnum pos.Lexing.pos_cnum s
