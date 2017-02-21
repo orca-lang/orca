@@ -1,6 +1,8 @@
 open Signature
 
-let prompt_str = "🐋 > "
+let prompt_str = ref "🐋 > "
+
+let set_prompt s = prompt_str := s
 
 let set_no_wrapper, get_wrapper =
   let wrap = ref true in
@@ -24,7 +26,7 @@ let read_toplevel parser () =
       end
   in
 
-  let str = read_more prompt_str  "" in
+  let str = read_more !prompt_str  "" in
   let str = if true || ends_with_period str then Str.first_chars str (String.length str - 1) else str in
   Debug.print (fun () -> "Repl read:" ^ str);
   let lex = Ulexing.from_utf8_string (str ^ "\n") in
