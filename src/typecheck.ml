@@ -151,14 +151,25 @@ let rec check_tel (sign, cG) u tel =
      else
        let us = check_type (sign, cG) s in
        let u' = max_universe us u in
+       Debug.print (fun () -> "Checking telescope at variable " ^ print_name x
+                           ^ " which has universe " ^ print_universe us
+                           ^ " upgrading telescope's universe from "
+                           ^ print_universe u ^ " to " ^ print_universe u');
        check_tel (sign, (x, s) :: cG) u' tel'
 
 let tc_constructor (sign , cG : signature * ctx) (u : universe) (tel : tel)
                    (n , tel', (n', es) : def_name * tel * dsig) : signature_entry =
   Debug.print_string ("Typechecking constructor: " ^ n) ;
-  let _ = check_tel (sign, cG) u tel' in
-  List.iter2 (check (sign, (ctx_from_tel tel') @ cG)) es (List.map (fun (_,_,t) -> t) tel);
-  Constructor (n, tel', (n', es))
+  let uc = check_tel (sign, cG) u tel' in
+  if le_universe uc u then
+    begin
+      List.iter2 (check (sign, (ctx_from_tel tel') @ cG)) es (List.map (fun (_,_,t) -> t) tel);
+      Constructor (n, tel', (n', es))
+    end
+  else
+    raise (Error.Error ("Constructor " ^ n ^ " has universe " ^ print_universe uc
+                        ^ " which does not fit in " ^ print_universe u
+                        ^ ", the universe of the data type " ^ n'))
 
 let tc_program (sign : signature) : program -> signature = function
   | Data (n, ps, is, u, ds) ->
@@ -167,7 +178,7 @@ let tc_program (sign : signature) : program -> signature = function
      let cG = ctx_from_tel ps in
      let u'' = check_tel (sign, cG) u' is in
      let sign' = DataDef (n, ps, is, u'') :: sign in
-     (List.map (tc_constructor (sign', cG) u'' (ps @ is)) ds) @ sign'
+     (List.map (tc_constructor (sign', cG) u (ps @ is)) ds) @ sign'
      (* TODO Add positivity checking *)
 
   | Syn (n, ps, e, ds) ->

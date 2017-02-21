@@ -1,0 +1,7 @@
+data nat : * where
+| z : nat
+| s : nat -> nat
+
+data vec (A : set1) : nat -> set where
+| nil : vec A z
+| cons : (n : nat) -> (x : A) -> vec A n -> vec A (s n)
