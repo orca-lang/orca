@@ -173,7 +173,7 @@ module Int = struct
     (* name, parameters, indices, universe *)
     | Data of def_name * tel * tel * universe * decls
     | Syn of def_name * tel * exp * decls
-    | DefPM of def_name * exp * pat_decls
+    | DefPM of def_name * tel * exp * pat_decls
     | Def of def_name * exp * exp
 
   let rec fv =
@@ -400,6 +400,6 @@ module Int = struct
     | Data (n, ps, is, u, decls) ->
        "(data " ^ n ^ " (" ^ print_params ps ^ ") (" ^ print_params is ^ ") " ^ print_universe u  ^ "\n" ^ print_decls decls ^ ")"
     | Syn (n, ps, e, decls) -> "(syn " ^ n ^ " " ^ print_params ps ^ "  " ^ print_exp e ^ "\n" ^ print_decls decls ^ ")"
-    | DefPM (n, e, decls) -> "(def " ^ n ^ " " ^ print_exp e ^ "\n" ^ print_def_decls decls ^ ")"
+    | DefPM (n, tel, e, decls) -> "(def " ^ n ^ " (" ^ print_tel tel ^ ") " ^ print_exp e ^ "\n" ^ print_def_decls decls ^ ")"
     | Def (n, e1, e2) -> "(def " ^ n ^ " " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
 end

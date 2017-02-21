@@ -244,7 +244,11 @@ let pre_process s = function
      s'', I.Syn (n, ps', e', ds')
   | E.DefPM (n, e, ds) ->
      let s' = add_name_sign s n in
-     s', I.DefPM (n, pproc_exp s [] [] e, List.map (pproc_def_decl s') ds)
+     let e' = pproc_exp s [] [] e in
+     begin match e' with
+     | I.Pi(tel, e'') -> s', I.DefPM (n, tel, e'', List.map (pproc_def_decl s') ds)
+     | e'' -> s', I.DefPM (n, [], e'', List.map (pproc_def_decl s') ds)
+     end
   | E.Def (n, t, e) ->
      let s' = add_name_sign s n in
      s', I.Def (n, pproc_exp s [] [] t, pproc_exp s [] [] e)

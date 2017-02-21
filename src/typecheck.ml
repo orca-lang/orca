@@ -173,7 +173,7 @@ let tc_program (sign : signature) : program -> signature = function
   | Syn (n, ps, e, ds) ->
      Debug.print_string ("Typechecking syn declaration: " ^ n);
      assert false
-  | DefPM (n, t, ds) ->
+  | DefPM (n, tel, t, ds) ->
      Debug.print_string ("Typechecking pattern matching definition: " ^ n);
      let _u = check_type (sign, []) t in
      List.iter (fun (p, rhs) -> Matching.check_clause n p rhs t) ds;
