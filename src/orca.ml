@@ -93,17 +93,22 @@ let () =
   with
   | Error.Syntax_error pos ->
      Debug.print_string "There was a syntax error in the file." ;
-     Printf.printf "Syntax error in line %d, col %d.\n" pos.Lexing.pos_lnum pos.Lexing.pos_cnum
+     Printf.printf "Syntax error in line %d, col %d.\n" pos.Lexing.pos_lnum pos.Lexing.pos_cnum ;
+     exit 1
   | Error.Scanning_error (pos, s) ->
      Debug.print_string "There was a lexing error in the file." ;
      Printf.printf "Scanning error in line %d, col %d\nMessage:%s\n"
-                   pos.Lexing.pos_lnum pos.Lexing.pos_cnum s
+                   pos.Lexing.pos_lnum pos.Lexing.pos_cnum s;
+     exit 1
   | Ulexing.Error ->
      Debug.print_string "There was a lexing error in the file.(2)" ;
-     Printf.printf "Ulexing Error\n"
+     Printf.printf "Ulexing Error\n";
+     exit 1
   | Error.Error msg ->
      Debug.print_string ("An error occured while processing the input:\n" ^ msg) ;
-     Printf.printf "An error occured while processing your input.\n\t%s\n" msg
+     Printf.printf "An error occured while processing your input.\n\t%s\n" msg ;
+     exit 1
   | Error.Violation msg ->
      Debug.print_string ("An unexpected error occured, report this as a bug.\n" ^ msg);
-     Printf.printf "An unexpected error occured, report this as a bug.\n\t%s\n" msg
+     Printf.printf "An unexpected error occured, report this as a bug.\n\t%s\n" msg ;
+     exit 1
