@@ -101,7 +101,7 @@ and check (sign , cG : signature * ctx) (e : exp) (t : exp) : unit =
          raise (Error.Error ("Cannot check expression " ^ print_exp e))
      in
      try
-       let sigma = Unify.unify sign (fv t @ fv t') t t' in
+       let sigma = Unify.unify sign t t' in
        Debug.print (fun () -> "Unification for " ^ print_exp t ^ " with " ^
                                 print_exp t' ^ " succeeded with substitution "
                                 ^ Unify.print_subst sigma ^ ".")
@@ -126,7 +126,7 @@ and check_spine (sign, cG) sp tel t =
   match sp, tel with
   | e::sp', (_, x, s)::tel ->
      check (sign, cG) e s ;
-     let tel', t' = subst_tel (x, e) tel t in
+     let tel', t' = subst_pi (x, e) tel t in
      check_spine (sign, (x, s)::cG) sp' tel' t'
   | [], [] -> t
   | _ -> raise (Error.Error "Spine and telescope of different lengths while type checking.")

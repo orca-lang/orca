@@ -28,7 +28,7 @@ and occur_check_tel n tel =
 
 let print_subst sigma = "[" ^ String.concat ", " (List.map (fun (x, e) -> print_exp e ^ "/" ^ print_name x) sigma) ^ "]"
 
-let unify sign flex e1 e2 =
+let unify_flex sign flex e1 e2 =
   let is_flex n = List.mem n flex in
   let rec unify e1 e2 =
     Debug.print (fun () -> "Comparing: " ^ print_exp e1 ^ " and " ^ print_exp e2) ;
@@ -109,3 +109,5 @@ let unify sign flex e1 e2 =
        sigma @ (unify_pi sign tel1' t1 tel2' t2)
   in
   unify e1 e2
+
+let unify sign e1 e2 = unify_flex sign (fv e1 @ fv e2) e1 e2

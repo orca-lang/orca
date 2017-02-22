@@ -179,6 +179,11 @@ module Int = struct
     | DefPM of def_name * tel * exp * pat_decls
     | Def of def_name * exp * exp
 
+  let exp_of_pat (p : pat) : exp = assert false
+
+  (* Will fail if exp is not in pattern form *)
+  let pat_of_exp (e : exp) : pat = assert false
+
   let rec fv =
     function
     | Univ _ -> []
@@ -296,7 +301,7 @@ module Int = struct
     match e with
     | Univ u -> Univ u
     | Pi (tel, t) ->
-       let tel', t' = subst_tel (x, es) tel t in
+       let tel', t' = subst_pi (x, es) tel t in
        Pi(tel', t')
     | Arr (t, e) -> Arr(f t, f e)
     | Box (ctx, e) -> Box(f ctx, f e)
@@ -322,7 +327,7 @@ module Int = struct
     | Nil -> Nil
     | Annot (e1, e2) -> Annot(f e1, f e2)
     | Under -> Under
-  and subst_tel (x, es) tel t =
+  and subst_pi (x, es) tel t =
     match tel with
     | [] -> [], subst (x, es) t
     | (i, n, e) :: tel ->
@@ -330,11 +335,16 @@ module Int = struct
        (* the following cannot happen because n' is just fresh *)
        (* if List.mem n' (fv es) then raise (Error.Violation "Duplicate variable name would be captured.") ; *)
        let tel', t' = refresh_free_var_tel (n, n') tel t in
-       let tel'', t'' = subst_tel (x, es) tel' t' in
+       let tel'', t'' = subst_pi (x, es) tel' t' in
        (i, n', subst (x, es) e) :: tel'', t''
 
   let subst_list sigma e =
     List.fold_left (fun e s -> subst s e) e sigma
+
+  let subst_list_on_tel sigma tel =
+    List.map (fun (i, x, e) -> (i, x, subst_list sigma e)) tel
+
+  let elist_of_tel tel = List.map (fun (_, _, s) -> s) tel
 
   (* Pretty printer -- could be prettier *)
   let print_universe = function
