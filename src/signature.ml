@@ -54,6 +54,14 @@ let lookup_sign_def n sign =
   | DataDef _ -> None
   | Program _ -> assert false
 
+(* returns all the constructors of type n *)
+let lookup_constructors n sign =
+  let constructs_n = function
+    | Constructor(_, _, (n',_)) -> n = n'
+    | _ -> false
+  in
+  List.map signature_entry_name (List.filter constructs_n sign)
+
 let rec print_signature sign = "[" ^ String.concat "; " (List.map signature_entry_name sign) ^ "]"
 
 type ctx = (name * exp) list
