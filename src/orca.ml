@@ -1,4 +1,3 @@
-
 module Menhir = MenhirLib.Convert.Simplified
 
 let file_name = "orca"
@@ -37,7 +36,7 @@ let args = [("-ext", Arg.Unit set_print_external, "Print external syntax before 
            ;("-prompt", Arg.String Repl.set_prompt, "<string> Sets a custom prompt.")
            ]
 
-let execute_code (sign : Signature.signature) (program : Syntax.Ext.program list) : Signature.signature =
+let execute_code (sign : Sign.signature) (program : Syntax.Ext.program list) : Sign.signature =
     Debug.print_string "* The external tree is:";
     Debug.print (fun () -> String.concat "\n"
         (List.rev (List.map Syntax.Ext.print_program program)));
@@ -50,7 +49,7 @@ let execute_code (sign : Signature.signature) (program : Syntax.Ext.program list
     end;
     let _, int_rep = List.fold_left
                            (fun (s, ds) d -> let s', d' = Preproc.pre_process s d in s', (d' :: ds))
-                           (List.map Signature.signature_entry_name sign, [])
+                           (List.map Sign.signature_entry_name sign, [])
                            program
     in
     let int_rep = List.rev int_rep in (* Because the fold inverts them. TODO consider a right fold? *)
@@ -64,7 +63,7 @@ let execute_code (sign : Signature.signature) (program : Syntax.Ext.program list
 
     if not (get_parse_only ()) then begin
            Debug.print_string "Starting typechecking." ;
-            let sign' = List.fold_left Typecheck.tc_program sign int_rep in
+            let sign' = List.fold_left Prog.tc_program sign int_rep in
             Debug.print_string "The file was typechecked.";
             print_string "File type-checked successfully.\n";
             sign'

@@ -167,7 +167,10 @@ module Int = struct
   (* name of the constructed type, the type parameters, and the indices *)
   type dsig = def_name * exp list
   type decls = (def_name * tel * dsig) list
-  type pat_decls = (pats * exp) list
+  type rhs
+    = Just of exp
+    | Impossible of name
+  type pat_decls = (pats * rhs) list
 
   type program =
     (* name, parameters, indices, universe *)
@@ -388,7 +391,11 @@ module Int = struct
   let print_decls (decls : decls) : string =
     String.concat "\n" (List.map (fun (n, tel, dsig) -> "(" ^ n ^ " " ^ print_tel tel ^ " " ^ print_dsig dsig ^ ")") decls)
   let print_pats pats = String.concat " " (List.map (fun p -> "(" ^ print_pat p ^ ")") (List.rev pats))
-  let print_def_decls decls = String.concat "\n" (List.map (fun (pats, e) -> "(" ^ print_pats pats ^ " " ^ print_exp e ^ ")") decls)
+  let print_rhs = function
+    | Just e -> print_exp e
+    | Impossible x -> "(impossible " ^ print_name x ^ ")"
+  let print_def_decls decls =
+    String.concat "\n" (List.map (fun (pats, rhs) -> "(" ^ print_pats pats ^ " " ^ print_rhs rhs ^ ")") decls)
 
   let print_param = function
     | Implicit, n, e -> "(:i " ^ print_name n ^ " " ^ print_exp e ^ ")"

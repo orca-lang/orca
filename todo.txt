@@ -4,3 +4,4 @@
 * Add the syntax for implicit pies
 * change print_tel to print_pi and a proper print_tel
 * negative test cases!
+* Add syntax for impossible cases

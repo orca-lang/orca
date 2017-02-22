@@ -1,6 +1,5 @@
 open Syntax.Int
-open Signature
-
+open Sign
 
 let rec whnf (sign : signature) (e : exp) : exp =
   Debug.print (fun () -> "Computing the whnf of " ^ print_exp e ^ ".") ;

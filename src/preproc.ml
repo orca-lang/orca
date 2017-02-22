@@ -220,7 +220,7 @@ let pproc_def_decl s (pats, e) =
   let
     cG', pats' = List.fold_left (fun (cG, pats) pat -> let cG', pat' = pproc_pat s cG [] pat in cG', (pat'::pats)) ([], []) pats
   in
-  (pats', pproc_exp s cG' [] e)
+  (pats', I.Just (pproc_exp s cG' [] e))
 
 let params_to_ctx = List.map2 (fun (_, n, _) (_, n', _) -> n, n')
 

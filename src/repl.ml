@@ -1,4 +1,4 @@
-open Signature
+open Sign
 
 let prompt_str = ref "🐋 > "
 
