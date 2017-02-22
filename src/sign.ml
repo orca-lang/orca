@@ -62,6 +62,9 @@ let lookup_constructors n sign =
   in
   List.map signature_entry_name (List.filter constructs_n sign)
 
+(* Given the name of a type and a spine, return the parameter, the indices *)
+let split_idx_param (n : def_name) (sp : exp list) : exp list * exp list = assert false
+
 let rec print_signature sign = "[" ^ String.concat "; " (List.map signature_entry_name sign) ^ "]"
 
 type ctx = (name * exp) list
@@ -69,3 +72,7 @@ type ctx = (name * exp) list
 let print_ctx c = "[" ^ (String.concat "," (List.map (fun (x, e) -> print_name x ^ ": " ^ print_exp e) c)) ^ "]"
 
 let ctx_of_tel tel = List.map (fun (_, x, s) -> x, s) tel
+
+let rec ctx_subst s = function
+  | (x, t) :: cG -> (x, subst s t) :: (ctx_subst s cG)
+  | [] -> []
