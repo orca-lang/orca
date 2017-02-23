@@ -117,7 +117,7 @@ module Int = struct
   type index = int
   type def_name = string
 
-  let (--) l n = List.filter ((!=) n) l
+  let (--) l n = List.filter ((<>) n) l
 
   type universe
     = Star
@@ -178,13 +178,6 @@ module Int = struct
     | Syn of def_name * tel * exp * decls
     | DefPM of def_name * tel * exp * pat_decls
     | Def of def_name * exp * exp
-
-  let exp_of_pat (p : pat) : exp = assert false
-
-  (* Will fail if exp is not in pattern form *)
-  let pat_of_exp (e : exp) : pat = assert false
-
-  let pats_of_exps : exp list -> pats = List.map pat_of_exp
 
   let rec fv =
     function
@@ -346,6 +339,12 @@ module Int = struct
   let subst_list_on_tel sigma tel =
     List.map (fun (i, x, e) -> (i, x, subst_list sigma e)) tel
 
+  let rec compose_single_with_subst s = function
+    | [] -> []
+    | (y, t') :: sigma -> (y, subst s t') :: (compose_single_with_subst s sigma)
+
+  let compose_subst sigma delta = List.map (fun (x, t) -> x, subst_list sigma t) delta
+
   let exp_list_of_tel tel = List.map (fun (_, _, s) -> s) tel
 
   (* Pretty printer -- could be prettier *)
@@ -402,12 +401,12 @@ module Int = struct
 
   let print_decls (decls : decls) : string =
     String.concat "\n" (List.map (fun (n, tel, dsig) -> "(" ^ n ^ " " ^ print_tel tel ^ " " ^ print_dsig dsig ^ ")") decls)
-  let print_pats pats = String.concat " " (List.map (fun p -> "(" ^ print_pat p ^ ")") (List.rev pats))
+  let print_pats pats = String.concat " " (List.map (fun p -> "(" ^ print_pat p ^ ")") pats)
   let print_rhs = function
     | Just e -> print_exp e
     | Impossible x -> "(impossible " ^ print_name x ^ ")"
   let print_def_decls decls =
-    String.concat "\n" (List.map (fun (pats, rhs) -> "(" ^ print_pats pats ^ " " ^ print_rhs rhs ^ ")") decls)
+    String.concat "\n" (List.map (fun (pats, rhs) -> "(" ^ print_pats pats ^ " => " ^ print_rhs rhs ^ ")") decls)
 
   let print_param = function
     | Implicit, n, e -> "(:i " ^ print_name n ^ " " ^ print_exp e ^ ")"
@@ -421,4 +420,42 @@ module Int = struct
     | Syn (n, ps, e, decls) -> "(syn " ^ n ^ " " ^ print_params ps ^ "  " ^ print_exp e ^ "\n" ^ print_decls decls ^ ")"
     | DefPM (n, tel, e, decls) -> "(def " ^ n ^ " (" ^ print_tel tel ^ ") " ^ print_exp e ^ "\n" ^ print_def_decls decls ^ ")"
     | Def (n, e1, e2) -> "(def " ^ n ^ " " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
+
+  let rec exp_of_pat : pat -> exp = function
+    | PVar n -> Var n
+    | PBVar i -> BVar i
+    | Innac e -> raise (Error.Violation "We'd be very surprised if this were to happen.")
+    | PLam (f, p) -> Lam (f, exp_of_pat p)
+    | PConst (n, ps) -> App (Const n, List.map exp_of_pat ps)
+    | PAnnot (p, e) -> Annot (exp_of_pat p, e)
+    | PClos (n, p) -> Clos (Var n, exp_of_pat p)
+    | PEmptyS -> EmptyS
+    | PShift i -> Shift i
+    | PSubst (p1, p2) -> Subst (exp_of_pat p1, exp_of_pat p2)
+    | PNil -> Nil
+    | PComma (p1, p2) -> Comma (exp_of_pat p1, exp_of_pat p2)
+    | PUnder -> Under
+    | PWildcard -> raise (Error.Violation "We'd also be very surprised if this were to happen.")
+
+
+  (* Will fail if exp is not in pattern form *)
+  let rec pat_of_exp : exp -> pat = function
+    | App (Const n, sp) -> PConst (n, pats_of_exps sp)
+    | Const n -> PConst (n, [])
+    | Var x -> PVar x
+    | BVar i -> assert false (* TODO: Implement for syntax *)
+    | Lam (n, e) -> assert false (* TODO: Implement for syntax *)
+    | AppL (e1, e2) -> assert false (* TODO: Implement for syntax *)
+    | Clos (e1, e2) -> assert false (* TODO: Implement for syntax *)
+    | EmptyS -> assert false (* TODO: Implement for syntax *)
+    | Shift i -> assert false (* TODO: Implement for syntax *)
+    | Comma (e1, e2) -> assert false (* TODO: Implement for syntax *)
+    | Subst (e1, e2) -> assert false (* TODO: Implement for syntax *)
+    | Nil -> assert false (* TODO: Implement for syntax *)
+    | Annot (e, t) -> assert false (* TODO: Implement for syntax *)
+    | Under -> assert false (* TODO: Implement for syntax *)
+    | e -> raise (Error.Violation ("Expression " ^ print_exp e ^ " is not in pattern form."))
+
+  and pats_of_exps (es : exp list) : pats = List.map pat_of_exp es
+
 end
