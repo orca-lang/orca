@@ -71,8 +71,12 @@ type ctx = (name * exp) list
 
 let print_ctx c = "[" ^ (String.concat "," (List.map (fun (x, e) -> print_name x ^ ": " ^ print_exp e) c)) ^ "]"
 
-let ctx_of_tel tel = List.map (fun (_, x, s) -> x, s) tel
+let ctx_of_tel : tel -> ctx = List.map (fun (_, x, s) -> x, s)
+
+let exp_list_of_ctx : ctx -> exp list = List.map snd
 
 let rec ctx_subst s = function
   | (x, t) :: cG -> (x, subst s t) :: (ctx_subst s cG)
   | [] -> []
+
+let shift_subst_by_ctx sigma cG = (List.map (fun (x, _) -> x, Var x) cG) @ sigma

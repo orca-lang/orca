@@ -184,6 +184,8 @@ module Int = struct
   (* Will fail if exp is not in pattern form *)
   let pat_of_exp (e : exp) : pat = assert false
 
+  let pats_of_exps : exp list -> pats = List.map pat_of_exp
+
   let rec fv =
     function
     | Univ _ -> []
@@ -344,7 +346,7 @@ module Int = struct
   let subst_list_on_tel sigma tel =
     List.map (fun (i, x, e) -> (i, x, subst_list sigma e)) tel
 
-  let elist_of_tel tel = List.map (fun (_, _, s) -> s) tel
+  let exp_list_of_tel tel = List.map (fun (_, _, s) -> s) tel
 
   (* Pretty printer -- could be prettier *)
   let print_universe = function

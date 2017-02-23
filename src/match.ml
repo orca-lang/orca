@@ -35,10 +35,10 @@ let split (sign : signature) (p : pats) (cD : ctx) : ctx * ctx_map =
            if n != n' then raise (Error.Error "Get a grip!, wrong constructor.")
            else
              let us', ws = split_idx_param n sp in
-             (* let flex = flexible ps (ctx_of_tel thetatel) in *)
-             (* let delta = Unify.unify_flex sign flex vs ws in *)
-             (* let delta' = PConst (c, elist_of_tel subst_list_on_tel delta thetatel) :: (pat_of_exp delta) in *)
-             assert false
+             let flex = flexible ps (ctx_of_tel thetatel) in
+             let delta = Unify.unify_flex_many sign flex vs ws in
+             let delta' = (x, App (Const c, exp_list_of_tel (subst_list_on_tel delta thetatel))) :: delta in
+             assert false, pats_of_exps (exp_list_of_ctx (shift_subst_by_ctx delta' cD'))
 
         | _ -> assert false
 
