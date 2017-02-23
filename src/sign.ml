@@ -25,6 +25,11 @@ let rec lookup_sign_entry (n : def_name) (sign : signature) : signature_entry =
     with Not_found ->
       raise (Error.Violation ("Unable to find " ^ n ^ " in the signature"))
 
+let lookup_cons_entry (c : def_name) (sign : signature) : tel * dsig =
+  match lookup_sign_entry c sign with
+  | Constructor (_, tel, dsig) -> tel, dsig
+  | _ -> raise (Error.Error ("Constant " ^ c ^ " was expected to be a constructor."))
+
 let lookup_sign n sign =
   match lookup_sign_entry n sign with
   | Definition (_, t, _) -> t
@@ -63,7 +68,18 @@ let lookup_constructors n sign =
   List.map signature_entry_name (List.filter constructs_n sign)
 
 (* Given the name of a type and a spine, return the parameter, the indices *)
-let split_idx_param (n : def_name) (sp : exp list) : exp list * exp list = assert false
+let split_idx_param (sign : signature) (n : def_name) (es : exp list) : exp list * exp list =
+  match lookup_sign_entry n sign with
+  | DataDef (_, ps, is, _) ->
+     let rec split = function
+       | e::es, _::ps ->
+          let es1, es2 = split (es, ps) in
+          e::es1, es2
+       | es, [] -> [], es
+       | _ -> raise (Error.Violation "Run out of parameters.")
+     in
+     split (es, ps)
+  | _ -> raise (Error.Error ("split_idx_param expected a datatype."))
 
 let rec print_signature sign = "[" ^ String.concat "; " (List.map signature_entry_name sign) ^ "]"
 
@@ -79,4 +95,10 @@ let rec ctx_subst s = function
   | (x, t) :: cG -> (x, subst s t) :: (ctx_subst s cG)
   | [] -> []
 
-let shift_subst_by_ctx sigma cG = (List.map (fun (x, _) -> x, Var x) cG) @ sigma
+let shift_subst_by_ctx sigma cG = let sigma' = sigma @ (List.map (fun (x, _) -> x, Var x) cG) in
+                                  Debug.print (fun () -> "Shift called with sigma = [" ^ print_ctx sigma
+                                                         ^ "], cG = [" ^ print_ctx cG ^ "], resulting in [" ^ print_ctx sigma' ^ "].");
+                                  sigma'
+
+let subst_list_on_ctx sigma =
+    List.map (fun (x, e) -> x, subst_list sigma e)
