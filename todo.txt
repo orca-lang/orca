@@ -7,3 +7,4 @@
 * change print_tel to print_pi and a proper print_tel
 * negative test cases!
 * Add syntax for impossible cases
+* (low priority) Move emacs mode from generic mode to derived mode (and add features!)
