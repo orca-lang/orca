@@ -101,7 +101,8 @@ and check (sign , cG : signature * ctx) (e : exp) (t : exp) : unit =
          raise (Error.Error ("Cannot check expression " ^ print_exp e))
      in
      try
-       let sigma = Unify.unify sign t t' in
+       let _, sigma = Unify.unify (sign, cG) t t' in
+       (* TODO check, that sigma instantiates all the pending variables (No free vars remaining) *)
        Debug.print (fun () -> "Unification for " ^ print_exp t ^ " with " ^
                                 print_exp t' ^ " succeeded with substitution "
                                 ^ Unify.print_subst sigma ^ ".")
