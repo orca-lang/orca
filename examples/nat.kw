@@ -2,6 +2,9 @@ data nat where
 | zero: nat
 | suc: nat -> nat
 
+def plus : (x : nat) -> (y : nat) -> nat where
+| zero m => m
+| (suc n) m => plus n (suc m)
 
 data fin : nat -> * where
 | fZ : fin zero
