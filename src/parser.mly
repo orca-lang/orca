@@ -57,7 +57,7 @@ decl:
 | s = IDENT COLON t = exp {s, t}
 
 def_decl:
-| p = simple_pattern+ RARR e = exp {List.rev p, e}
+| p = simple_pattern+ RARR e = exp {p, e}
 
 exp:
 | g = exp TURNSTILE e = exp {Box (g, e)}

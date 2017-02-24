@@ -91,6 +91,10 @@ let ctx_of_tel : tel -> ctx = List.map (fun (_, x, s) -> x, s)
 
 let exp_list_of_ctx : ctx -> exp list = List.map snd
 
+let subst_of_ctx : ctx -> subst = List.map (fun (x, _) -> x, Var x)
+
+let name_list_of_ctx : ctx -> name list = List.map fst
+
 let var_list_of_ctx : ctx -> exp list = List.map (fun (x, _) -> Var x)
 
 let rec ctx_subst s = function

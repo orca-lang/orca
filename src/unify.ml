@@ -56,7 +56,7 @@ let rec unify_flex (sign, cG) flex e1 e2 =
          else
            raise (Error.Error ("Constructor " ^ n ^ " does not unify_flex with constructor " ^ n' ^ "."))
 
-      | Var n, Var n' when n = n' -> cG, []
+      | Var n, Var n' when n = n' -> cG, [n, Var n]
 
       | Var n, _ when is_flex n ->
          if not (occur_check n e2) then
@@ -79,7 +79,7 @@ let rec unify_flex (sign, cG) flex e1 e2 =
       | Under, _ -> cG, []
       | _, Under -> cG, []
       | _, _ ->
-         raise (Error.Error ("Expression " ^ print_exp e1 ^ " does not unify_flex with " ^ print_exp e2 ^ "."))
+         raise (Error.Error ("Expression " ^ print_exp e1 ^ " does not unify with " ^ print_exp e2 ^ "."))
     in
     Debug.deindent();
     Debug.print (fun () -> "Resulted in " ^ print_subst sigma ^ " and context " ^ print_ctx cD);
@@ -111,7 +111,14 @@ let rec unify_flex (sign, cG) flex e1 e2 =
        let cD', sigma'' = (unify_flex_pi (sign, cD) flex tel1' t1 tel2' t2) in
        cD', sigma @ sigma''
 
-let unify sign e1 e2 = unify_flex sign (fv e1 @ fv e2) e1 e2
-let unify_many sign es1 es2 =
-  let flex = List.fold_left2 (fun ns e e' -> ns @ fv e @ fv e') [] es1 es2 in
+let get_flex_vars cG e1 e2 =
+  let ncG = name_list_of_ctx cG in
+  List.fold_left (fun c v -> if List.mem v ncG then c else v::c) [] (fv e1 @ fv e2)
+
+let unify (sign, cG) e1 e2 =
+  let flex_vars = get_flex_vars cG e1 e2 in
+  unify_flex (sign, cG) flex_vars e1 e2
+
+let unify_many (sign, cG) es1 es2 =
+  let flex = List.fold_left2 (fun ns e e' -> ns @ get_flex_vars cG e e') [] es1 es2 in
   unify_flex_many sign flex es1 es2

@@ -174,11 +174,15 @@ let pproc_param s cG (icit, n, e) =
   let cG', n' = add_name_ctx cG n in
   cG', (icit, n', pproc_exp s cG [] e)
 
-let rec pproc_pat (s : sign) cG cP =
+let rec pproc_pat (s : sign) cG cP p =
+  let print_ctx cG = "[" ^ String.concat ", " (List.map (fun (e, i) -> e ^ ", " ^ Name.print_name i) cG) ^ "]" in
   let f pat = pproc_pat s cG cP pat in
-  function
+  Debug.print (fun () -> "Procesing pattern : " ^ E.print_pat p ^ " with current context " ^ print_ctx cG);
+  match p with
   | E.PIdent n -> find_pat_name s cG cP n
-  | E.Innac e -> cG, I.Innac (pproc_exp s cG [] e)
+  | E.Innac e ->
+     Debug.print (fun () -> "Preprocessing inaccessible pattern " ^ E.print_exp e ^ " in context " ^ print_ctx cG);
+     cG, I.Innac (pproc_exp s cG [] e)
   | E.PLam (x, p) ->
     let cG', p' = pproc_pat s cG (add_name_bvar cP x) p in
     cG', I.PLam (x,  p')
@@ -216,10 +220,15 @@ let rec pproc_pat (s : sign) cG cP =
   | E.PUnder -> cG, I.PUnder
   | E.PWildcard -> cG, I.PWildcard
 
+let rec pproc_pats s cG = function
+  | [] -> cG, []
+  | p :: ps ->
+     let cG', p' = pproc_pat s cG [] p in
+     let cG'', ps' = pproc_pats s cG' ps in
+     cG'', p' :: ps'
+
 let pproc_def_decl s (pats, e) =
-  let
-    cG', pats' = List.fold_left (fun (cG, pats) pat -> let cG', pat' = pproc_pat s cG [] pat in cG', (pat'::pats)) ([], []) pats
-  in
+  let cG', pats' = pproc_pats s [] pats in
   (pats', I.Just (pproc_exp s cG' [] e))
 
 let params_to_ctx = List.map2 (fun (_, n, _) (_, n', _) -> n, n')

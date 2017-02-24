@@ -37,9 +37,10 @@ let rec flexible (p : pats)(cG : ctx) : name list =
   Debug.deindent ();
   res
 
-exception Unification_failure
+exception Unification_failure of string
 
 let split (sign : signature) (p1 : pats) (c, ps : def_name * pats) (cD2 : ctx) (x, t : name * exp) (cD1 : ctx) : ctx * ctx_map =
+  Debug.print (fun () -> "Split type " ^ print_exp t) ;
   let n, sp =
     match Whnf.whnf sign t with
     | App(Const n, sp) -> n, sp
@@ -47,27 +48,34 @@ let split (sign : signature) (p1 : pats) (c, ps : def_name * pats) (cD2 : ctx) (
     | e -> raise (Error.Error ("Expected constructor application. Got " ^ print_exp e))
   in
   let us, vs = split_idx_param sign n sp in
+  Debug.print (fun () -> "For " ^ n ^ " the split of " ^ print_exps sp
+                         ^ " resulted in parameters " ^ print_exps us
+                         ^ " and indices " ^ print_exps vs);
   let thetatel, (n', sp) = lookup_cons_entry c sign in
   if n = n'
   then
     let us', ws = split_idx_param sign n sp in
     let cT = rename_ctx_using_pats (ctx_of_tel thetatel) ps in
     let flex = flexible (ps @ p1) (cT @ cD1) in
+    Debug.print (fun () -> "Flexibles variables are " ^ print_names flex);
     let cD', delta =
       try
         Debug.print (fun () -> "Split unifies vs = " ^ print_exps vs ^ ", ws = " ^ print_exps ws);
         Unify.unify_flex_many (sign, cT @ cD1) flex vs ws
          with
-         | Error.Error _ -> raise Unification_failure
+         | Error.Error msg -> raise (Unification_failure msg)
     in
+    let id_cD' = subst_of_ctx cD1 in
     let cT' = compose_subst delta cT in
+    Debug.print (fun () -> "cD1 = " ^ print_ctx cD1 ^ " while id_cD' = " ^ print_ctx id_cD');
+    let delta = compose_subst delta id_cD' in (* to get the eta-long subst *)
     Debug.print (fun () -> "In the middle of split, we have : delta = " ^ print_ctx delta  ^ " cT = " ^ print_ctx cT
                            ^ " Composition of delta and cT results in " ^ print_ctx cT' ^ ". Also, cD' = " ^ print_ctx cD');
     let ss = x, App (Const c, var_list_of_ctx cT') in
     Debug.print (fun () -> "Creating substitution : " ^ print_ctx [ss]);
     let delta_shift = shift_subst_by_ctx delta [ss] in
     let delta' = compose_single_with_subst ss delta_shift in
-    let cD'', delta'' = (subst_list_on_ctx delta' cD2) @ cD', pats_of_exps (exp_list_of_ctx (shift_subst_by_ctx delta' cD2)) in
+    let cD'', delta'' = cD' @ (subst_list_on_ctx delta' cD2), pats_of_exps (exp_list_of_ctx (shift_subst_by_ctx delta' cD2)) in
     Debug.print (fun () -> "Split! \ncD2 = " ^ print_ctx cD2 ^ "\ndelta' = " ^ print_ctx delta'
                            ^ "\n delta'' = " ^ print_pats delta'' ^ "\n cD'' = " ^ print_ctx cD'');
     cD'', delta''
@@ -109,7 +117,7 @@ let split_set sign (x : name) (cG : ctx) : ctx_map =
             try
               snd (split_rec sign ps (cG2 @ [(x, t)] @ cG1))
             with
-            | Unification_failure -> []
+            | Unification_failure _ -> []
           in
           sigma @ (split_constrs constrs')
        end
@@ -159,9 +167,10 @@ let check_pats (sign : signature) (p : pats) (cG : ctx) : ctx * ctx_map =
       Debug.print (fun () -> "p' = " ^ print_pats p');
       Debug.print (fun () -> "sigma' = " ^ print_pats sigma');
       Debug.print (fun () -> "cD' = " ^ print_ctx cD');
-      Debug.deindent ();Debug.deindent ();
+      Debug.deindent ();
 
       let res = check_pats p' sigma' cD' in
+      Debug.print (fun () -> "Check pats returned result ctx " ^ print_ctx (fst res) ^ " and pattern " ^ print_pats (snd res));
       Debug.deindent ();
       res
   in
@@ -204,7 +213,10 @@ let caseless (sign : signature) (cD : ctx) (x : name) (t : exp) : unit =
   else raise (Error.Error ("Pattern variable " ^ print_name x ^ " is not really impossible."))
 
 let check_clause (sign : signature) (f : def_name) (p : pats) (telG : tel) (t : exp) (rhs : rhs) : unit =
-  let cD, sigma = check_lhs sign p (ctx_of_tel telG) in
-  match rhs with
-  | Just e -> check (sign, cD) e t
-  | Impossible x -> caseless sign cD x t
+  try
+    let cD, sigma = check_lhs sign p (ctx_of_tel telG) in
+    match rhs with
+    | Just e -> check (sign, cD) e t
+    | Impossible x -> caseless sign cD x t
+  with
+    Unification_failure msg -> raise (Error.Error msg)

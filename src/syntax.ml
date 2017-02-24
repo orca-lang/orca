@@ -94,7 +94,7 @@ module Ext = struct
 
 
   let print_decls decls = String.concat "\n" (List.map (fun (n, e) -> "(" ^ n ^ " " ^ print_exp e ^ ")") decls)
-  let print_pats pats = String.concat " " (List.map (fun p -> "(" ^ print_pat p ^ ")") (List.rev pats))
+  let print_pats pats = String.concat " " (List.map (fun p -> "(" ^ print_pat p ^ ")") pats)
   let print_def_decls decls = String.concat "\n" (List.map (fun (pats, e) -> "(" ^ print_pats pats ^ " " ^ print_exp e ^ ")") decls)
 
   let print_param = function
@@ -291,7 +291,10 @@ module Int = struct
 
   (* Substitution of regular variables *)
 
-  let rec subst (x, es : name * exp) (e : exp) :  exp =
+  type single_subst = name * exp
+  type subst = single_subst list
+
+  let rec subst (x, es : single_subst) (e : exp) :  exp =
     let f e = subst (x, es) e in
     match e with
     | Univ u -> Univ u

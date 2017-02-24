@@ -10,12 +10,14 @@ let rec whnf (sign : signature) (e : exp) : exp =
      | Some e -> whnf sign e
      | None -> Const n
      end
+  | App(h, []) ->
+     whnf sign h
   | App(h, sp) ->
      begin match whnf sign h with
      | Fn(xs, e) ->
         let sigma = List.map2 (fun x e -> x, e) xs sp in
         whnf sign (subst_list sigma e) (* Beta reduction *)
-     | e -> e
+     | h -> App(h, sp)
      end
   | Annot(e, _) -> e
 

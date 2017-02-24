@@ -6,32 +6,44 @@ def plus : (x : nat) -> (y : nat) -> nat where
 | zero m => m
 | (suc n) m => plus n (suc m)
 
-data fin : nat -> * where
-| fZ : fin zero
-| fS : (n : nat) -> fin n -> fin (suc n)
+def plus' : (x : nat) -> (y : nat) -> nat where
+| m zero => m
+| m (suc n) => plus' (suc m) n
 
-def Z : nat = zero
-def 1 : nat = suc Z
-
-data list : * -> * where (*) no parameters here
-| nil: (A : *) -> list A
-| cons: (A : *) -> A -> list A -> list A
-
-def empty_nat_list : list nat = nil nat
-def unary_nat_list : list nat = cons nat 1 (nil nat)
-
-(* Big things ahead *)
-
-data big_nat : set_0 where
-| big_zero : big_nat
-| big_suc : big_nat -> big_nat
+data singl : nat -> * where
+| sZ : singl zero
+| sS : (n : nat) -> singl n -> singl (suc n)
 
 
-def big_1 : big_nat = big_suc big_zero
+(*) data fin : nat -> * where
+(*) | fZ : (n : nat) -> fin (suc n)
+(*) | fS : (n : nat) -> fin n -> fin (suc n)
 
-data big_list (A : set) : * where (*) we use parameters here
-| big_nil: big_list A
-| big_cons: A -> big_list A -> big_list A
+def singl_plus : (m : nat) -> (n : nat) -> singl m -> singl n -> singl m where
+| zero n fZ singl_n => singl_n 	(*) singl_n is of the wrong type!!!
 
-def big_empty_nat_list : big_list big_nat = big_nil
-def big_unary_nat_list : big_list big_nat = big_cons big_1 big_nil
+(*) def Z : nat = zero
+(*) def 1 : nat = suc Z
+
+(*) data list : * -> * where (*) no parameters here
+(*) | nil: (A : *) -> list A
+(*) | cons: (A : *) -> A -> list A -> list A
+
+(*) def empty_nat_list : list nat = nil nat
+(*) def unary_nat_list : list nat = cons nat 1 (nil nat)
+
+(*) (* Big things ahead *)
+
+(*) data big_nat : set_0 where
+(*) | big_zero : big_nat
+(*) | big_suc : big_nat -> big_nat
+
+
+(*) def big_1 : big_nat = big_suc big_zero
+
+(*) data big_list (A : set) : * where (*) we use parameters here
+(*) | big_nil: big_list A
+(*) | big_cons: A -> big_list A -> big_list A
+
+(*) def big_empty_nat_list : big_list big_nat = big_nil
+(*) def big_unary_nat_list : big_list big_nat = big_cons big_1 big_nil
