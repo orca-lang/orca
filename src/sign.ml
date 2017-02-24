@@ -7,7 +7,7 @@ type signature_entry
   | Constructor of def_name * tel * dsig
   (* name, parameters, indices, resulting universe *)
   | DataDef of def_name * tel * tel * universe
-  | Program of def_name * tel * exp
+  | Program of def_name * tel * exp (* TODO define this *)
 
 type signature = signature_entry list
 
@@ -50,7 +50,7 @@ let lookup_sign n sign =
      in
      Debug.print (fun () -> "Looked up constructor " ^ n ^ " which has type " ^ print_exp t');
      t'
-  | Program (_,_,t) -> t
+  | Program (_,tel,t) -> if tel = [] then t else Pi (tel, t)
 
 let lookup_sign_def n sign =
   match lookup_sign_entry n sign with
@@ -91,6 +91,8 @@ let ctx_of_tel : tel -> ctx = List.map (fun (_, x, s) -> x, s)
 
 let exp_list_of_ctx : ctx -> exp list = List.map snd
 
+let var_list_of_ctx : ctx -> exp list = List.map (fun (x, _) -> Var x)
+
 let rec ctx_subst s = function
   | (x, t) :: cG -> (x, subst s t) :: (ctx_subst s cG)
   | [] -> []
@@ -102,3 +104,10 @@ let shift_subst_by_ctx sigma cG = let sigma' = sigma @ (List.map (fun (x, _) -> 
 
 let subst_list_on_ctx sigma =
     List.map (fun (x, e) -> x, subst_list sigma e)
+
+let rec rename_ctx_using_pats (cG : ctx) (ps : pats) =
+  match cG, ps with
+  | [], [] -> []
+  | (x, t) :: cG', PVar y :: ps' -> (y, t) :: (rename_ctx_using_pats cG' ps')
+  | s :: cG', _ :: ps' -> s :: (rename_ctx_using_pats cG' ps')
+  | _ -> raise (Error.Violation "rename_ctx_using_pats. Both arguments should have same length")

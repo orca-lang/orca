@@ -51,16 +51,20 @@ let split (sign : signature) (p1 : pats) (c, ps : def_name * pats) (cD2 : ctx) (
   if n = n'
   then
     let us', ws = split_idx_param sign n sp in
-    let cT = ctx_of_tel thetatel in
+    let cT = rename_ctx_using_pats (ctx_of_tel thetatel) ps in
     let flex = flexible (ps @ p1) (cT @ cD1) in
     let cD', delta =
       try
+        Debug.print (fun () -> "Split unifies vs = " ^ print_exps vs ^ ", ws = " ^ print_exps ws);
         Unify.unify_flex_many (sign, cT @ cD1) flex vs ws
          with
          | Error.Error _ -> raise Unification_failure
     in
     let cT' = compose_subst delta cT in
-    let ss = x, App (Const c, exp_list_of_ctx cT') in
+    Debug.print (fun () -> "In the middle of split, we have : delta = " ^ print_ctx delta  ^ " cT = " ^ print_ctx cT
+                           ^ " Composition of delta and cT results in " ^ print_ctx cT' ^ ". Also, cD' = " ^ print_ctx cD');
+    let ss = x, App (Const c, var_list_of_ctx cT') in
+    Debug.print (fun () -> "Creating substitution : " ^ print_ctx [ss]);
     let delta_shift = shift_subst_by_ctx delta [ss] in
     let delta' = compose_single_with_subst ss delta_shift in
     let cD'', delta'' = (subst_list_on_ctx delta' cD2) @ cD', pats_of_exps (exp_list_of_ctx (shift_subst_by_ctx delta' cD2)) in
@@ -181,7 +185,7 @@ and check_innac (sign, cD : signature * ctx) (p : pat) (q : pat) (t : exp) : uni
      check (sign, cD) eq t ;
      let _ = Unify.unify (sign, cD) ep eq in
      ()
-  | PVar x, PVar y (* when x = y *) -> () (* Norell requires both variables *)
+  | PVar x, PVar y when x = y -> ()
   | PConst (n, sp), PConst (n', sq) when n = n' ->
      begin match lookup_sign_entry n sign with
      | Constructor (_, tel, _) -> check_innacs (sign, cD) sp sq (ctx_of_tel tel)

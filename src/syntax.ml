@@ -378,6 +378,8 @@ module Int = struct
        "(-> " ^ print_exp e ^ " " ^ print_pi tel t ^ ")"
     | (_, x, e) :: tel -> "(pi " ^ print_name x ^ " " ^ print_exp e ^ " " ^ print_pi tel t ^ ")"
 
+  let print_exps es = "(" ^ String.concat ", " (List.map print_exp es) ^ ")"
+
   let rec print_pat (p : pat) : string = match p with
     | PVar n -> print_name n
     | PBVar i -> "(i " ^ string_of_int i ^ ")"

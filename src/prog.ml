@@ -32,9 +32,11 @@ let tc_program (sign : signature) : program -> signature = function
      assert false
   | DefPM (n, tel, t, ds) ->
      Debug.print_string ("Typechecking pattern matching definition: " ^ n);
-     let _u = check_type (sign, []) t in
-     List.iter (fun (p, rhs) -> check_clause sign n p tel t rhs) ds;
-     sign                       (* TODO add the new equations to the signature *)
+     let u = check_type (sign, []) t in
+     let _ = check_tel (sign, []) u tel in
+     let sign' = Program(n, tel, t)::sign in
+     List.iter (fun (p, rhs) -> check_clause sign' n p tel t rhs) ds;
+     sign'                       (* TODO add the new equations to the signature *)
   | Def (n, t, e) ->
      Debug.print_string ("Typechecking definition: " ^ n);
      let _ = check_type (sign, []) t in
