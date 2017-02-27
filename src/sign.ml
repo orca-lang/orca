@@ -101,10 +101,12 @@ let rec ctx_subst s = function
   | (x, t) :: cG -> (x, subst s t) :: (ctx_subst s cG)
   | [] -> []
 
-let shift_subst_by_ctx sigma cG = let sigma' = sigma @ (List.map (fun (x, _) -> x, Var x) cG) in
-                                  Debug.print (fun () -> "Shift called with sigma = [" ^ print_ctx sigma
-                                                         ^ "], cG = [" ^ print_ctx cG ^ "], resulting in [" ^ print_ctx sigma' ^ "].");
-                                  sigma'
+let shift_subst_by_ctx sigma cG =
+  let sigma' = sigma @ (List.map (fun (x, _) -> x, Var x) cG) in
+  Debug.print (fun () -> "Shift called with sigma = " ^ print_ctx sigma
+                         ^ ", cG = " ^ print_ctx cG ^ ", resulting in "
+                         ^ print_ctx sigma' ^ ".");
+  sigma'
 
 let subst_list_on_ctx sigma =
     List.map (fun (x, e) -> x, subst_list sigma e)

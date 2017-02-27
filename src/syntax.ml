@@ -400,13 +400,19 @@ module Int = struct
     | PWildcard -> "._"
 
   let print_tel (tel : tel) : string =
-    String.concat ", " (List.map (fun (_, x, e) -> "(" ^ print_name x ^ ", " ^ print_exp e ^ ")") tel)
+    String.concat ", " (List.map (fun (_, x, e) -> "(" ^ print_name x
+                                                   ^ ", " ^ print_exp e ^ ")") tel)
 
   let print_dsig ((d, es) : dsig) = "(" ^ d ^ " " ^ String.concat " " (List.map print_exp es) ^ ")"
 
   let print_decls (decls : decls) : string =
-    String.concat "\n" (List.map (fun (n, tel, dsig) -> "(" ^ n ^ " " ^ print_tel tel ^ " " ^ print_dsig dsig ^ ")") decls)
-  let print_pats pats = String.concat " " (List.map (fun p -> "(" ^ print_pat p ^ ")") pats)
+    String.concat "\n"
+                  (List.map (fun (n, tel, dsig) -> "(" ^ n ^ " " ^ print_tel tel
+                                                   ^ " " ^ print_dsig dsig ^ ")") decls)
+
+  let print_pats pats = "(" ^ String.concat " "
+                                            (List.map (fun p -> "(" ^ print_pat p ^ ")") pats)
+                        ^ ")"
   let print_rhs = function
     | Just e -> print_exp e
     | Impossible x -> "(impossible " ^ print_name x ^ ")"

@@ -128,12 +128,12 @@ let split_set sign (x : name) (cG : ctx) : ctx_map =
 
 let refine (sign : signature) (p : pats) (cD : ctx) (sigma : ctx_map) : pats * ctx * ctx_map =
   let cD', delta = split_rec sign p cD in
-    Debug.print (fun () -> "Calling split_rec with cD = [" ^ print_ctx cD
-                           ^ "], p = [" ^ print_pats p ^ "], resulting in delta = ["
-                           ^ print_pats delta ^ "] and ctx cD' = [" ^ print_ctx cD' ^ "]");
+    Debug.print (fun () -> "Calling split_rec with cD = " ^ print_ctx cD
+                           ^ ", p = " ^ print_pats p ^ ", resulting in delta = ["
+                           ^ print_pats delta ^ " and ctx cD' = " ^ print_ctx cD' ^ ".");
   let p' = matchings delta p in
-  Debug.print (fun () -> "Calling matchings with delta = [" ^ print_pats delta
-                         ^ "], p = [" ^ print_pats p ^ "], resulting in [" ^ print_pats p' ^ "].");
+  Debug.print (fun () -> "Calling matchings with delta = " ^ print_pats delta
+                         ^ ", p = " ^ print_pats p ^ ", resulting in " ^ print_pats p' ^ ".");
   let sd = compose_maps sigma cD delta in
   p' , cD', sd
 

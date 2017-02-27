@@ -8,7 +8,6 @@
 * negative test cases!
 * Add syntax for impossible cases
 * (low priority) Move emacs mode from generic mode to derived mode(and add features!)
-* remove [[ ]] in debug.out
 * add a printf-like interface to debug
 * add holes to the syntax
 * remove subst_list to something doing with simultaneous subst
