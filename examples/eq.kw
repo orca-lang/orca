@@ -1,0 +1,12 @@
+(* Equality is an equivalence relation *)
+
+data eq (A : *) : A -> A -> * where
+| refl: (x : A) -> eq A x x
+
+def ref : (A : *) -> (x : A) -> eq A x x = fn A x => refl x
+
+(*) def sym : (A : *) -> (x : A) -> (y : A) ->  eq A x y -> eq A y x where
+(*) | A x .x (refl .x) => refl x
+
+(*) def trans : (A : *) -> (x : A) -> (y : A) -> (z : A) -> eq A x y -> eq A y z -> eq A x z where
+(*) | A x .x .x (refl .x) (refl .x) => refl x
