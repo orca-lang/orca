@@ -77,9 +77,17 @@ and check (sign , cG : signature * ctx) (e : exp) (t : exp) : unit =
   begin match e, Whnf.whnf sign t with
   (* checkable terms *)
   | Fn (fs, e), Pi(tel, t) ->
-     let t' = List.fold_left2 (fun t f (_, n, s) -> subst(n, Var f) t) t fs tel in
-     let cGext = List.map2 (fun f (_, _, s) -> f, s) fs tel in
-     check (sign, cGext @ cG) e t'
+     let sigma = List.map2 (fun f (_, n, _) -> n, Var f) fs tel in
+     let t' = subst_list sigma t in
+     let cG' = subst_list_on_ctx sigma cG in
+     let cGext = List.map2 (fun f (_, _, s) -> f, s) fs (subst_list_on_tel sigma tel) in
+     Debug.indent();
+     Debug.print (fun () -> "Checking function: " ^ print_exp (Fn (fs, e)) ^ " in context " ^ print_ctx cG ^ ".");
+     Debug.print (fun () -> "In ctx " ^ print_ctx cG'
+                            ^ " with extension " ^ print_ctx cGext
+                          ^ " with renaming " ^ print_ctx sigma ^ ".");
+     check (sign, cGext @ cG') e t' ;
+     Debug.deindent()
 
   (* terms from the syntactic framework *)
   | Lam (f, e), _ -> assert false

@@ -108,7 +108,7 @@ let rec unify_flex (sign, cG) flex e1 e2 =
        let sigma = (n1, Var n2) :: sigma'  in
        let tel1' = subst_list_in_tel sigma tel1 in
        let tel2' = subst_list_in_tel sigma tel2 in
-       let cD', sigma'' = (unify_flex_pi (sign, cD) flex tel1' t1 tel2' t2) in
+       let cD', sigma'' = (unify_flex_pi (sign, (n2, e2) :: cD) flex tel1' t1 tel2' t2) in
        cD', sigma @ sigma''
 
 let get_flex_vars cG e1 e2 = fv cG e1 @ fv cG e2
@@ -121,13 +121,14 @@ let unify (sign, cG) e1 e2 =
                         ^ " in context Γ = " ^ print_ctx cG
                         ^ ".\n");
   let cG', sigma = unify_flex (sign, cG) flex_vars e1 e2 in
-  (* let remaining_vars = fv_subst cG' sigma in *)
-  (* if remaining_vars = [] *)
-  (* then *) cG', sigma
-  (* else *)
-  (*     raise (Error.Error ("Unification of " ^ print_exp e1 ^ " and " ^ print_exp e2 *)
-  (*                         ^ " did not find instances for " ^ print_names remaining_vars *)
-  (*                         ^ " which remain free.")) *)
+  let remaining_vars = fv_subst cG' sigma in
+  if remaining_vars = []
+  then cG', sigma
+  else
+    raise (Error.Error ("Unification of " ^ print_exp e1 ^ " and " ^ print_exp e2
+                        ^ " in context " ^ print_ctx cG
+                          ^ " did not find instances for " ^ print_names remaining_vars
+                          ^ " which remain free in " ^ print_ctx cG' ^ "."))
 
 let unify_many (sign, cG) es1 es2 =
   let flex = List.fold_left2 (fun ns e e' -> ns @ get_flex_vars cG e e') [] es1 es2 in
