@@ -98,6 +98,11 @@ let split (sign : signature) (p1 : pats) (c, ps : def_name * pats) (cD2 : ctx) (
 
 let split_rec (sign : signature) (ps : pats) (cD : ctx) : ctx * ctx_map =
   let rec search p1 p2 cD1 cD2 =
+    Debug.print(fun () -> "Split search with\np1 = " ^ print_pats p1
+                          ^ "\nand p2 = " ^ print_pats p2
+                          ^ "\nin CD1 = " ^ print_ctx cD1
+                          ^ "\nin CD2 = " ^ print_ctx cD2);
+    Debug.indent();
     match p2, cD2 with
     | [], [] -> [], []
     | PConst (c, sp) :: ps', (x, t) :: cD2 ->
@@ -108,6 +113,7 @@ let split_rec (sign : signature) (ps : pats) (cD : ctx) : ctx * ctx_map =
        search (p1 @ [Innac e]) ps' (cD1 @ [x, t]) cD2
     | _ -> raise (Error.Error ("Search: Syntax not implemented\np2 = " ^ print_pats p2 ^ "\ncD2 = " ^ print_ctx cD2))
   in
+  Debug.deindent();
   Debug.print (fun () -> "Split rec list ordering figuring out, ps = [" ^  print_pats ps ^ "], cD = " ^ print_ctx cD);
   search [] ps [] cD
 
