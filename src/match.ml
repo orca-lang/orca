@@ -143,17 +143,18 @@ let split_set sign (x : name) (cG : ctx) : ctx_map =
   | _ -> raise (Error.Error ("Type " ^ print_exp t ^ " should be a data type."))
 
 let refine (sign : signature) (p : pats) (cD : ctx) (sigma : ctx_map) : pats * ctx * ctx_map =
-  Debug.indent ();
-  Debug.print (fun () -> "Refined called: p = " ^ print_pats p ^ ", cD = " ^ print_ctx cD ^ ", sigma = " ^ print_pats sigma);
+  Debug.print (fun () -> "Refined called: p = " ^ print_pats p
+                         ^ "\ncD = " ^ print_ctx cD
+                         ^ "\nsigma = " ^ print_pats sigma);
   let cD', delta = split_rec sign p cD in
   Debug.print (fun () -> "Calling split_rec with cD = " ^ print_ctx cD
-                         ^ ", p = " ^ print_pats p ^ ", resulting in delta = ["
-                         ^ print_pats delta ^ " and ctx cD' = " ^ print_ctx cD' ^ ".");
+                         ^ "\np = " ^ print_pats p
+                         ^ "\nresulting in delta = " ^ print_pats delta
+                         ^ "\nand ctx cD' = " ^ print_ctx cD' ^ ".");
   let p' = matchings delta p in
   Debug.print (fun () -> "Calling matchings with delta = " ^ print_pats delta
-                         ^ ", p = " ^ print_pats p ^ ", resulting in " ^ print_pats p' ^ ".");
+                         ^ "\np = " ^ print_pats p ^ "\nresulting in " ^ print_pats p' ^ ".");
   let sd = compose_maps sigma cD delta in
-  Debug.deindent ();
   p' , cD', sd
 
 let check_pats (sign : signature) (p : pats) (cG : ctx) : ctx * ctx_map =
@@ -177,23 +178,17 @@ let check_pats (sign : signature) (p : pats) (cG : ctx) : ctx * ctx_map =
       cD, sigma
     else
       let p', cD', sigma' = refine sign p cD sigma in
-      Debug.indent ();
-      Debug.print (fun () -> "Check pats on");
-      Debug.indent ();
-      Debug.print (fun () -> "p = " ^ print_pats p);
-      Debug.print (fun () -> "sigma = " ^ print_pats sigma);
-      Debug.print (fun () -> "cD = " ^ print_ctx cD);
-      Debug.deindent ();
-      Debug.print (fun () -> "Getting from refine");
-      Debug.indent ();
-      Debug.print (fun () -> "p' = " ^ print_pats p');
-      Debug.print (fun () -> "sigma' = " ^ print_pats sigma');
-      Debug.print (fun () -> "cD' = " ^ print_ctx cD');
-      Debug.deindent ();
+      Debug.print (fun () -> "Check pats on"
+                             ^ "\np = " ^ print_pats p
+                             ^ "\nsigma = " ^ print_pats sigma
+                             ^ "\ncD = " ^ print_ctx cD);
+      Debug.print (fun () -> "Getting from refine"
+                             ^ "\np' = " ^ print_pats p'
+                             ^ "\nsigma' = " ^ print_pats sigma'
+                             ^ "\ncD' = " ^ print_ctx cD');
 
       let res = check_pats p' sigma' cD' in
-      Debug.print (fun () -> "Check pats returned result ctx " ^ print_ctx (fst res) ^ " and pattern " ^ print_pats (snd res));
-      Debug.deindent ();
+      Debug.print (fun () -> "Check pats returned result ctx " ^ print_ctx (fst res) ^ "\nand pattern " ^ print_pats (snd res));
       res
   in
   check_pats p (List.map (fun (x, _) -> PVar x) cG) cG

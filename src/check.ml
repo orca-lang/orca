@@ -84,8 +84,8 @@ and check (sign , cG : signature * ctx) (e : exp) (t : exp) : unit =
      Debug.indent();
      Debug.print (fun () -> "Checking function: " ^ print_exp (Fn (fs, e)) ^ "\nin context " ^ print_ctx cG ^ ".");
      Debug.print (fun () -> "Resulted in ctx " ^ print_ctx cG'
-                            ^ " with extension " ^ print_ctx cGext
-                          ^ " with renaming " ^ print_ctx sigma ^ ".");
+                            ^ "\nwith extension " ^ print_ctx cGext
+                            ^ "\nwith renaming " ^ print_subst sigma ^ ".");
      check (sign, cGext @ cG') e t' ;
      Debug.deindent()
 
