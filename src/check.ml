@@ -82,8 +82,8 @@ and check (sign , cG : signature * ctx) (e : exp) (t : exp) : unit =
      let cG' = subst_list_on_ctx sigma cG in
      let cGext = List.map2 (fun f (_, _, s) -> f, s) fs (subst_list_on_tel sigma tel) in
      Debug.indent();
-     Debug.print (fun () -> "Checking function: " ^ print_exp (Fn (fs, e)) ^ " in context " ^ print_ctx cG ^ ".");
-     Debug.print (fun () -> "In ctx " ^ print_ctx cG'
+     Debug.print (fun () -> "Checking function: " ^ print_exp (Fn (fs, e)) ^ "\nin context " ^ print_ctx cG ^ ".");
+     Debug.print (fun () -> "Resulted in ctx " ^ print_ctx cG'
                             ^ " with extension " ^ print_ctx cGext
                           ^ " with renaming " ^ print_ctx sigma ^ ".");
      check (sign, cGext @ cG') e t' ;

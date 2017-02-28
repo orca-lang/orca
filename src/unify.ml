@@ -117,9 +117,9 @@ let unify (sign, cG) e1 e2 =
   let flex_vars = get_flex_vars cG e1 e2 in
   Debug.print(fun () -> "Flexible unify " ^ print_exp e1
                         ^ " and " ^ print_exp e2
-                        ^ " with flexible variables= " ^ print_names flex_vars
-                        ^ " in context Γ = " ^ print_ctx cG
-                        ^ ".\n");
+                        ^ "\nwith flexible variables= " ^ print_names flex_vars
+                        ^ "\nin context Γ = " ^ print_ctx cG
+                        ^ ".");
   let cG', sigma = unify_flex (sign, cG) flex_vars e1 e2 in
   let remaining_vars = fv_subst cG' sigma in
   if remaining_vars = []
