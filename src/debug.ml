@@ -6,9 +6,22 @@ let debug_file_name = "debug.out"
 let debug_indent = ref 0
 let debug_indent_string = "  "
 
+(* Turns debug on and starts a new file *)
 let set_debug_on () =
   debug_on := true ;
   debug_channel := Some (open_out debug_file_name)
+
+(* Sets the debug off and closes the open file if any *)
+let set_debug_off () =
+  debug_on := true ;
+  match !debug_channel with
+  | None -> ()
+  | Some ch -> close_out ch
+
+(* Turns debugging on, but it does not truncate the file *)
+let set_debug_cont () =
+  debug_on := true ;
+  debug_channel := Some (open_out_gen [Open_append ; Open_creat] 0o666 debug_file_name)
 
 let get_ch () =
   match !debug_channel with
