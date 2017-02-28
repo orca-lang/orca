@@ -93,9 +93,13 @@ let exp_list_of_ctx : ctx -> exp list = List.map snd
 
 let subst_of_ctx : ctx -> subst = List.map (fun (x, _) -> x, Var x)
 
+let psubst_of_ctx : ctx -> psubst = List.map (fun (x, _) -> x, PVar x)
+
 let name_list_of_ctx : ctx -> name list = List.map fst
 
 let var_list_of_ctx : ctx -> exp list = List.map (fun (x, _) -> Var x)
+
+let pvar_list_of_ctx : ctx -> pat list = List.map (fun (x, _) -> PVar x)
 
 let rec ctx_subst s = function
   | (x, t) :: cG -> (x, subst s t) :: (ctx_subst s cG)
@@ -103,13 +107,23 @@ let rec ctx_subst s = function
 
 let shift_subst_by_ctx sigma cG =
   let sigma' = sigma @ (List.map (fun (x, _) -> x, Var x) cG) in
-  Debug.print (fun () -> "Shift called with sigma = " ^ print_ctx sigma
+  Debug.print (fun () -> "Shift called with sigma = " ^ print_subst sigma
                          ^ ", cG = " ^ print_ctx cG ^ ", resulting in "
-                         ^ print_ctx sigma' ^ ".");
+                         ^ print_subst sigma' ^ ".");
+  sigma'
+
+let shift_psubst_by_ctx sigma cG =
+  let sigma' = sigma @ (List.map (fun (x, _) -> x, PVar x) cG) in
+  Debug.print (fun () -> "Shift called with sigma = " ^ print_psubst sigma
+                         ^ ", cG = " ^ print_ctx cG ^ ", resulting in "
+                         ^ print_psubst sigma' ^ ".");
   sigma'
 
 let subst_list_on_ctx sigma =
     List.map (fun (x, e) -> x, subst_list sigma e)
+
+let simul_psubst_on_ctx sigma =
+    List.map (fun (x, e) -> x, simul_psubst sigma e)
 
 let rec rename_ctx_using_pats (cG : ctx) (ps : pats) =
   match cG, ps with
@@ -117,3 +131,25 @@ let rec rename_ctx_using_pats (cG : ctx) (ps : pats) =
   | (x, t) :: cG', PVar y :: ps' -> (y, t) :: (rename_ctx_using_pats cG' ps')
   | s :: cG', _ :: ps' -> s :: (rename_ctx_using_pats cG' ps')
   | _ -> raise (Error.Violation "rename_ctx_using_pats. Both arguments should have same length")
+
+let lookup_ctx cG n =
+  try
+    Some (List.assoc n cG)
+  with
+    Not_found -> None
+
+let rec rename_ctx_using_subst (cG : ctx) (sigma : subst) =
+  match cG with
+  | [] -> []
+  | (x, t) :: cG' ->
+     match lookup_ctx sigma x with
+     | Some (Var y) -> (y, t) :: (rename_ctx_using_subst cG' sigma)
+     | _ -> (x, t) :: (rename_ctx_using_subst cG' sigma)
+
+let rec rename_ctx_using_psubst (cG : ctx) (sigma : psubst) =
+  match cG with
+  | [] -> []
+  | (x, t) :: cG' ->
+     match lookup_ctx sigma x with
+     | Some (PVar y) -> (y, t) :: (rename_ctx_using_psubst cG' sigma)
+     | _ -> (x, t) :: (rename_ctx_using_psubst cG' sigma)

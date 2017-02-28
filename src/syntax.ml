@@ -299,6 +299,8 @@ module Int = struct
 
   type single_subst = name * exp
   type subst = single_subst list
+  type single_psubst = name * pat
+  type psubst = single_psubst list
 
   let fv_subst cG sigma = List.concat (List.map (fun (n, e) -> fv cG e -- n) sigma)
 
@@ -355,6 +357,39 @@ module Int = struct
     | (y, t') :: sigma -> (y, subst s t') :: (compose_single_with_subst s sigma)
 
   let compose_subst sigma delta = List.map (fun (x, t) -> x, subst_list sigma t) delta
+
+  let rec psubst ((x, p') as s) (p : pat) :  pat =
+    match p with
+    | PVar n when n = x -> p'
+    | PVar n -> PVar n
+    | PBVar i -> PBVar i
+    | Innac e -> Innac e        (* MMMMM *)
+    | PLam (f, p) -> PLam(f, psubst s p)
+    | PConst (n, ps) -> PConst(n, List.map (psubst s) ps)
+    | PAnnot (p, e) -> PAnnot(psubst s p, e) (* MMMM should we remove PAnnot? Yaasss *)
+    | PClos (n, p) when n = x -> assert false (* MMMMMMM *)
+    | PClos (n, p) -> PClos (n, psubst s p)
+    | PEmptyS -> PEmptyS
+    | PShift i -> PShift i
+    | PSubst (p1, p2) -> PSubst (psubst s p1, psubst s p2)
+    | PNil -> PNil
+    | PComma (p1, p2) -> PComma (psubst s p1, psubst s p2)
+    | PUnder -> PUnder
+    | PWildcard -> PWildcard
+
+  let rec compose_single_with_psubst s = function
+    | [] -> []
+    | (y, t') :: sigma -> (y, psubst s t') :: (compose_single_with_psubst s sigma)
+
+  let pats_of_psubst : psubst -> pats = List.map snd
+
+  let simul_psubst sigma p =
+    List.fold_left (fun p s -> psubst s p) p sigma
+
+  let simul_psubst_on_list sigma ps =
+    List.map (simul_psubst sigma) ps
+
+  let compose_psubst sigma delta = List.map (fun (x, t) -> x, simul_psubst sigma t) delta
 
   let exp_list_of_tel tel = List.map (fun (_, _, s) -> s) tel
 
@@ -432,6 +467,9 @@ module Int = struct
     | Explicit, n, e -> "(:e " ^ print_name n ^ " " ^ print_exp e ^ ")"
 
   let print_params ps = String.concat " " (List.map print_param ps)
+
+  let print_subst c = "[" ^ (String.concat "," (List.map (fun (x, e) -> print_name x ^ " := " ^ print_exp e) c)) ^ "]"
+  let print_psubst c = "[" ^ (String.concat "," (List.map (fun (x, e) -> print_name x ^ " := " ^ print_pat e) c)) ^ "]"
 
   let print_program = function
     | Data (n, ps, is, u, decls) ->
