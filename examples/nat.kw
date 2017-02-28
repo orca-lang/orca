@@ -1,6 +1,11 @@
+(* natural numbers *)
+
 data nat where
 | zero: nat
 | suc: nat -> nat
+
+(*) def Z : nat = zero
+(*) def 1 : nat = suc Z
 
 def plus : (x : nat) -> (y : nat) -> nat where
 | zero m => m
@@ -10,20 +15,22 @@ def plus' : (x : nat) -> (y : nat) -> nat where
 | m zero => m
 | m (suc n) => plus' (suc m) n
 
+(* singletons over naturals *)
+
 data singl : nat -> * where
 | sZ : singl zero
 | sS : (n : nat) -> singl n -> singl (suc n)
 
+def singl_plus : (m : nat) -> (n : nat) -> singl m -> singl n -> singl m where
+| zero n fZ singl_n => singl_n 	(*) singl_n is of the wrong type!!!
+
+(* finite numbers *)
 
 (*) data fin : nat -> * where
 (*) | fZ : (n : nat) -> fin (suc n)
 (*) | fS : (n : nat) -> fin n -> fin (suc n)
 
-def singl_plus : (m : nat) -> (n : nat) -> singl m -> singl n -> singl m where
-| zero n fZ singl_n => singl_n 	(*) singl_n is of the wrong type!!!
-
-(*) def Z : nat = zero
-(*) def 1 : nat = suc Z
+(* lists *)
 
 (*) data list : * -> * where (*) no parameters here
 (*) | nil: (A : *) -> list A
@@ -32,12 +39,11 @@ def singl_plus : (m : nat) -> (n : nat) -> singl m -> singl n -> singl m where
 (*) def empty_nat_list : list nat = nil nat
 (*) def unary_nat_list : list nat = cons nat 1 (nil nat)
 
-(*) (* Big things ahead *)
+(* biiig numbers *)
 
 (*) data big_nat : set_0 where
 (*) | big_zero : big_nat
 (*) | big_suc : big_nat -> big_nat
-
 
 (*) def big_1 : big_nat = big_suc big_zero
 
