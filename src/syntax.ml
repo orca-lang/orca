@@ -179,10 +179,15 @@ module Int = struct
     | DefPM of def_name * tel * exp * pat_decls
     | Def of def_name * exp * exp
 
-  let rec fv =
+  let rec fv cG =
+    let fv e = fv cG e in
+    let in_ctx n = function
+      | (x, _)::_ when x = n -> true
+      | _ -> false
+    in
     function
     | Univ _ -> []
-    | Pi (tel, t) ->fv_tel tel t
+    | Pi (tel, t) -> fv_pi cG tel t
     | Arr (t, e) -> fv t @ fv e
     | Box (ctx, e) -> fv ctx @ fv e
     | Fn (xs, e) ->
@@ -191,7 +196,8 @@ module Int = struct
     | App (e1, es) -> fv e1 @ List.concat (List.map fv es)
     | AppL (e1, e2) -> fv e1 @ fv e2
     | Const n -> []
-    | Var n -> [n]
+    | Var n when not (in_ctx n cG) -> [n]
+    | Var n -> []
     | BVar i -> []
     | Clos (e1, e2) -> fv e1 @ fv e2
     | EmptyS -> []
@@ -202,9 +208,9 @@ module Int = struct
     | Annot (e1, e2) -> fv e1 @ fv e2
     | Under -> []
 
-  and fv_tel (tel : tel) (t : exp) = match tel with
-    | [] -> fv t
-    | (_, n, e)::tel -> fv e @ (fv_tel tel t -- n)
+  and fv_pi cG (tel : tel) (t : exp) = match tel with
+    | [] -> fv cG t
+    | (_, n, e)::tel -> fv cG e @ (fv_pi cG tel t -- n)
 
   (* Generate fresh names for all the bound variables,
      to keep names unique *)
@@ -293,6 +299,8 @@ module Int = struct
 
   type single_subst = name * exp
   type subst = single_subst list
+
+  let fv_subst cG sigma = List.concat (List.map (fun (n, e) -> fv cG e -- n) sigma)
 
   let rec subst (x, es : single_subst) (e : exp) :  exp =
     let f e = subst (x, es) e in
