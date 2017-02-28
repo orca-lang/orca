@@ -429,7 +429,7 @@ module Int = struct
   let rec print_pat (p : pat) : string = match p with
     | PVar n -> print_name n
     | PBVar i -> "(i " ^ string_of_int i ^ ")"
-    | Innac e -> "(. " ^ print_exp e ^ ")"
+    | Innac e -> "." ^ print_exp e
     | PLam (f, p) -> "(\ " ^ f ^ " " ^ print_pat p ^ ")"
     | PConst (n, ps) -> "(" ^ n ^ " " ^ (String.concat " " (List.map (fun p -> "(" ^ print_pat p ^ ")") ps)) ^ ")"
     | PAnnot (p, e) -> "(: " ^ print_pat p ^ " " ^ print_exp e ^ ")"
@@ -453,8 +453,8 @@ module Int = struct
                   (List.map (fun (n, tel, dsig) -> "(" ^ n ^ " " ^ print_tel tel
                                                    ^ " " ^ print_dsig dsig ^ ")") decls)
 
-  let print_pats pats = "(" ^ String.concat " "
-                                            (List.map (fun p -> "(" ^ print_pat p ^ ")") pats)
+  let print_pats pats = "(" ^ String.concat " ; "
+                                            (List.map (fun p -> "" ^ print_pat p ^ "") pats)
                         ^ ")"
   let print_rhs = function
     | Just e -> print_exp e
