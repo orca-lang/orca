@@ -31,7 +31,10 @@ let get_ch () =
 let print (f : unit -> string) : unit =
   if !debug_on then
     let indent = Util.concat_n_times !debug_indent debug_indent_string in
-    (output_string (get_ch()) (indent ^ f () ^ "\n");
+    let new_line_indent = "\n" ^ indent ^ "↳ " in
+    let re = Str.regexp "\n" in
+    let s = Str.global_replace re new_line_indent (f()) in
+    (output_string (get_ch()) (indent ^ s ^ "\n");
      flush (get_ch()))
   else ()
 
