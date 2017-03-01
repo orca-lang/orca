@@ -5,6 +5,11 @@ open Name
 
 type ctx_map = pat list
 
+let rec subst_of_ctx_map (sigma : ctx_map) (tel : tel) : subst =
+  match sigma, tel with
+  | [], [] -> []
+  | p :: ps, (_, n, t) :: tel' -> (n, exp_of_pat p) :: (subst_of_ctx_map ps tel')
+
 (* let compose_maps (sigma : ctx_map) (cD : ctx) (delta : ctx_map) : ctx_map = *)
 (*   List.map (fun (_, e) -> pat_of_exp e) *)
 (*            (compose_subst (List.map2 (fun (x, _) p -> x, exp_of_pat p) cD delta) *)
@@ -77,14 +82,17 @@ let split (sign : signature) (p1 : pats) (c, ps : def_name * pats) (cD2 : ctx) (
     (* let delta = compose_subst delta id_cD' in (\* to get the eta-long subst *\) *)
     (* Debug.print (fun () -> "In the middle of split, we have : delta = " ^ print_subst delta  ^ " cT = " ^ print_ctx cT *)
     (*                        ^ " Composition of delta and cT results in " ^ print_ctx cT' ^ ". Also, cD' = " ^ print_ctx cD'); *)
+    Debug.print (fun () -> "cT = " ^ print_ctx cT ^ "\ncT' = " ^ print_ctx cT');
     let ss = x, App (Const c, var_list_of_ctx cT') in
     let delta' = compose_single_with_subst ss (delta @ [x, Var x]) in
     Debug.print (fun () -> "delta' = " ^ print_subst delta');
     let id_cD' = psubst_of_ctx cD1 in
-    let pdelta = compose_psubst (List.map (fun (x, e) -> x, Innac e) delta) id_cD' in
+    let pdelta = List.map (fun (x, e) -> x, Innac e) delta in
     Debug.print (fun () -> "pdelta = " ^ print_psubst pdelta);
-    let pss = x, PConst (c, simul_psubst_on_list pdelta (pvar_list_of_ctx cT')) in
+    let pss = x, PConst (c, simul_psubst_on_list pdelta (pvar_list_of_ctx cT)) in
     Debug.print (fun () -> "pss = " ^ print_psubst [pss]);
+    let pdelta = compose_psubst pdelta id_cD' in
+    Debug.print (fun () -> "pdelta = " ^ print_psubst pdelta);
     let pdelta_shift = pdelta @ [x, PVar x] in
     let pdelta' = compose_single_with_psubst pss pdelta_shift in
     Debug.print (fun () -> "pdelta' = " ^ print_psubst pdelta');
@@ -149,6 +157,7 @@ let split_set sign (x : name) (cG : ctx) : ctx_map =
   | _ -> raise (Error.Error ("Type " ^ print_exp t ^ " should be a data type."))
 
 let refine (sign : signature) (p : pats) (cD : ctx) (sigma : ctx_map) : pats * ctx * ctx_map =
+  Debug.indent ();
   Debug.print (fun () -> "Refined called: p = " ^ print_pats p
                          ^ "\ncD = " ^ print_ctx cD
                          ^ "\nsigma = " ^ print_pats sigma);
@@ -161,9 +170,11 @@ let refine (sign : signature) (p : pats) (cD : ctx) (sigma : ctx_map) : pats * c
   Debug.print (fun () -> "Calling matchings with delta = " ^ print_pats delta
                          ^ "\np = " ^ print_pats p ^ "\nresulting in " ^ print_pats p' ^ ".");
   let sd = compose_maps sigma cD delta in
+  Debug.deindent ();
   p' , cD', sd
 
 let check_pats (sign : signature) (p : pats) (cG : ctx) : ctx * ctx_map =
+  Debug.indent ();
   let is_Pvar = function
     | PVar _ -> true
     | _ -> false
@@ -197,25 +208,31 @@ let check_pats (sign : signature) (p : pats) (cG : ctx) : ctx * ctx_map =
       Debug.print (fun () -> "Check pats returned result ctx " ^ print_ctx (fst res) ^ "\nand pattern " ^ print_pats (snd res));
       res
   in
-  check_pats p (List.map (fun (x, _) -> PVar x) cG) cG
+  let res = check_pats p (List.map (fun (x, _) -> PVar x) cG) cG in
+  Debug.deindent ();
+  res
 
 
 let rec check_innacs (sign, cD : signature * ctx) (p : pats) (sigma : ctx_map) (cG : ctx) : unit =
   match p, sigma with
   | p::ps, q::qs ->
      begin match cG with
-     | (x, t) :: cG' -> check_innac (sign, cD) p q t ; check_innacs (sign, cD) ps qs (ctx_subst (x, exp_of_pat q) cG)
+     | (x, t) :: cG' -> check_innac (sign, cD) p q t ; check_innacs (sign, cD) ps qs (ctx_subst (x, exp_of_pat q) cG')
      | _ -> raise (Error.Error "The context ended unexpectedly.")
      end
   | [], [] -> ()
   | _ -> raise (Error.Error "Size mismatch.")
 
 and check_innac (sign, cD : signature * ctx) (p : pat) (q : pat) (t : exp) : unit =
+  Debug.print (fun () -> "Checking inaccessible patterns.\np = "
+    ^ print_pat p ^ "\nq = " ^ print_pat q);
   match p, q with
   | Innac ep, Innac eq ->
+     Debug.indent ();
      check (sign, cD) ep t ;
      check (sign, cD) eq t ;
      let _ = Unify.unify (sign, cD) ep eq in
+     Debug.deindent ();
      ()
   | PVar x, PVar y when x = y -> ()
   | PConst (n, sp), PConst (n', sq) when n = n' ->
@@ -236,10 +253,13 @@ let caseless (sign : signature) (cD : ctx) (x : name) (t : exp) : unit =
   else raise (Error.Error ("Pattern variable " ^ print_name x ^ " is not really impossible."))
 
 let check_clause (sign : signature) (f : def_name) (p : pats) (telG : tel) (t : exp) (rhs : rhs) : unit =
+  Debug.print (fun () -> "Checking pattern clause:\nPattern spine: " ^ print_pats p
+    ^ "\nRHS: " ^ print_rhs rhs);
   try
     let cD, sigma = check_lhs sign p (ctx_of_tel telG) in
+    Debug.print (fun () -> "LHS was checked:\n cD = " ^ print_ctx cD ^ "\n sigma = "^ print_pats sigma ^ "\n telG = " ^ print_tel telG);
     match rhs with
-    | Just e -> check (sign, cD) e t
+    | Just e -> check (sign, cD) e (subst_list (subst_of_ctx_map sigma telG) t)
     | Impossible x -> caseless sign cD x t
   with
     Unification_failure msg -> raise (Error.Error msg)

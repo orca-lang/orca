@@ -481,7 +481,7 @@ module Int = struct
   let rec exp_of_pat : pat -> exp = function
     | PVar n -> Var n
     | PBVar i -> BVar i
-    | Innac e -> raise (Error.Violation "We'd be very surprised if this were to happen.")
+    | Innac e -> e
     | PLam (f, p) -> Lam (f, exp_of_pat p)
     | PConst (n, ps) -> App (Const n, List.map exp_of_pat ps)
     | PAnnot (p, e) -> Annot (exp_of_pat p, e)
