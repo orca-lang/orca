@@ -5,6 +5,9 @@ data eq (A : *) : A -> A -> * where
 
 def ref : (A : *) -> (x : A) -> eq A x x = fn A x => refl x
 
+(*) TODO consider this syntax
+(*) def ref (A : *) (x : A) : eq A x x = refl x
+
 def sym : (A : *) -> (x : A) -> (y : A) ->  eq A x y -> eq A y x where
 | A z .z (refl .z) => refl z
 

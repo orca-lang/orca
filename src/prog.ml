@@ -35,13 +35,18 @@ let tc_program (sign : signature) : program -> signature = function
      Debug.indent ();
      let t' = if tel = [] then t else Pi(tel, t) in
      let _u = check_type (sign, []) t' in
-
-     let sign' = Program(n, tel, t)::sign in
-     List.iter (fun (p, rhs) -> check_clause sign' n p tel t rhs) ds;
+     let sign' = check_clauses sign n tel t ds in
      Debug.deindent ();
-     sign'                       (* TODO add the new equations to the signature *)
+     sign'
+
+
+
   | Def (n, t, e) ->
      Debug.print_string ("Typechecking definition: " ^ n);
      let _ = check_type (sign, []) t in
+     let tel, t' = match t with
+       | Pi(tel, t') -> tel, t'
+       | _ -> [], t
+     in
      check (sign, []) e t ;
-     (Definition (n, t, e))::sign
+     (Definition (n, tel, t', e))::sign

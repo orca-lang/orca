@@ -2,18 +2,18 @@ open Syntax.Int
 open Name
 
 type signature_entry
-  = Definition of def_name * exp * exp (* the name, the type, and the definition *)
+  = Definition of def_name * tel * exp * exp (* the name, the type, and the definition *)
   (* name, parameters, constructed type *)
   | Constructor of def_name * tel * dsig
   (* name, parameters, indices, resulting universe *)
   | DataDef of def_name * tel * tel * universe
-  | Program of def_name * tel * exp (* TODO define this *)
+  | Program of def_name * tel * exp * pat_decls
 
 type signature = signature_entry list
 
 let signature_entry_name = function
-    | Definition (n', _, _)
-    | Program (n', _, _)
+    | Definition (n', _, _, _)
+    | Program (n', _, _, _)
     | DataDef (n', _, _, _)
     | Constructor (n', _, _) -> n'
 
@@ -32,7 +32,9 @@ let lookup_cons_entry (c : def_name) (sign : signature) : tel * dsig =
 
 let lookup_sign n sign =
   match lookup_sign_entry n sign with
-  | Definition (_, t, _) -> t
+  | Definition (_, [], t, _) -> t
+  | Definition (_, tel, t, _) -> Pi(tel, t)
+
   | DataDef (_, ps, is, u) ->
      let tel = ps @ is in
      if Util.empty_list tel
@@ -50,14 +52,14 @@ let lookup_sign n sign =
      in
      Debug.print (fun () -> "Looked up constructor " ^ n ^ " which has type " ^ print_exp t');
      t'
-  | Program (_,tel,t) -> if tel = [] then t else Pi (tel, t)
+  | Program (_,tel,t, _) -> if tel = [] then t else Pi (tel, t)
 
 let lookup_sign_def n sign =
   match lookup_sign_entry n sign with
-  | Definition (_, _, e) -> Some e
+  | Definition (_, _, _, e) -> Some e
   | Constructor _ -> None
   | DataDef _ -> None
-  | Program _ -> assert false
+  | Program _ -> None
 
 (* returns all the constructors of type n *)
 let lookup_constructors n sign =

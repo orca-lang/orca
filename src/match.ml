@@ -9,6 +9,7 @@ let rec subst_of_ctx_map (sigma : ctx_map) (tel : tel) : subst =
   match sigma, tel with
   | [], [] -> []
   | p :: ps, (_, n, t) :: tel' -> (n, exp_of_pat p) :: (subst_of_ctx_map ps tel')
+  | _ -> raise (Error.Violation "subst_of_ctx_map got lists of different lengths")
 
 (* let compose_maps (sigma : ctx_map) (cD : ctx) (delta : ctx_map) : ctx_map = *)
 (*   List.map (fun (_, e) -> pat_of_exp e) *)
@@ -263,3 +264,9 @@ let check_clause (sign : signature) (f : def_name) (p : pats) (telG : tel) (t : 
     | Impossible x -> caseless sign cD x t
   with
     Unification_failure msg -> raise (Error.Error msg)
+
+let check_clauses (sign : signature) (f : def_name) (telG : tel) (t : exp) (ds : pat_decls) : signature =
+  (* we add a non-reducing version of f to the signature *)
+  let sign'=  (Program (f, telG, t, [])) :: sign in
+  List.iter (fun (ps, rhs) -> check_clause sign' f ps telG t rhs) ds ;
+  (Program (f, telG, t, ds)) :: sign
