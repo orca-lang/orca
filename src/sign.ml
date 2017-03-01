@@ -54,12 +54,17 @@ let lookup_sign n sign =
      t'
   | Program (_,tel,t, _) -> if tel = [] then t else Pi (tel, t)
 
+type lookup_result
+  = D of exp                    (* A definition without pattern matching *)
+  | P of pat_decls              (* A definition with pattern matching *)
+  | N                           (* A non-reducible constant *)
+
 let lookup_sign_def n sign =
   match lookup_sign_entry n sign with
-  | Definition (_, _, _, e) -> Some e
-  | Constructor _ -> None
-  | DataDef _ -> None
-  | Program _ -> None
+  | Definition (_, _, _, e) -> D e
+  | Constructor _ -> N
+  | DataDef _ -> N
+  | Program (_, _, _, ds) -> P ds
 
 (* returns all the constructors of type n *)
 let lookup_constructors n sign =
@@ -73,12 +78,13 @@ let lookup_constructors n sign =
 let split_idx_param (sign : signature) (n : def_name) (es : exp list) : exp list * exp list =
   match lookup_sign_entry n sign with
   | DataDef (_, ps, is, _) ->
+     Debug.print (fun () -> "Splitting parameters " ^ print_exps es ^ " against " ^ print_tel ps);
      let rec split = function
        | e::es, _::ps ->
           let es1, es2 = split (es, ps) in
           e::es1, es2
        | es, [] -> [], es
-       | _ -> raise (Error.Violation "Run out of parameters.")
+       | _ -> raise (Error.Violation "Ran out of parameters.")
      in
      split (es, ps)
   | _ -> raise (Error.Error ("split_idx_param expected a datatype."))

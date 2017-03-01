@@ -11,11 +11,6 @@ let rec subst_of_ctx_map (sigma : ctx_map) (tel : tel) : subst =
   | p :: ps, (_, n, t) :: tel' -> (n, exp_of_pat p) :: (subst_of_ctx_map ps tel')
   | _ -> raise (Error.Violation "subst_of_ctx_map got lists of different lengths")
 
-(* let compose_maps (sigma : ctx_map) (cD : ctx) (delta : ctx_map) : ctx_map = *)
-(*   List.map (fun (_, e) -> pat_of_exp e) *)
-(*            (compose_subst (List.map2 (fun (x, _) p -> x, exp_of_pat p) cD delta) *)
-(*                                                        (List.map (fun x -> gen_floating_name (), exp_of_pat x) sigma)) *)
-
 let compose_maps (sigma : ctx_map) (cD : ctx) (delta : ctx_map) : ctx_map =
   let delta_names = List.map2 (fun (x, _) p -> x, p) cD delta in
   List.map (simul_psubst delta_names) sigma

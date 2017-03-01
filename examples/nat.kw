@@ -5,6 +5,7 @@ data nat where
 | suc: nat -> nat
 
 def Z : nat = zero
+def Z2 : nat = zero
 def 1 : nat = suc Z
 
 def plus : (x : nat) -> (y : nat) -> nat where
@@ -14,6 +15,13 @@ def plus : (x : nat) -> (y : nat) -> nat where
 def plus' : (x : nat) -> (y : nat) -> nat where
 | m zero => m
 | m (suc n) => plus' (suc m) n
+
+data eq (A : *) : A -> A -> * where
+| refl: (x : A) -> eq A x x
+
+def test0 : eq nat (suc zero) (plus zero (suc zero)) = refl (suc zero)
+def test1 : eq nat (plus' Z 1) (plus Z 1) = refl 1
+def test2 : eq nat Z Z2 = refl Z
 
 (* singletons over naturals *)
 

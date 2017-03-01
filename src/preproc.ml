@@ -11,8 +11,10 @@
    * Index bound variables to de Bruijn indices
    * Manage repeated names (TO BE DONE)
    * Checks that constructors build the appropriate type
+   * Checks that the equation list is not empty
+   * Checks that all equations are of the same length
 
- *)
+*)
 
 module E = Syntax.Ext
 module I = Syntax.Int
@@ -254,8 +256,13 @@ let pre_process s = function
   | E.DefPM (n, e, ds) ->
      let s' = add_name_sign s n in
      let e' = pproc_exp s [] [] e in
+     let lengths = List.map (fun (ps, _) -> List.length ps) ds in
+     if try List.for_all ((=) (List.hd lengths)) lengths
+        with Failure _ -> raise (Error.Error ("Empty set of patterns for definition " ^ n))
+     then () else raise (Error.Error ("Not all pattern spines are of the same length for definition " ^ n));
      begin match e' with
-     | I.Pi(tel, e'') -> s', I.DefPM (n, tel, e'', List.map (pproc_def_decl s') ds)
+     | I.Pi(tel, e'') ->
+        s', I.DefPM (n, tel, e'', List.map (pproc_def_decl s') ds)
      | e'' -> s', I.DefPM (n, [], e'', List.map (pproc_def_decl s') ds)
      end
   | E.Def (n, t, e) ->

@@ -212,6 +212,25 @@ module Int = struct
     | [] -> fv cG t
     | (_, n, e)::tel -> fv cG e @ (fv_pi cG tel t -- n)
 
+  let rec fv_pat =
+    function
+    | PVar n -> [n]
+    | PBVar i -> []
+    | Innac e -> []
+    | PLam (f, p) -> fv_pat p
+    | PConst (n, ps) -> fv_pats ps
+    | PAnnot (p, e) -> fv_pat p
+    | PClos (n, p) ->  fv_pat p
+    | PEmptyS -> []
+    | PShift i -> []
+    | PSubst (p1, p2) -> fv_pat p1 @ fv_pat p2
+    | PNil -> []
+    | PComma (p1, p2) -> fv_pat p1 @ fv_pat p2
+    | PUnder -> []
+    | PWildcard -> []
+
+  and fv_pats ps = List.concat(List.map fv_pat ps)
+
   (* Generate fresh names for all the bound variables,
      to keep names unique *)
 
@@ -493,26 +512,4 @@ module Int = struct
     | PComma (p1, p2) -> Comma (exp_of_pat p1, exp_of_pat p2)
     | PUnder -> Under
     | PWildcard -> raise (Error.Violation "We'd also be very surprised if this were to happen.")
-
-
-  (* Will fail if exp is not in pattern form *)
-  let rec pat_of_exp : exp -> pat = function
-    | App (Const n, sp) -> PConst (n, pats_of_exps sp)
-    | Const n -> PConst (n, [])
-    | Var x -> PVar x
-    | BVar i -> assert false (* TODO: Implement for syntax *)
-    | Lam (n, e) -> assert false (* TODO: Implement for syntax *)
-    | AppL (e1, e2) -> assert false (* TODO: Implement for syntax *)
-    | Clos (e1, e2) -> assert false (* TODO: Implement for syntax *)
-    | EmptyS -> assert false (* TODO: Implement for syntax *)
-    | Shift i -> assert false (* TODO: Implement for syntax *)
-    | Comma (e1, e2) -> assert false (* TODO: Implement for syntax *)
-    | Subst (e1, e2) -> assert false (* TODO: Implement for syntax *)
-    | Nil -> assert false (* TODO: Implement for syntax *)
-    | Annot (e, t) -> assert false (* TODO: Implement for syntax *)
-    | Under -> assert false (* TODO: Implement for syntax *)
-    | e -> raise (Error.Violation ("Expression " ^ print_exp e ^ " is not in pattern form."))
-
-  and pats_of_exps (es : exp list) : pats = List.map pat_of_exp es
-
 end
