@@ -19,14 +19,14 @@ let is_syntax = function
   | Lam _
   | AppL _
   | Const _
-  | Var _ 
+  | Var _
   | BVar _
   | Clos _
-  | EmptyS 
+  | EmptyS
   | Shift _
   | Dot _
   | Snoc _
-  | Nil 
+  | Nil
   | Under -> true
   | _ -> false
 
@@ -64,7 +64,7 @@ let lookup x cG =
                ("Unbound var after preprocessing, this cannot happen. (Var: " ^ print_name x ^ ")"))
   end
 
-let lookup_bound i  cP = 
+let lookup_bound i  cP =
   try snd (List.nth cP i)
   with _ -> raise (Error.Error ("Bound variable had index larger than bound context"))
 
@@ -87,7 +87,7 @@ let check_box (sign, cG) cP = function
         then t
         else raise (Error.Error "Wrong contexts. Tip: use a substitution?")
       | _ -> raise (Error.Error "Not a box. Don't think outside of the box.")
-      
+
 let rec infer (sign, cG : signature * ctx) (e : exp) : exp =
   Debug.print (fun () -> "Infer called with: " ^ print_exp e ^ " in context: " ^ print_ctx cG);
   Debug.indent() ;
@@ -212,9 +212,9 @@ and check_pi (sign, cG) tel t =
 
 and is_syn_type (sign, cG) cP (e : exp) =
   assert false
-      
+
 and check_syn (sign, cG) cP (e : exp) (t : exp) =
-  match e, Whnf.whnf sign t with  
+  match e, Whnf.whnf sign t with
   | Lam (f, e), SPi (tel, t) ->
     let cP' = List.map2 (fun f (_, _, e) -> f, e) f tel in
     check_syn (sign, cG) (cP' @ cP) e t
@@ -226,13 +226,15 @@ and check_syn (sign, cG) cP (e : exp) (t : exp) =
     let cP' = contextify sign g in
     is_syn_type (sign, cG) (cP' @ cP) e
   | Nil, Ctx -> ()
+  | _ -> raise (Error.Error "It's not a syntactic check")
 
 and infer_syn (sign, cG) cP (e : exp) =
   match e with
     | AppL (e, es) ->
       begin match infer_syn (sign, cG) cP e with
       | SPi (tel, t) -> assert false
-        end
+      | _ -> raise (Error.Error "Term in function position is not of function type")
+      end
     | Var x -> check_box (sign, cG) cP (lookup x cG)
     | Const n -> check_box (sign, cG) cP (lookup_sign n sign)
     | BVar i ->
@@ -244,8 +246,8 @@ and infer_syn (sign, cG) cP (e : exp) =
       let cP' = contextify sign g in
       let t = infer_syn (sign, cG) cP' e in
       Snoc (g, "_", t)
+    | _ -> raise (Error.Error "It's not a syntactic inference")
 
-       
 let rec check_tel (sign, cG) u tel =
   match tel with
   | [] -> u
