@@ -83,6 +83,7 @@ let find_pat_name (s : sign) (cG : ctx) (cP : bctx) (n : E.name) : ctx * I.pat =
 let rec get_bound_var_ctx (e: E.exp) : bctx =
   match e with
   | E.Comma (g, E.Annot(E.Ident n, _)) -> n :: (get_bound_var_ctx g)
+  | E.Annot(E.Ident n, _) -> [n]
   | E.Nil -> []
   | _ -> []
 
