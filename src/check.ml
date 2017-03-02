@@ -76,6 +76,7 @@ and check (sign , cG : signature * ctx) (e : exp) (t : exp) : unit =
   Debug.indent();
   begin match e, Whnf.whnf sign t with
   (* checkable terms *)
+  | Hole _, _ -> () (* holes are always of the right type *)
   | Fn (fs, e), Pi(tel, t) ->
      let sigma = List.map2 (fun f (_, n, _) -> n, Var f) fs tel in
      let t' = subst_list sigma t in

@@ -11,18 +11,19 @@ open Syntax.Ext
 %token STAR ARR SARR TURNSTILE TTS (* term turnstile *)
 %token <int>SET
 %token <string>IDENT
+%token <string option>HOLE
 %token EOF
 %token COMMA EMPTYS DOT NIL
 %token <int>SHIFT
 
-%nonassoc TURNSTILE TTS PATTERNWILD
+%nonassoc TURNSTILE TTS
 %nonassoc DOT RARR
 %left COMMA SEMICOLON
 %nonassoc COLON
 %right ARR SARR
 %left APPL
 
-%nonassoc STAR SHIFT SET EMPTYS IDENT NIL UNDERSCORE
+%nonassoc STAR SHIFT SET EMPTYS IDENT NIL UNDERSCORE HOLE
 %right LPAREN
 
 %start <Syntax.Ext.program list>program
@@ -82,6 +83,7 @@ simple_exp:
 | LPAREN t = exp RPAREN {t}
 | STAR {Star}
 | n = SET {Set n}
+| s = HOLE { Hole s }
 | s = IDENT {Ident s}
 | EMPTYS {EmptyS}
 | n = SHIFT {Shift n}

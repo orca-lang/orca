@@ -141,6 +141,8 @@ let rec pproc_exp (s : sign) (cG : ctx) (cP : bctx) : E.exp -> I.exp =
   | E.Nil -> I.Nil
   | E.Annot (e1, e2) -> I.Annot(f e1, f e2)
   | E.Under -> I.Under
+  | E.Hole (Some n) -> I.Hole (Name.gen_name n)
+  | E.Hole None -> I.Hole (Name.gen_name "H")
 
 and pproc_tel (s : sign) (cG : ctx) (cP : bctx) : E.exp -> I.tel * I.exp =
   function

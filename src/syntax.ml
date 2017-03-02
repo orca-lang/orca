@@ -15,6 +15,7 @@ module Ext = struct
     | Lam of name * exp
     | App of exp * exp
     | AppL of exp * exp
+    | Hole of name option
     | Ident of name
     | Clos of exp * exp
     | EmptyS
@@ -75,6 +76,8 @@ module Ext = struct
     | Nil -> "0"
     | Annot (e1, e2) -> "(: " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
     | Under -> "_"
+    | Hole (Some s) -> "?" ^ s
+    | Hole None -> "?"
 
   let rec print_pat (p : pat) : string = match p with
     | PIdent n -> n
@@ -143,6 +146,7 @@ module Int = struct
     | Nil
     | Annot of exp * exp
     | Under
+    | Hole of name
 
    and tel_entry = icit * name * exp
    and tel = tel_entry list
@@ -207,6 +211,7 @@ module Int = struct
     | Nil -> []
     | Annot (e1, e2) -> fv e1 @ fv e2
     | Under -> []
+    | Hole _ -> []
 
   and fv_pi cG (tel : tel) (t : exp) = match tel with
     | [] -> fv cG t
@@ -265,6 +270,7 @@ module Int = struct
       | Nil -> Nil
       | Annot (e1, e2) -> Annot(f e1, f e2)
       | Under -> Under
+      | Hole s -> Hole s
 
     and refresh_tel (rep : (name * name) list) (tel : tel) (t : exp) : tel * exp =
       match tel with
@@ -303,6 +309,7 @@ module Int = struct
     | Nil -> Nil
     | Annot (e1, e2) -> Annot(f e1, f e2)
     | Under -> Under
+    | Hole s -> Hole s
   and refresh_free_var_tel (x, y) tel t =
     match tel with
     | [] -> [], refresh_free_var (x, y) t
@@ -354,6 +361,7 @@ module Int = struct
     | Nil -> Nil
     | Annot (e1, e2) -> Annot(f e1, f e2)
     | Under -> Under
+    | Hole s -> Hole s
   and subst_pi (x, es) tel t =
     match tel with
     | [] -> [], subst (x, es) t
@@ -437,6 +445,7 @@ module Int = struct
     | Nil -> "0"
     | Annot (e1, e2) -> "(: " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
     | Under -> "_"
+    | Hole s -> "?" ^ print_name s
   and print_pi tel t = match tel with
     | [] -> print_exp t
     | (_, x, e) :: tel when is_name_floating x ->

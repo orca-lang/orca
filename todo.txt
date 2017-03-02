@@ -12,3 +12,5 @@
 * add holes to the syntax
 * remove subst_list to something doing with simultaneous subst
 * Unification should throw its own exception and not error
+* Improve holes: add synthesizable holes
+* Improve holes: list their types when done)

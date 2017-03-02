@@ -8,6 +8,8 @@ def Z : nat = zero
 def Z2 : nat = zero
 def 1 : nat = suc Z
 
+def hole : nat = ?fill_it
+
 def plus : (x : nat) -> (y : nat) -> nat where
 | zero m => m
 | (suc n) m => plus n (suc m)
