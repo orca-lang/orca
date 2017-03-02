@@ -68,7 +68,7 @@ exp:
 | e1 = exp APPL e2 = exp {AppL (e1, e2)}
 | e1 = exp COLON e2 = exp {Annot (e1, e2)}
 | FN xs = IDENT+ RARR e = exp {Fn (xs, e)}
-| LAM x = IDENT DOT e = exp {Lam (x, e)}
+| LAM x = IDENT+ DOT e = exp {Lam (x, e)}
 | s = exp ARR t = exp {Arr (s, t)}
 | s = exp SARR t = exp {SArr (s, t)}
 | s = exp COMMA e = exp {Comma (s, e)}
@@ -101,7 +101,7 @@ simple_pattern:
 | PATTERNWILD  {PWildcard}
 
 pattern:
-| LAM x = IDENT DOT p = pattern {PLam (x, p)}
+| LAM x = IDENT+ DOT p = pattern {PLam (x, p)}
 | c = IDENT ps = simple_pattern+ {PConst (c, ps)}
 | p = pattern COLON t = exp {PAnnot (p, t)}
 | x = IDENT LSQUARE p = pattern RSQUARE {PClos (x, p)}

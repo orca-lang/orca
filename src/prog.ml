@@ -17,6 +17,8 @@ let tc_constructor (sign , cG : signature * ctx) (u : universe) (tel : tel)
                         ^ " which does not fit in " ^ print_universe u
                         ^ ", the universe of the data type " ^ n'))
 
+
+
 let tc_program (sign : signature) : program -> signature = function
   | Data (n, ps, is, u, ds) ->
      Debug.print_string ("Typechecking data declaration: " ^ n ^ "\n");
@@ -28,8 +30,13 @@ let tc_program (sign : signature) : program -> signature = function
      (* TODO Add positivity checking *)
 
   | Syn (n, ps, e, ds) ->
-     Debug.print_string ("Typechecking syn declaration: " ^ n);
-     assert false
+    Debug.print_string ("Typechecking syn declaration: " ^ n);
+    (* let u' = check_tel (sign, []) Star ps in *)
+    (* let cG = ctx_of_tel ps in *)
+    (* let () = check (sign, cG) e (Set 0) in (\* e should be Star or Pi(tel, Star)...? *\) *)
+    (* let sign' =  *)
+    assert false
+    
   | DefPM (n, tel, t, ds) ->
      Debug.print_string ("\nTypechecking pattern matching definition: " ^ n);
      Debug.indent ();

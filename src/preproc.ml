@@ -59,7 +59,7 @@ let rec add_names_ctx c = function
      c'', n'::ns'
 
 
-let add_name_bvar c n : bctx = n :: c
+let add_name_bvars c n : bctx = n @ c
 
 let isEmpty = (=) []
 
@@ -103,68 +103,80 @@ let rec get_bound_var_ctx_in_pat (p : E.pat) : bctx =
   | E.PIdent _ -> []
   | p -> raise (Error.Error (E.print_pat p ^ " is a forbidden pattern on the left hand side of :>"))
 
-let rec pproc_exp (s : sign) (cG : ctx) (cP : bctx) : E.exp -> I.exp =
-  let f e = pproc_exp s cG cP e in
-  function
+let rec pproc_exp (s : sign) (cG : ctx) (cP : bctx) (isSyn : bool) (e :E.exp) : I.exp =
+  Debug.print (fun () -> "Preprocessing expression " ^ E.print_exp e ^ " with flag " ^ string_of_bool isSyn);
+  let f e = pproc_exp s cG cP isSyn e in
+  match e with
   | E.Star -> I.Univ I.Star
   | E.Set n -> I.Univ (I.Set n)
+  | E.Arr (t0, t1) when isSyn ->
+    let tel, t' = pproc_tel s cG cP isSyn (E.Arr (t0, t1)) in
+    I.SPi (tel, t')
+  | E.SArr (t0, t1) ->
+    let tel, t' = pproc_tel s cG cP isSyn (E.Arr (t0, t1)) in
+    I.SPi (tel, t')
   | E.Arr (t0, t1) ->
-     let tel, t' = pproc_tel s cG cP (E.Arr (t0, t1)) in
+     let tel, t' = pproc_tel s cG cP isSyn (E.Arr (t0, t1)) in
      I.Pi (tel, t')
-  | E.SArr (s, t) -> I.Arr(f s, f t)
   | E.Box (g, e) ->
     if isEmpty cP then
      let cP' = get_bound_var_ctx g in
-     I.Box(pproc_exp s cG cP' g, pproc_exp s cG cP' e)
+     I.Box(pproc_exp s cG cP' isSyn g, pproc_exp s cG cP' isSyn e)
     else
       raise (Error.Error "Bound variables bindings (|-) cannot be nested")
   | E.TBox (g, e) ->
     if isEmpty cP then
       let cP' = get_bound_var_ctx_no_annot g in
-      pproc_exp s cG cP' e
+      pproc_exp s cG cP' isSyn e
     else
       raise (Error.Error "Bound variables bindings (:>) cannot be nested")
   | E.Fn (ns, e) ->
      let cG', n' = add_names_ctx cG ns in
-     I.Fn(n', pproc_exp s cG' cP e)
+     I.Fn(n', pproc_exp s cG' cP isSyn e)
   | E.Lam (n, e) ->
-     I.Lam(n, pproc_exp s cG (add_name_bvar cP n) e)
+     I.Lam(n, pproc_exp s cG (add_name_bvars cP n) isSyn e)
   | E.App (e1, e2) ->
-     let h, sp = pproc_app s cG cP (E.App(e1, e2)) in
+     let h, sp = pproc_app s cG cP isSyn (E.App(e1, e2)) in
      I.App(h, sp)
-  | E.AppL (e1, e2) -> I.AppL(f e1, f e2)
+  | E.AppL (e1, e2) ->
+    let h, sp = pproc_app s cG cP isSyn (E.AppL(e1, e2)) in
+     I.AppL(h, sp)
   | E.Ident n -> find_name s cG cP n
   | E.Clos (e, s) -> I.Clos(f e, f s)
   | E.EmptyS -> I.EmptyS
   | E.Shift n -> I.Shift n
-  | E.Comma (e1, e2) -> I.Comma(f e1, f e2)
-  | E.Semicolon (e1, e2) -> I.Subst(f e1, f e2)
+  | E.Semicolon (e1, e2) -> I.Dot(f e1, f e2)
+  | E.Comma (e1, E.Annot (E.Ident x, e2)) -> I.Snoc (f e1, x, f e2)
+  | E.Comma (e1, e2) -> I.Snoc (f e1, "_", f e2)
   | E.Nil -> I.Nil
   | E.Annot (e1, e2) -> I.Annot(f e1, f e2)
   | E.Under -> I.Under
   | E.Hole (Some n) -> I.Hole (Name.gen_name n)
   | E.Hole None -> I.Hole (Name.gen_name "H")
 
-and pproc_tel (s : sign) (cG : ctx) (cP : bctx) : E.exp -> I.tel * I.exp =
+and pproc_tel (s : sign) (cG : ctx) (cP : bctx) (isSyn : bool) : E.exp -> I.tel * I.exp =
   function
   | E.Arr (E.Annot (E.Ident n, t0), t1) ->
      let cG', n' = add_name_ctx cG n in
-     let tel, t = pproc_tel s cG' cP t1 in
-     (Syntax.Explicit, n', pproc_exp s cG cP t0) :: tel, t
+     let tel, t = pproc_tel s cG' cP isSyn t1 in
+     (Syntax.Explicit, n', pproc_exp s cG cP isSyn t0) :: tel, t
   | E.Arr (t0, t1) ->
-     let tel, t = pproc_tel s cG cP t1 in
-     (Syntax.Explicit, Name.gen_floating_name (), pproc_exp s cG cP t0) :: tel , t
-  | t -> [], pproc_exp s cG cP t
+     let tel, t = pproc_tel s cG cP isSyn t1 in
+     (Syntax.Explicit, Name.gen_floating_name (), pproc_exp s cG cP isSyn t0) :: tel , t
+  | t -> [], pproc_exp s cG cP isSyn t
 
-and pproc_app (s : sign) (cG : ctx) (cP : bctx) : E.exp -> I.exp * I.exp list =
+and pproc_app (s : sign) (cG : ctx) (cP : bctx) (isSyn : bool) : E.exp -> I.exp * I.exp list =
   function
   | E.App(e1, e2) ->
-     let h, sp = pproc_app s cG cP e1 in
-     h, sp @[pproc_exp s cG cP e2]
-  | e -> pproc_exp s cG cP e, []
+     let h, sp = pproc_app s cG cP isSyn e1 in
+     h, sp @[pproc_exp s cG cP isSyn e2]
+  | E.AppL(e1, e2) ->
+     let h, sp = pproc_app s cG cP isSyn e1 in
+     h, sp @[pproc_exp s cG cP isSyn e2]
+  | e -> pproc_exp s cG cP isSyn e, []
 
-let pproc_decl s cG (n, e) (d : I.def_name) =
-  let tel, e' = pproc_tel s cG [] e in
+let pproc_decl s cG (n, e) (isSyn : bool) (d : I.def_name) =
+  let tel, e' = pproc_tel s cG [] isSyn e in
   let (d', args) = match e' with
     | I.App (I.Const n', ds) -> n', ds
     | I.Const n' -> n', []
@@ -175,9 +187,9 @@ let pproc_decl s cG (n, e) (d : I.def_name) =
   else
     raise (Error.Error ("Return type of constructor " ^ n ^ " should be " ^ d))
 
-let pproc_param s cG (icit, n, e) =
+let pproc_param s cG (isSyn : bool) (icit, n, e) =
   let cG', n' = add_name_ctx cG n in
-  cG', (icit, n', pproc_exp s cG [] e)
+  cG', (icit, n', pproc_exp s cG [] isSyn e)
 
 let rec pproc_pat (s : sign) cG cP p =
   let print_ctx cG = "[" ^ String.concat ", " (List.map (fun (e, i) -> e ^ ", " ^ Name.print_name i) cG) ^ "]" in
@@ -187,9 +199,9 @@ let rec pproc_pat (s : sign) cG cP p =
   | E.PIdent n -> find_pat_name s cG cP n
   | E.Innac e ->
      Debug.print (fun () -> "Preprocessing inaccessible pattern " ^ E.print_exp e ^ " in context " ^ print_ctx cG);
-     cG, I.Innac (pproc_exp s cG [] e)
+     cG, I.Innac (pproc_exp s cG [] false e)
   | E.PLam (x, p) ->
-    let cG', p' = pproc_pat s cG (add_name_bvar cP x) p in
+    let cG', p' = pproc_pat s cG (add_name_bvars cP x) p in
     cG', I.PLam (x,  p')
   | E.PConst (c, ps) ->
     let g (cG, ps) p =
@@ -200,7 +212,7 @@ let rec pproc_pat (s : sign) cG cP p =
     cG', I.PConst (c, List.rev ps')
   | E.PAnnot (p, t) ->
     let cG', p' = f p in
-    cG', I.PAnnot (p', pproc_exp s [] [] t)
+    cG', I.PAnnot (p', pproc_exp s [] [] false t)
   | E.PClos (x, p) ->
     begin match find_pat_name s cG cP x with
     | cG', I.PVar n ->
@@ -213,7 +225,7 @@ let rec pproc_pat (s : sign) cG cP p =
   | E.PSubst (p1, p2) ->
     let cG', p1' = f p1 in
     let cG'', p2' = pproc_pat s cG' cP p2 in
-    cG'', I.PSubst (p1', p2')
+    cG'', I.PDot (p1', p2')
   | E.PNil -> cG, I.PNil
   | E.PComma (p1, p2) -> assert false
   | E.PBox (g, p) ->
@@ -234,31 +246,31 @@ let rec pproc_pats s cG = function
 
 let pproc_def_decl s (pats, e) =
   let cG', pats' = pproc_pats s [] pats in
-  (pats', I.Just (pproc_exp s cG' [] e))
+  (pats', I.Just (pproc_exp s cG' [] false e))
 
 let params_to_ctx = List.map2 (fun (_, n, _) (_, n', _) -> n, n')
 
 let pre_process s = function
   | E.Data (n, ps, e, ds) ->
-     let _, ps' = List.fold_left (fun (cG, ps) p -> let cG', p' = pproc_param s cG p in cG', (p'::ps)) ([], []) ps in
+     let _, ps' = List.fold_left (fun (cG, ps) p -> let cG', p' = pproc_param s cG false p in cG', (p'::ps)) ([], []) ps in
      let cG = params_to_ctx ps ps' in
-     let is, u = match pproc_tel s cG [] e with
+     let is, u = match pproc_tel s cG [] false e with
        | tel, I.Univ u -> tel, u
        | _, t -> raise (Error.Error ("Expected universe but instead got expression " ^ I.print_exp t))
      in
      let s' = add_name_sign s n in
-     let s'', ds' = List.fold_left (fun (s, dos) d -> let ss, dd = pproc_decl s cG d n in ss, (dd :: dos)) (s', []) ds in
+     let s'', ds' = List.fold_left (fun (s, dos) d -> let ss, dd = pproc_decl s cG d false n in ss, (dd :: dos)) (s', []) ds in
      s'', I.Data (n, ps', is, u, ds')
   | E.Syn (n, ps, e, ds) ->
-     let _, ps' = List.fold_left (fun (cG, ps) p -> let cG', p' = pproc_param s cG p in cG', (p'::ps)) ([], []) ps in
+     let _, ps' = List.fold_left (fun (cG, ps) p -> let cG', p' = pproc_param s cG true p in cG', (p'::ps)) ([], []) ps in
      let cG = params_to_ctx ps ps' in
-     let e' = pproc_exp s cG [] e in
+     let e' = pproc_exp s cG [] true e in
      let s' = add_name_sign s n in
-     let s'', ds' = List.fold_left (fun (s, dos) d -> let ss, dd = pproc_decl s cG d n in ss, (dd :: dos)) (s', []) ds in
+     let s'', ds' = List.fold_left (fun (s, dos) d -> let ss, dd = pproc_decl s cG d true n in ss, (dd :: dos)) (s', []) ds in
      s'', I.Syn (n, ps', e', ds')
   | E.DefPM (n, e, ds) ->
      let s' = add_name_sign s n in
-     let e' = pproc_exp s [] [] e in
+     let e' = pproc_exp s [] [] false e in
      let lengths = List.map (fun (ps, _) -> List.length ps) ds in
      if try List.for_all ((=) (List.hd lengths)) lengths
         with Failure _ -> raise (Error.Error ("Empty set of patterns for definition " ^ n))
@@ -270,4 +282,4 @@ let pre_process s = function
      end
   | E.Def (n, t, e) ->
      let s' = add_name_sign s n in
-     s', I.Def (n, pproc_exp s [] [] t, pproc_exp s [] [] e)
+     s', I.Def (n, pproc_exp s [] [] false t, pproc_exp s [] [] false e)

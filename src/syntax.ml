@@ -12,7 +12,7 @@ module Ext = struct
     | Box of exp * exp
     | TBox of exp * exp (* term box, only in external syntax *)
     | Fn of name list * exp
-    | Lam of name * exp
+    | Lam of name list * exp
     | App of exp * exp
     | AppL of exp * exp
     | Hole of name option
@@ -29,7 +29,7 @@ module Ext = struct
   type pat =
     | PIdent of name
     | Innac of exp
-    | PLam of name * pat
+    | PLam of name list * pat
     | PConst of name * pat list
     | PAnnot of pat * exp
     | PClos of name * pat
@@ -37,7 +37,7 @@ module Ext = struct
     | PShift of int
     | PSubst of pat * pat
     | PNil
-    | PComma of pat * pat
+    | PComma of pat *  pat
     | PBox of pat * pat
     | PUnder
     | PWildcard                 (* Inaccessible pattern wildcard *)
@@ -64,7 +64,7 @@ module Ext = struct
     | TBox (ctx, e) -> "(:> " ^ print_exp ctx ^ " " ^ print_exp e ^ ")"
     | Fn (fs, e) ->
        "(fn " ^ (String.concat " " fs) ^ " " ^ print_exp e ^ ")"
-    | Lam (f, e) -> "(\ " ^ f ^ " " ^ print_exp e ^ ")"
+    | Lam (f, e) -> "(\ " ^ String.concat " " f ^ " " ^ print_exp e ^ ")"
     | App (e1, e2) -> "(" ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
     | AppL (e1, e2) -> "(' " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
     | Ident n -> n
@@ -82,7 +82,7 @@ module Ext = struct
   let rec print_pat (p : pat) : string = match p with
     | PIdent n -> n
     | Innac e -> "(. " ^ print_exp e ^ ")"
-    | PLam (f, p) -> "(\ " ^ f ^ " " ^ print_pat p ^ ")"
+    | PLam (f, p) -> "(\ " ^ String.concat " " f ^ " " ^ print_pat p ^ ")"
     | PConst (n, ps) -> "(" ^ n ^ " " ^ (String.concat " " (List.map (fun p -> "(" ^ print_pat p ^ ")") ps)) ^ ")"
     | PAnnot (p, e) -> "(: " ^ print_pat p ^ " " ^ print_exp e ^ ")"
     | PClos (n, p) -> "([] " ^ n ^ " " ^ print_pat p ^ ")"
@@ -129,24 +129,25 @@ module Int = struct
   type exp
     = Univ of universe
     | Pi of tel * exp  (* A pi type *)
-    | Arr of exp * exp (* A syntactic type *)
+    | SPi of tel * exp (* A syntactic type *)
     | Box of exp * exp
     | Fn of name list * exp
-    | Lam of string * exp
+    | Lam of string list * exp
     | App of exp * exp list
-    | AppL of exp * exp
+    | AppL of exp * exp list
     | Const of def_name (* The name of a constant *)
     | Var of name
     | BVar of index
     | Clos of exp * exp
     | EmptyS
     | Shift of int
-    | Comma of exp * exp
-    | Subst of exp * exp
+    | Dot of exp * exp
+    | Snoc of exp * string * exp
     | Nil
     | Annot of exp * exp
     | Under
     | Hole of name
+    | Ctx
 
    and tel_entry = icit * name * exp
    and tel = tel_entry list
@@ -155,15 +156,15 @@ module Int = struct
     | PVar of name
     | PBVar of index
     | Innac of exp
-    | PLam of string * pat
+    | PLam of string list * pat
     | PConst of def_name * pat list
     | PAnnot of pat * exp
     | PClos of name * pat
     | PEmptyS
     | PShift of int
-    | PSubst of pat * pat
+    | PDot of pat * pat
     | PNil
-    | PComma of pat * pat
+    | PSnoc of pat * string * pat
     | PUnder
     | PWildcard
 
@@ -191,14 +192,15 @@ module Int = struct
     in
     function
     | Univ _ -> []
+    | Ctx -> []
     | Pi (tel, t) -> fv_pi cG tel t
-    | Arr (t, e) -> fv t @ fv e
+    | SPi (tel, e) -> fv_pi cG tel e 
     | Box (ctx, e) -> fv ctx @ fv e
     | Fn (xs, e) ->
        List.fold_left (fun vars x -> vars -- x) (fv e) xs
     | Lam (x, e) -> fv e
     | App (e1, es) -> fv e1 @ List.concat (List.map fv es)
-    | AppL (e1, e2) -> fv e1 @ fv e2
+    | AppL (e, es) -> fv e @ List.concat (List.map fv es)
     | Const n -> []
     | Var n when not (in_ctx n cG) -> [n]
     | Var n -> []
@@ -206,8 +208,8 @@ module Int = struct
     | Clos (e1, e2) -> fv e1 @ fv e2
     | EmptyS -> []
     | Shift n -> []
-    | Comma (e1, e2) -> fv e1 @ fv e2
-    | Subst (e1, e2) -> fv e1 @ fv e2
+    | Dot (e1, e2) -> fv e1 @ fv e2
+    | Snoc (g, _, e) -> fv g @ fv e
     | Nil -> []
     | Annot (e1, e2) -> fv e1 @ fv e2
     | Under -> []
@@ -228,9 +230,9 @@ module Int = struct
     | PClos (n, p) ->  fv_pat p
     | PEmptyS -> []
     | PShift i -> []
-    | PSubst (p1, p2) -> fv_pat p1 @ fv_pat p2
+    | PDot (p1, p2) -> fv_pat p1 @ fv_pat p2
     | PNil -> []
-    | PComma (p1, p2) -> fv_pat p1 @ fv_pat p2
+    | PSnoc (p1, _, p2) -> fv_pat p1 @ fv_pat p2
     | PUnder -> []
     | PWildcard -> []
 
@@ -244,8 +246,9 @@ module Int = struct
       let f x = refresh rep x in
       function
       | Univ u -> Univ u
+      | Ctx -> Ctx
       | Pi (tel, t) -> let tel', t' = refresh_tel rep tel t in Pi(tel', t')
-      | Arr (t, e) -> Arr(f t, f e)
+      | SPi (tel, t) -> let tel', t' = refresh_tel rep tel t in SPi(tel', t')
       | Box (ctx, e) -> Box(f ctx, f e)
       | Fn (xs, e) ->
          let xs' = List.map refresh_name xs in
@@ -254,7 +257,7 @@ module Int = struct
       | Lam (x, e) ->
          Lam(x, f e)
       | App (e1, es) -> App(f e1, List.map f es)
-      | AppL (e1, e2) -> AppL(f e1, f e2)
+      | AppL (e1, es) -> AppL(f e1, List.map f es)
       | Const n -> Const n
       | Var n ->
          (try
@@ -265,8 +268,8 @@ module Int = struct
       | Clos (e1, e2) -> Clos(f e1, f e2)
       | EmptyS -> EmptyS
       | Shift n -> Shift n
-      | Comma (e1, e2) -> Comma(f e1, f e2)
-      | Subst (e1, e2) -> Subst(f e1, f e2)
+      | Dot (e1, e2) -> Dot (f e1, f e2)
+      | Snoc (e1, x, e2) -> Snoc (f e1, x, f e2)
       | Nil -> Nil
       | Annot (e1, e2) -> Annot(f e1, f e2)
       | Under -> Under
@@ -287,16 +290,19 @@ module Int = struct
     let f e = refresh_free_var (x, y) e in
     match e with
     | Univ u -> Univ u
+    | Ctx -> Ctx
     | Pi (tel, t) ->
        let tel', t' = refresh_free_var_tel (x, y) tel t in
        Pi (tel', t')
-    | Arr (t, e) -> Arr(f t, f e)
+    | SPi (tel, t) ->
+       let tel', t' = refresh_free_var_tel (x, y) tel t in
+       SPi (tel', t')
     | Box (ctx, e) -> Box(f ctx, f e)
     | Fn (xs, _) when List.mem x xs -> raise (Error.Violation "Duplicate variable name")
     | Fn (xs, e) -> Fn (xs, f e)
     | Lam (x, e) -> Lam(x, f e)
     | App (e1, es) -> App(f e1, List.map f es)
-    | AppL (e1, e2) -> AppL(f e1, f e2)
+    | AppL (e1, es) -> AppL(f e1, List.map f es)
     | Const n -> Const n
     | Var n when n = x -> Var y
     | Var n -> Var n
@@ -304,8 +310,8 @@ module Int = struct
     | Clos (e1, e2) -> Clos(f e1, f e2)
     | EmptyS -> EmptyS
     | Shift n -> Shift n
-    | Comma (e1, e2) -> Comma(f e1, f e2)
-    | Subst (e1, e2) -> Subst(f e1, f e2)
+    | Dot (e1, e2) -> Dot (f e1, f e2)
+    | Snoc (g, x, e2) -> Snoc(f g, x, f e2)
     | Nil -> Nil
     | Annot (e1, e2) -> Annot(f e1, f e2)
     | Under -> Under
@@ -334,10 +340,13 @@ module Int = struct
     let f e = subst (x, es) e in
     match e with
     | Univ u -> Univ u
+    | Ctx -> Ctx
     | Pi (tel, t) ->
        let tel', t' = subst_pi (x, es) tel t in
        Pi(tel', t')
-    | Arr (t, e) -> Arr(f t, f e)
+    | SPi (tel, t) ->
+      let tel', t' = subst_pi (x, es) tel t in
+       SPi(tel', t')
     | Box (ctx, e) -> Box(f ctx, f e)
     | Fn (ys, e) ->
        let ys' = List.map refresh_name ys in
@@ -348,7 +357,7 @@ module Int = struct
        Fn(ys', subst (x, es) (refresh_free_vars extra e))
     | Lam (x, e) -> Lam(x, f e)
     | App (e1, es) -> App(f e1, List.map f es)
-    | AppL (e1, e2) -> AppL(f e1, f e2)
+    | AppL (e1, es) -> AppL(f e1, List.map f es)
     | Const n -> Const n
     | Var n  when x = n -> refresh es
     | Var n -> Var n
@@ -356,8 +365,8 @@ module Int = struct
     | Clos (e1, e2) -> Clos(f e1, f e2)
     | EmptyS -> EmptyS
     | Shift n -> Shift n
-    | Comma (e1, e2) -> Comma(f e1, f e2)
-    | Subst (e1, e2) -> Subst(f e1, f e2)
+    | Dot (e1, e2) -> Dot (f e1, f e2)
+    | Snoc (e1, x, e2) -> Snoc (f e1, x, f e2)
     | Nil -> Nil
     | Annot (e1, e2) -> Annot(f e1, f e2)
     | Under -> Under
@@ -398,9 +407,9 @@ module Int = struct
     | PClos (n, p) -> PClos (n, psubst s p)
     | PEmptyS -> PEmptyS
     | PShift i -> PShift i
-    | PSubst (p1, p2) -> PSubst (psubst s p1, psubst s p2)
+    | PDot (p1, p2) -> PDot (psubst s p1, psubst s p2)
     | PNil -> PNil
-    | PComma (p1, p2) -> PComma (psubst s p1, psubst s p2)
+    | PSnoc (p1, x, p2) -> PSnoc (psubst s p1, x, psubst s p2)
     | PUnder -> PUnder
     | PWildcard -> PWildcard
 
@@ -427,21 +436,22 @@ module Int = struct
 
   let rec print_exp = function
     | Univ u -> print_universe u
+    | Ctx -> "ctx"
     | Pi (tel, t) -> print_pi tel t
-    | Arr (t, e) -> "(->> " ^ print_exp t ^ " " ^ print_exp e ^ ")"
+    | SPi (tel, t) -> print_spi tel t
     | Box (ctx, e) -> "(|- " ^ print_exp ctx ^ " " ^ print_exp e ^ ")"
     | Fn (fs, e) -> "(fn " ^ (String.concat " " (List.map print_name fs)) ^ " " ^ print_exp e ^ ")"
-    | Lam (f, e) -> "(\ " ^ f ^ " " ^ print_exp e ^ ")"
+    | Lam (f, e) -> "(\ " ^ String.concat " " f ^ " " ^ print_exp e ^ ")"
     | App (e, es) -> "(" ^ print_exp e ^ " " ^ String.concat " " (List.map print_exp es) ^ ")"
-    | AppL (e1, e2) -> "(' " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
+    | AppL (e1, es) -> "(' " ^ print_exp e1 ^ " " ^ String.concat " " (List.map print_exp es) ^ ")"
     | Const n -> n
     | Var n -> Name.print_name n
     | BVar i -> "(i " ^ string_of_int i ^ ")"
     | Clos (e1, e2) -> "([] " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
     | EmptyS -> "^"
     | Shift n -> "^" ^ string_of_int n
-    | Comma (e1, e2) -> "(, " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
-    | Subst (e1, e2) -> "(; " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
+    | Dot (e1, e2) -> "(; " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
+    | Snoc (e1, x, e2) -> "(, " ^ print_exp e1 ^ ", " ^ x ^ " : " ^ print_exp e2 ^ ")"
     | Nil -> "0"
     | Annot (e1, e2) -> "(: " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
     | Under -> "_"
@@ -451,6 +461,11 @@ module Int = struct
     | (_, x, e) :: tel when is_name_floating x ->
        "(-> " ^ print_exp e ^ " " ^ print_pi tel t ^ ")"
     | (_, x, e) :: tel -> "(pi " ^ print_name x ^ " " ^ print_exp e ^ " " ^ print_pi tel t ^ ")"
+  and print_spi tel t = match tel with
+    | [] -> print_exp t
+    | (_, x, e) :: tel when is_name_floating x ->
+       "(->> " ^ print_exp e ^ " " ^ print_pi tel t ^ ")"
+    | (_, x, e) :: tel -> "(spi " ^ print_name x ^ " " ^ print_exp e ^ " " ^ print_pi tel t ^ ")"
 
   let print_exps es = "(" ^ String.concat ", " (List.map print_exp es) ^ ")"
 
@@ -458,15 +473,15 @@ module Int = struct
     | PVar n -> print_name n
     | PBVar i -> "(i " ^ string_of_int i ^ ")"
     | Innac e -> "." ^ print_exp e
-    | PLam (f, p) -> "(\ " ^ f ^ " " ^ print_pat p ^ ")"
+    | PLam (f, p) -> "(\ " ^ String.concat " " f ^ " " ^ print_pat p ^ ")"
     | PConst (n, ps) -> "(" ^ n ^ " " ^ (String.concat " " (List.map (fun p -> "(" ^ print_pat p ^ ")") ps)) ^ ")"
     | PAnnot (p, e) -> "(: " ^ print_pat p ^ " " ^ print_exp e ^ ")"
     | PClos (n, p) -> "([] " ^ print_name n ^ " " ^ print_pat p ^ ")"
     | PEmptyS -> "^"
     | PShift i -> "(^ " ^ string_of_int i ^ ")"
-    | PSubst (p1, p2) -> "(; " ^ print_pat p1 ^ " " ^ print_pat p2 ^ ")"
+    | PDot (p1, p2) -> "(; " ^ print_pat p1 ^ " " ^ print_pat p2 ^ ")"
     | PNil -> "0"
-    | PComma (p1, p2) -> "(, " ^ print_pat p1 ^ " " ^ print_pat p1 ^ ")"
+    | PSnoc (p1, x, p2) -> "(, " ^ print_pat p1 ^ ", " ^ x ^ ":" ^ print_pat p1 ^ ")"
     | PUnder -> "_"
     | PWildcard -> "._"
 
@@ -516,9 +531,9 @@ module Int = struct
     | PClos (n, p) -> Clos (Var n, exp_of_pat p)
     | PEmptyS -> EmptyS
     | PShift i -> Shift i
-    | PSubst (p1, p2) -> Subst (exp_of_pat p1, exp_of_pat p2)
+    | PDot (p1, p2) -> Dot (exp_of_pat p1, exp_of_pat p2)
     | PNil -> Nil
-    | PComma (p1, p2) -> Comma (exp_of_pat p1, exp_of_pat p2)
+    | PSnoc (p1, x, p2) -> Snoc (exp_of_pat p1, x, exp_of_pat p2)
     | PUnder -> Under
     | PWildcard -> raise (Error.Violation "We'd also be very surprised if this were to happen.")
 end

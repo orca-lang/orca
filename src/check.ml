@@ -15,6 +15,79 @@ let le_universe (u1 : universe) (u2 : universe) : bool =
   | Star, _ -> true
   | _, Star -> false
 
+let is_syntax = function
+  | Lam _
+  | AppL _
+  | Const _
+  | Var _ 
+  | BVar _
+  | Clos _
+  | EmptyS 
+  | Shift _
+  | Dot _
+  | Snoc _
+  | Nil 
+  | Under -> true
+  | _ -> false
+
+let drop_suffix cP n =
+  if List.length cP < n then
+    raise (Error.Error ("Shifted too far"))
+  else
+    let rec drop cP n =
+      match cP, n with
+      | _, 0 -> cP
+      | _::cP', n -> drop cP' (n-1)
+      | _ -> raise (Error.Violation "move on, there's nothing to see here!")
+    in
+    drop cP n
+
+let rec contextify sign (g : exp) =
+  match Whnf.whnf sign g with
+  | Nil -> []
+  | Snoc (g', x, e) ->
+    let cP = contextify sign g' in
+    (* is_syn_type (sign, cG) cP e; *)
+    (x, e) :: cP
+  | _ -> raise (Error.Error ("Expected context, obtained " ^ print_exp g))
+
+let rec decontextify cP =
+  match cP with
+  | [] -> Nil
+  | (x, e) :: cP' -> Snoc (decontextify cP', x, e)
+
+let lookup x cG =
+  begin
+    try List.assoc x cG
+    with Not_found ->
+      raise (Error.Violation
+               ("Unbound var after preprocessing, this cannot happen. (Var: " ^ print_name x ^ ")"))
+  end
+
+let lookup_bound i  cP = 
+  try snd (List.nth cP i)
+  with _ -> raise (Error.Error ("Bound variable had index larger than bound context"))
+
+let rec compare_ctxs (sign, cG) cP cP' =
+  match cP, cP' with
+  | [], [] -> true
+  | (_,t)::cP, (_,t')::cP' ->
+    let r = try
+              let _ = Unify.unify_flex (sign, cG) [] t t' in true
+      with
+      | _ -> false
+    in
+    r && compare_ctxs (sign, cG) cP cP'
+  | _ -> raise (Error.Error ("cP's are of different lengths"))
+
+let check_box (sign, cG) cP = function
+      | Box (g, t) ->
+        let cP' = contextify sign g in
+        if compare_ctxs (sign, cG) cP cP'
+        then t
+        else raise (Error.Error "Wrong contexts. Tip: use a substitution?")
+      | _ -> raise (Error.Error "Not a box. Don't think outside of the box.")
+      
 let rec infer (sign, cG : signature * ctx) (e : exp) : exp =
   Debug.print (fun () -> "Infer called with: " ^ print_exp e ^ " in context: " ^ print_ctx cG);
   Debug.indent() ;
@@ -24,14 +97,7 @@ let rec infer (sign, cG : signature * ctx) (e : exp) : exp =
        check (sign, cG) e t ; t
     | Const n ->
        lookup_sign n sign
-    | Var n ->
-
-       begin
-         try List.assoc n cG
-         with Not_found ->
-           raise (Error.Violation
-                    ("Unbound var after preprocessing, this cannot happen. (Var: " ^ print_name n ^ ")"))
-       end
+    | Var n -> lookup n cG
     | App (h, sp) ->
        begin match infer (sign, cG) h with
        | Pi (tel, t) ->
@@ -90,17 +156,9 @@ and check (sign , cG : signature * ctx) (e : exp) (t : exp) : unit =
      check (sign, cGext @ cG') e t' ;
      Debug.deindent()
 
-  (* terms from the syntactic framework *)
-  | Lam (f, e), _ -> assert false
-  | AppL (e1, e2), _ -> assert false
-  | BVar i, _ -> assert false
-  | Clos (e1, e2), _ -> assert false
-  | EmptyS, _ -> assert false
-  | Shift n, _ -> assert false
-  | Comma (e1, e2), _ -> assert false
-  | Subst (e1, e2), _ -> assert false
-  | Nil, _ -> assert false
-  | Arr (t, e), _ -> assert false
+  | _, Box (g, alpha) when is_syntax e ->
+    let cP = contextify sign g in
+    check_syn (sign, cG) cP e alpha
 
   | _ ->
      let t' =
@@ -152,6 +210,42 @@ and check_pi (sign, cG) tel t =
      | Set n -> Univ (max_universe us ut)
      end
 
+and is_syn_type (sign, cG) cP (e : exp) =
+  assert false
+      
+and check_syn (sign, cG) cP (e : exp) (t : exp) =
+  match e, Whnf.whnf sign t with  
+  | Lam (f, e), SPi (tel, t) ->
+    let cP' = List.map2 (fun f (_, _, e) -> f, e) f tel in
+    check_syn (sign, cG) (cP' @ cP) e t
+  | Clos (e, s), _ ->
+    let cP' = contextify sign (infer_syn (sign, cG) cP s) in
+    check_syn (sign, cG) cP' e t
+  | Snoc (g, _, e), Ctx ->
+    check_syn (sign, cG) cP g Ctx;
+    let cP' = contextify sign g in
+    is_syn_type (sign, cG) (cP' @ cP) e
+  | Nil, Ctx -> ()
+
+and infer_syn (sign, cG) cP (e : exp) =
+  match e with
+    | AppL (e, es) ->
+      begin match infer_syn (sign, cG) cP e with
+      | SPi (tel, t) -> assert false
+        end
+    | Var x -> check_box (sign, cG) cP (lookup x cG)
+    | Const n -> check_box (sign, cG) cP (lookup_sign n sign)
+    | BVar i ->
+      lookup_bound i cP
+    | EmptyS -> Nil
+    | Shift n -> decontextify (drop_suffix cP n)
+    | Dot (s, e) ->
+      let g = infer_syn (sign, cG) cP s in
+      let cP' = contextify sign g in
+      let t = infer_syn (sign, cG) cP' e in
+      Snoc (g, "_", t)
+
+       
 let rec check_tel (sign, cG) u tel =
   match tel with
   | [] -> u

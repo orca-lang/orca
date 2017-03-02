@@ -6,16 +6,16 @@ let rec occur_check n e =
   let f e = occur_check n e in
   match e with
   | Var n' -> n = n'
-  | Pi (tel, t) -> occur_check_tel n tel || occur_check n t
-  | Arr (s , t) -> f s || f t
+  | Pi (tel, t) 
+  | SPi (tel, t) -> occur_check_tel n tel || occur_check n t
   | Box (g, e) -> f g || f e
   | Fn (xs, e) when List.mem n xs -> f e
   | Lam (_, e) -> f e
-  | AppL (e1, e2)
   | Clos (e1, e2)
-  | Comma (e1, e2)
-  | Subst (e1, e2)
+  | Snoc (e1, _, e2)
+  | Dot (e1, e2)
   | Annot (e1, e2) -> f e1 || f e2
+  | AppL (e, es)
   | App (e, es) ->
      f e || List.fold_left (||) false (List.map (occur_check n) es)
   | _ -> false
@@ -42,14 +42,14 @@ let rec unify_flex (sign, cG) flex e1 e2 =
       | Univ (Set n) , Univ(Set n') when n = n' -> cG, []
       | Univ (Set n), Univ(Set n') -> raise (Error.Error ("Universes don't match: " ^ string_of_int n ^ " <> " ^ string_of_int n'))
       | Pi (tel, t), Pi(tel', t') -> unify_pi tel t tel' t'
-      | Arr(e1, e2), Arr(e1', e2') -> unify_many cG [e1;e2] [e1';e2']
+      | SPi (tel, t), SPi(tel', t') -> unify_pi tel t tel' t'
       | Box(g, e), Box(g', e') -> unify_many cG [g; e] [g'; e']
       | Fn(ns, e), Fn(ns', e') ->
          let sigma = List.map2 (fun n n' -> (n, Var n')) ns ns' in
          unify_flex (subst_list sigma e) (subst_list sigma e')
       | Lam(_,e), Lam(_, e') -> unify_flex e e'
       | App(e, es1), App(e', es2) -> unify_many cG (e::es1) (e'::es2)
-      | AppL(e1, e2), AppL(e1', e2') -> unify_many cG [e1; e2] [e1'; e2']
+      | AppL(e1, es), AppL(e1', es') -> unify_many cG (e1::es) (e1'::es')
       | Const n, Const n' ->
          if n = n' then
            cG, []
@@ -72,8 +72,8 @@ let rec unify_flex (sign, cG) flex e1 e2 =
       | Clos(e1, e2), Clos(e1', e2') -> unify_many cG [e1;e2] [e1';e2']
       | EmptyS, EmptyS -> cG, []
       | Shift n, Shift n' -> cG, []
-      | Comma(e1, e2), Comma(e1', e2') -> unify_many cG [e1;e2] [e1';e2']
-      | Subst(e1, e2), Subst(e1', e2') -> unify_many cG [e1;e2] [e1';e2']
+      | Dot(e1, e2), Dot(e1', e2') -> unify_many cG [e1;e2] [e1';e2']
+      | Snoc(e1, _, e2), Snoc(e1', _, e2') -> unify_many cG [e1;e2] [e1';e2']
       | Nil, Nil -> cG, []
       | Annot(e1, e2), Annot(e1', e2') -> unify_many cG [e1;e2] [e1';e2']
       | Under, _ -> cG, []
