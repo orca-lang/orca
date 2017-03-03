@@ -194,7 +194,7 @@ module Int = struct
     | Univ _ -> []
     | Ctx -> []
     | Pi (tel, t) -> fv_pi cG tel t
-    | SPi (tel, e) -> fv_pi cG tel e 
+    | SPi (tel, e) -> fv_pi cG tel e
     | Box (ctx, e) -> fv ctx @ fv e
     | Fn (xs, e) ->
        List.fold_left (fun vars x -> vars -- x) (fv e) xs
