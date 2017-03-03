@@ -94,37 +94,37 @@ let check_box (sign, cG) cP = function
         else raise (Error.Error "Wrong contexts. Tip: use a substitution?")
       | _ -> raise (Error.Error "Not a box. Don't think outside of the box.")
 
-let rec infer (sign, cG : signature * ctx) (e : exp) : exp =
+let rec infer (sign, cG : signature * ctx) cP (e : exp) : exp =
   Debug.print (fun () -> "Infer called with: " ^ print_exp e ^ " in context: " ^ print_ctx cG);
   Debug.indent() ;
   let res =
     begin match e with
     | Annot (e, t) ->
-       check (sign, cG) e t ; t
+       check (sign, cG) cP e t ; t
     | Const n ->
        lookup_sign n sign
     | Var n -> lookup n cG
     | App (h, sp) ->
-       begin match infer (sign, cG) h with
+       begin match infer (sign, cG) cP h with
        | Pi (tel, t) ->
-         check_spine (sign, cG) sp tel t
+         check_spine (sign, cG) cP sp tel t
        | SPi (tel, t) ->
-         check_syn_spine (sign, cG) [] sp tel t
+         check_syn_spine (sign, cG) cP sp tel t
        | Box (g, SPi (tel, t)) ->
-         let cP = contextify sign g in
-         Box (g, check_syn_spine (sign, cG) cP sp tel t)
+         let cD, sigma, cP' = unify_ctx (sign, cG) g cP in
+         Box (g, check_syn_spine (sign, cD) cP' sp (subst_list_on_stel sigma tel) (subst_list sigma t))
        | t -> raise (Error.Error ("The left hand side (" ^ print_exp h ^ ") of the application was of type "
                                   ^ print_exp t ^ " which is not of function type"))
        end
 
     | Univ u -> Univ (infer_universe u)
     | Pi (tel, t) ->
-       check_pi (sign, cG) tel t
+       check_pi (sign, cG) cP tel t
 
-    | Box (ctx, e) ->
-      check (sign, cG) ctx Ctx;
-      let cP = contextify sign ctx in
-      check_syn_type (sign, cG) cP e;
+    | Box (g, e) ->
+      check (sign, cG) cP g Ctx;
+      let cD, sigma, cP' = unify_ctx (sign, cG) g cP in
+      check_syn_type (sign, cD) cP' (subst_list sigma e);
       Univ Star
 
     | _ ->
@@ -142,14 +142,14 @@ and infer_universe = function
   | Star -> Set 0
   | Set n -> Set (n + 1)
 
-and check_type (sign, cG : signature * ctx) (s : exp) : universe =
-  match infer (sign, cG) s with
+and check_type (sign, cG : signature * ctx) cP (s : exp) : universe =
+  match infer (sign, cG) cP s with
   | Univ u -> u
   | e ->
      Debug.print (fun () -> "Assert universe failed for " ^ print_exp e ^ ".") ;
      raise (Error.Error "Not a universe.")
 
-and check (sign , cG : signature * ctx) (e : exp) (t : exp) : unit =
+and check (sign , cG : signature * ctx) cP (e : exp) (t : exp) : unit =
   Debug.print (fun () ->
       "Check called with: " ^ print_exp e ^ ":" ^ print_exp t ^ " in context: " ^ print_ctx cG);
   Debug.indent();
@@ -166,7 +166,7 @@ and check (sign , cG : signature * ctx) (e : exp) (t : exp) : unit =
      Debug.print (fun () -> "Resulted in ctx " ^ print_ctx cG'
                             ^ "\nwith extension " ^ print_ctx cGext
                             ^ "\nwith renaming " ^ print_subst sigma ^ ".");
-     check (sign, cGext @ cG') e t' ;
+     check (sign, cGext @ cG') cP e t' ;
      Debug.deindent()
 
   | _, Box (g, alpha) when is_syntax e ->
@@ -175,7 +175,7 @@ and check (sign , cG : signature * ctx) (e : exp) (t : exp) : unit =
 
   | _ ->
      let t' =
-       try infer (sign, cG) e
+       try infer (sign, cG) cP e
        with Error.Error msg ->
          Debug.print_string msg;
          raise (Error.Error ("Cannot check expression " ^ print_exp e))
@@ -203,17 +203,17 @@ and check (sign , cG : signature * ctx) (e : exp) (t : exp) : unit =
   Debug.print (fun() -> "Finished check for " ^ print_exp e) ;
   ()
 
-and check_spine (sign, cG) sp tel t =
+and check_spine (sign, cG) cP sp tel t =
   match sp, tel with
   | e::sp', (_, x, s)::tel ->
-     check (sign, cG) e s ;
+     check (sign, cG) cP e s ;
      let tel', t' = subst_pi (x, e) tel t in
-     check_spine (sign, cG) sp' tel' t'
+     check_spine (sign, cG) cP sp' tel' t'
   | [], [] -> t
   | _, [] ->
     begin
       match Whnf.whnf sign t with
-      | Pi (tel', t') -> check_spine (sign, cG) sp tel' t'
+      | Pi (tel', t') -> check_spine (sign, cG) cP sp tel' t'
       | Box (g, SPi (tel', t')) ->
         let cP = contextify sign g in
         check_syn_spine (sign, cG) cP sp tel' t'
@@ -221,12 +221,12 @@ and check_spine (sign, cG) sp tel t =
     end
   | [], _ -> Pi (tel, t)
 
-and check_pi (sign, cG) tel t =
+and check_pi (sign, cG) cP tel t =
   match tel with
-  | [] -> infer (sign, cG) t
+  | [] -> infer (sign, cG) cP t
   | (_, x, s)::tel' ->
-     let us = check_type (sign, cG) s in
-     let ut = check_pi (sign, (x, s)::cG) tel' t in
+     let us = check_type (sign, cG) cP s in
+     let ut = check_pi (sign, (x, s)::cG) cP tel' t in
      begin match ut with
      | Univ Star -> Univ Star (* Star is impredicative *)
      | Univ (Set n) -> Univ (max_universe us (Set n))
@@ -283,7 +283,7 @@ and check_syn (sign, cG) cP (e : exp) (t : exp) =
       ()
     | e, t ->
       Debug.print(fun ()-> "Expression " ^ print_exp e ^ " is not syntactic and thus back to check");
-      check (sign, cG) e (Box (decontextify cP, t))
+      check (sign, cG) cP e (Box (decontextify cP, t))
   end; Debug.deindent ()
     
 
@@ -323,7 +323,7 @@ and check_syn_spine (sign, cG) cP sp tel t =
   | _, [] ->
     begin
       match Whnf.whnf sign t with
-      | Pi (tel', t') -> check_spine (sign, cG) sp tel' t'
+      | Pi (tel', t') -> check_spine (sign, cG) cP sp tel' t'
       | SPi (tel', t') -> check_syn_spine (sign, cG) cP sp tel' t
       | Box (g, SPi (tel', t')) ->
         let cD, sigma, cP' = unify_ctx (sign, cG) g cP in
@@ -339,20 +339,20 @@ and check_spi (sign, cG) cP tel t =
     check_syn_type (sign, cG) cP s;
     check_spi (sign, cG) ((x, s) :: cP) tel' t
       
-let rec check_tel (sign, cG) u tel =
+let rec check_tel (sign, cG) cP u tel =
   match tel with
   | [] -> u
   | (_, x, s) :: tel' ->
      if u = Star then
-       check_tel (sign, (x, s) :: cG) u tel'
+       check_tel (sign, (x, s) :: cG) cP u tel'
      else
-       let us = check_type (sign, cG) s in
+       let us = check_type (sign, cG) cP s in
        let u' = max_universe us u in
        Debug.print (fun () -> "Checking telescope at variable " ^ print_name x
                            ^ " which has universe " ^ print_universe us
                            ^ " upgrading telescope's universe from "
                            ^ print_universe u ^ " to " ^ print_universe u');
-       check_tel (sign, (x, s) :: cG) u' tel'
+       check_tel (sign, (x, s) :: cG) cP u' tel'
 
 let rec check_stel (sign, cG) cP tel =
   match tel with

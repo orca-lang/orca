@@ -213,20 +213,20 @@ let rec check_innacs (sign, cD : signature * ctx) (p : pats) (sigma : ctx_map) (
   match p, sigma with
   | p::ps, q::qs ->
      begin match cG with
-     | (x, t) :: cG' -> check_innac (sign, cD) p q t ; check_innacs (sign, cD) ps qs (ctx_subst (x, exp_of_pat q) cG')
+     | (x, t) :: cG' -> check_innac (sign, cD) [] p q t ; check_innacs (sign, cD) ps qs (ctx_subst (x, exp_of_pat q) cG')
      | _ -> raise (Error.Error "The context ended unexpectedly.")
      end
   | [], [] -> ()
   | _ -> raise (Error.Error "Size mismatch.")
 
-and check_innac (sign, cD : signature * ctx) (p : pat) (q : pat) (t : exp) : unit =
+and check_innac (sign, cD : signature * ctx) cP (p : pat) (q : pat) (t : exp) : unit =
   Debug.print (fun () -> "Checking inaccessible patterns.\np = "
     ^ print_pat p ^ "\nq = " ^ print_pat q);
   match p, q with
   | Innac ep, Innac eq ->
      Debug.indent ();
-     check (sign, cD) ep t ;
-     check (sign, cD) eq t ;
+     check (sign, cD) cP ep t ;
+     check (sign, cD) cP eq t ;
      let _ = Unify.unify (sign, cD) ep eq in
      Debug.deindent ();
      ()
@@ -236,6 +236,7 @@ and check_innac (sign, cD : signature * ctx) (p : pat) (q : pat) (t : exp) : uni
      | Constructor (_, tel, _) -> check_innacs (sign, cD) sp sq (ctx_of_tel tel)
      | _ -> raise (Error.Violation ("It should have been a constructor."))
      end
+  (* In the syntax cases, we might need to grow cP *)
   | p, q -> raise (Error.Error ("Pattern matching on syntax is not yet supported.\np = " ^ print_pat p ^ "\nq = " ^ print_pat q))
 
 let check_lhs (sign : signature) (p : pats) (cG : ctx) : ctx * ctx_map =
@@ -255,7 +256,7 @@ let check_clause (sign : signature) (f : def_name) (p : pats) (telG : tel) (t : 
     let cD, sigma = check_lhs sign p (ctx_of_tel telG) in
     Debug.print (fun () -> "LHS was checked:\n cD = " ^ print_ctx cD ^ "\n sigma = "^ print_pats sigma ^ "\n telG = " ^ print_tel telG);
     match rhs with
-    | Just e -> check (sign, cD) e (subst_list (subst_of_ctx_map sigma telG) t)
+    | Just e -> check (sign, cD) [] e (subst_list (subst_of_ctx_map sigma telG) t)
     | Impossible x -> caseless sign cD x t
   with
     Unification_failure msg -> raise (Error.Error msg)

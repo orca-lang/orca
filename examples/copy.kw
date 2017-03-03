@@ -10,7 +10,7 @@ lf tp where
 syn oft : tm -> tp -> * where
 | t-unit: oft one unit
 | t-app: (f: tm) -> (e : tm) -> (s: tp) -> (t: tp) ->
-  app f (arr s t) -> app e s -> oft (app f e) t
+  oft f (arr s t) -> oft e s -> oft (app f e) t
 (*) | t-lam:
 
 def copy : (g : ctx) -> (g |- tm) -> (g |- tm) where
