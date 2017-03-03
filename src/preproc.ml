@@ -169,10 +169,12 @@ and pproc_tel (s : sign) (cG : ctx) (cP : bctx) (is_syntax : bool) : E.exp -> I.
 
 and pproc_stel (s : sign) (cG : ctx) (cP : bctx) (is_syntax : bool) : E.exp -> I.stel * I.exp =
   function
+  | E.Arr (E.Annot (E.Ident n, t0), t1)
   | E.SArr (E.Annot (E.Ident n, t0), t1) ->
      let cP' = add_name_bvars cP [n] in
      let tel, t = pproc_stel s cG cP' is_syntax t1 in
      (Syntax.Explicit, n, pproc_exp s cG cP is_syntax t0) :: tel, t
+  | E.Arr (t0, t1)
   | E.SArr (t0, t1) ->
      let tel, t = pproc_stel s cG cP is_syntax t1 in
      (Syntax.Explicit, "_", pproc_exp s cG cP is_syntax t0) :: tel , t
@@ -199,6 +201,18 @@ let pproc_decl s cG (n, e) (is_syntax : bool) (d : I.def_name) =
     (add_name_sign s n, (n, tel, (d', args)))
   else
     raise (Error.Error ("Return type of constructor " ^ n ^ " should be " ^ d))
+
+let pproc_sdecl s cG (n, e) (is_syntax : bool) (d : I.def_name) =
+  let tel, e' = pproc_stel s cG [] is_syntax e in
+  let (d', args) = match e' with
+    | I.App (I.Const n', ds) -> n', ds
+    | I.Const n' -> n', []
+    | _ -> raise (Error.Error ("Return type of constructor " ^ n ^ " should be " ^ d))
+  in
+  if d = d' then
+    (add_name_sign s n, (n, tel, (d', args)))
+  else
+    raise (Error.Error ("Return type of constructor " ^ n ^ " should be " ^ d))      
 
 let pproc_param s cG (is_syntax : bool) (icit, n, e) =
   let cG', n' = add_name_ctx cG n in
@@ -274,13 +288,15 @@ let pre_process s = function
      let s' = add_name_sign s n in
      let s'', ds' = List.fold_left (fun (s, dos) d -> let ss, dd = pproc_decl s cG d false n in ss, (dd :: dos)) (s', []) ds in
      s'', I.Data (n, ps', is, u, ds')
-  | E.Syn (n, ps, e, ds) ->
-     let _, ps' = List.fold_left (fun (cG, ps) p -> let cG', p' = pproc_param s cG true p in cG', (p'::ps)) ([], []) ps in
-     let cG = params_to_ctx ps ps' in
-     let e' = pproc_exp s cG [] true e in
+  | E.Syn (n, e, ds) ->   
+    let tel, e' = pproc_stel s [] [] true e in
+    let _ = match e' with
+      | I.SStar -> ()
+      | _ -> raise (Error.Error ("Syntax definition for " ^ n ^ " should have kind ★ instead of " ^ I.print_exp e'))
+    in
      let s' = add_name_sign s n in
-     let s'', ds' = List.fold_left (fun (s, dos) d -> let ss, dd = pproc_decl s cG d true n in ss, (dd :: dos)) (s', []) ds in
-     s'', I.Syn (n, ps', e', ds')
+     let s'', ds' = List.fold_left (fun (s, dos) d -> let ss, dd = pproc_sdecl s [] d true n in ss, (dd :: dos)) (s', []) ds in
+     s'', I.Syn (n, tel, ds')
   | E.DefPM (n, e, ds) ->
      let s' = add_name_sign s n in
      let e' = pproc_exp s [] [] false e in

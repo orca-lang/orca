@@ -56,6 +56,12 @@ let rec decontextify cP =
   | [] -> Nil
   | (x, e) :: cP' -> Snoc (decontextify cP', x, e)
 
+let unify_ctx (sign, cG) g cP =
+  let g' = decontextify cP in
+  let cD, sigma = Unify.unify (sign, cG) g g' in
+  let cP' = contextify sign (subst_list sigma g) in
+  cD, sigma, cP'
+    
 let lookup x cG =
   begin
     try List.assoc x cG
@@ -101,7 +107,12 @@ let rec infer (sign, cG : signature * ctx) (e : exp) : exp =
     | App (h, sp) ->
        begin match infer (sign, cG) h with
        | Pi (tel, t) ->
-          check_spine (sign, cG) sp tel t
+         check_spine (sign, cG) sp tel t
+       | SPi (tel, t) ->
+         check_syn_spine (sign, cG) [] sp tel t
+       | Box (g, SPi (tel, t)) ->
+         let cP = contextify sign g in
+         Box (g, check_syn_spine (sign, cG) cP sp tel t)
        | t -> raise (Error.Error ("The left hand side (" ^ print_exp h ^ ") of the application was of type "
                                   ^ print_exp t ^ " which is not of function type"))
        end
@@ -199,7 +210,16 @@ and check_spine (sign, cG) sp tel t =
      let tel', t' = subst_pi (x, e) tel t in
      check_spine (sign, cG) sp' tel' t'
   | [], [] -> t
-  | _ -> raise (Error.Error "Spine and telescope of different lengths while type checking.")
+  | _, [] ->
+    begin
+      match Whnf.whnf sign t with
+      | Pi (tel', t') -> check_spine (sign, cG) sp tel' t'
+      | Box (g, SPi (tel', t')) ->
+        let cP = contextify sign g in
+        check_syn_spine (sign, cG) cP sp tel' t'
+      | _ -> raise (Error.Error ("Unconsumed application cannot check against type " ^ print_exp t))
+    end
+  | [], _ -> Pi (tel, t)
 
 and check_pi (sign, cG) tel t =
   match tel with
@@ -214,44 +234,84 @@ and check_pi (sign, cG) tel t =
      end
 
 and check_syn_type (sign, cG) cP (e : exp) : unit =
-  assert false
-
+  Debug.print (fun () -> "Checking syntactic type " ^ print_exp e);
+  Debug.indent ();
+  begin
+    match Whnf.whnf sign e with
+    | SStar -> ()
+    | SPi (tel, e') ->
+      let rec check_tel_type cP = function
+        | [] -> cP
+        | (_, x, s) :: tel ->
+          check_syn_type (sign, cG) cP s;
+          check_tel_type ((x, s) :: cP) tel
+      in
+      let cP' = check_tel_type cP tel in
+      check_syn_type (sign, cG) cP' e'
+    | Const n -> if lookup_syn_def n sign = [] then ()
+      else raise (Error.Error ("Type " ^ n ^ " is not fully applied."))
+    | App (Const n, es) ->
+      let tel = lookup_syn_def n sign in
+      begin try
+              List.iter2 (fun e (_, x, t) -> check_syn (sign, cG) cP e t) es tel
+        with Invalid_argument _ -> raise (Error.Error ("Type " ^ n ^ " is not fully applied."))
+      end
+    | _ -> raise (Error.Error (print_exp e ^ " is not a syntactic type."))
+  end; Debug.deindent ()
+      
+    
 and check_syn (sign, cG) cP (e : exp) (t : exp) =
-  match e, Whnf.whnf sign t with
-  | Lam (f, e), SPi (tel, t) ->
-    let cP' = List.map2 (fun f (_, _, e) -> f, e) f tel in
-    check_syn (sign, cG) (cP' @ cP) e t
-  | Clos (e, s), _ ->
-    let cP' = contextify sign (infer_syn (sign, cG) cP s) in
-    check_syn (sign, cG) cP' e t
-  | Snoc (g, _, e), Ctx ->
-    check_syn (sign, cG) cP g Ctx;
-    let cP' = contextify sign g in
-    check_syn_type (sign, cG) (cP' @ cP) e
-  | Nil, Ctx -> ()
-  | _ -> raise (Error.Error "It's not a syntactic check")
+  Debug.print (fun () -> "Checking syntactic expression " ^ print_exp e ^ " against type " ^ print_exp t);
+  Debug.indent ();
+  begin
+    match e, Whnf.whnf sign t with
+    | Lam (f, e), SPi (tel, t) ->
+      let cP' = List.map2 (fun f (_, _, e) -> f, e) f tel in
+      check_syn (sign, cG) (cP' @ cP) e t
+    | Clos (e, s), _ ->
+      let cP' = contextify sign (infer_syn (sign, cG) cP s) in
+      check_syn (sign, cG) cP' e t
+    | Snoc (g, _, e), Ctx ->
+      check_syn (sign, cG) cP g Ctx;
+      let cP' = contextify sign g in
+      check_syn_type (sign, cG) (cP' @ cP) e
+    | Nil, Ctx -> ()
+    | e, t when is_syntax e ->
+      Debug.print(fun ()-> "Expression " ^ print_exp e ^ " is syntactic and thus being inferred");
+      let t' = infer_syn (sign, cG) cP e in
+      let _ = Unify.unify (sign, cG) t t' in
+      ()
+    | e, t ->
+      Debug.print(fun ()-> "Expression " ^ print_exp e ^ " is not syntactic and thus back to check");
+      check (sign, cG) e (Box (decontextify cP, t))
+  end; Debug.deindent ()
+    
 
 and infer_syn (sign, cG) cP (e : exp) =
-  match e with
-  | SPi (tel, t) -> check_spi (sign, cG) cP tel t; SStar
-  | AppL (e, es) ->
-    begin match infer_syn (sign, cG) cP e with
-    | SPi (tel, t) -> check_syn_spine (sign, cG) cP es tel t
-    | _ -> raise (Error.Error "Term in function position is not of function type")
-    end
-  | Var x -> check_box (sign, cG) cP (lookup x cG)
-  | Const n -> check_box (sign, cG) cP (lookup_sign n sign)
-  | BVar i ->
-    lookup_bound i cP
-  | EmptyS -> Nil
-  | Shift n -> decontextify (drop_suffix cP n)
-  | Dot (s, e) ->
-    let g = infer_syn (sign, cG) cP s in
-    let cP' = contextify sign g in
-    let t = infer_syn (sign, cG) cP' e in
-    Snoc (g, "_", t)
-  | _ -> raise (Error.Error "It's not a syntactic inference")
-
+  Debug.print (fun () -> "Inferring type of syntactic expression " ^ print_exp e);
+  Debug.indent ();
+  let res = 
+    match e with
+    | SPi (tel, t) -> check_spi (sign, cG) cP tel t
+    | AppL (e, es) ->
+      begin match infer_syn (sign, cG) cP e with
+      | SPi (tel, t) -> check_syn_spine (sign, cG) cP es tel t
+      | _ -> raise (Error.Error "Term in function position is not of function type")
+      end
+    | Var x -> check_box (sign, cG) cP (lookup x cG)
+    | Const n -> check_box (sign, cG) cP (lookup_sign n sign)
+    | BVar i ->
+      lookup_bound i cP
+    | EmptyS -> Nil
+    | Shift n -> decontextify (drop_suffix cP n)
+    | Dot (s, e) ->
+      let g = infer_syn (sign, cG) cP s in
+      let cP' = contextify sign g in
+      let t = infer_syn (sign, cG) cP' e in
+      Snoc (g, "_", t)
+    | _ -> raise (Error.Error ("Cannot infer syntactic expression " ^ print_exp e))
+  in Debug.deindent (); res
+      
 and check_syn_spine (sign, cG) cP sp tel t =
   match sp, tel with
   | e::sp', (_, x, s)::tel ->
@@ -260,7 +320,17 @@ and check_syn_spine (sign, cG) cP sp tel t =
     let tel' = List.map (fun (i, n, e) -> i, n, wrap e) tel in
     check_syn_spine (sign, cG) cP sp' tel' (wrap t)
   | [], [] -> t
-  | _ -> raise (Error.Error "Spine and telescope of different lengths while type checking.")
+  | _, [] ->
+    begin
+      match Whnf.whnf sign t with
+      | Pi (tel', t') -> check_spine (sign, cG) sp tel' t'
+      | SPi (tel', t') -> check_syn_spine (sign, cG) cP sp tel' t
+      | Box (g, SPi (tel', t')) ->
+        let cD, sigma, cP' = unify_ctx (sign, cG) g cP in
+        check_syn_spine (sign, cD) cP' sp (subst_list_on_stel sigma tel') (subst_list sigma t')
+      | _ -> raise (Error.Error ("Unconsumed application cannot check against type " ^ print_exp t))
+    end
+  | [], _ -> SPi (tel, t)
     
 and check_spi (sign, cG) cP tel t =
   match tel with
@@ -283,3 +353,10 @@ let rec check_tel (sign, cG) u tel =
                            ^ " upgrading telescope's universe from "
                            ^ print_universe u ^ " to " ^ print_universe u');
        check_tel (sign, (x, s) :: cG) u' tel'
+
+let rec check_stel (sign, cG) cP tel =
+  match tel with
+  | [] -> ()
+  | (_, x, s) :: tel' ->
+    check_syn_type (sign, cG) cP s;
+    check_stel (sign, cG) ((x, s) :: cP) tel'

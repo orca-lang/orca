@@ -13,9 +13,6 @@ syn oft : tm -> tp -> * where
   app f (arr s t) -> app e s -> oft (app f e) t
 (*) | t-lam:
 
-
-syn ctx where
-
 def copy : (g : ctx) -> (g |- tm) -> (g |- tm) where
 | g (app M N) => app (copy g M) (copy g N)
 | g (lam (\x. M)) => lam (\x. copy (g, x) M)

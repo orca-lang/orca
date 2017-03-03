@@ -42,7 +42,7 @@ program:
 
 toplevel:
 | DATA s = IDENT p = params t = type_dec? WHERE option(MID) d = separated_list (MID, decl) {Data (s, p, unwrap_or Star t, d)}
-| SYN s = IDENT p = params t = type_dec? WHERE option(MID) d = separated_list (MID, decl) {Syn (s, p, unwrap_or Star t, d)}
+| SYN s = IDENT t = type_dec? WHERE option(MID) d = separated_list (MID, decl) {Syn (s, unwrap_or Star t, d)}
 | DEF f = IDENT COLON t = exp WHERE option(MID) d = separated_list (MID, def_decl) {DefPM (f, t, d)}
 | DEF f = IDENT COLON t = exp EQ e = exp {Def (f, t, e)}
 

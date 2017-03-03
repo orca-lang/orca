@@ -17,7 +17,13 @@ let tc_constructor (sign , cG : signature * ctx) (u : universe) (tel : tel)
                         ^ " which does not fit in " ^ print_universe u
                         ^ ", the universe of the data type " ^ n'))
 
-
+let tc_syn_constructor (sign , cG : signature * ctx) (tel : stel)
+                       (n , tel', (n', es) : def_name * stel * dsig) : signature_entry =
+  Debug.print_string ("Typechecking syntax constructor: " ^ n) ;
+  check_stel (sign, cG) [] tel';
+  let cP = List.map (fun (_, x, s) -> x, s) tel' in
+  List.iter2 (check_syn (sign, cG) cP) es (List.map (fun (_,_,t) -> t) tel);
+  SConstructor (n, tel', (n', es))
 
 let tc_program (sign : signature) : program -> signature = function
   | Data (n, ps, is, u, ds) ->
@@ -29,13 +35,12 @@ let tc_program (sign : signature) : program -> signature = function
      (List.map (tc_constructor (sign', cG) u (ps @ is)) ds) @ sign'
      (* TODO Add positivity checking *)
 
-  | Syn (n, ps, e, ds) ->
+  | Syn (n, tel, ds) ->
     Debug.print_string ("Typechecking syn declaration: " ^ n);
-    (* let u' = check_tel (sign, []) Star ps in *)
-    (* let cG = ctx_of_tel ps in *)
-    (* let () = check (sign, cG) e (Set 0) in (\* e should be Star or Pi(tel, Star)...? *\) *)
-    (* let sign' =  *)
-    assert false
+    let () = check_stel (sign, []) [] tel in
+    let sign' = SynDef (n, tel) :: sign in
+    (List.map (tc_syn_constructor (sign', []) tel) ds) @ sign'
+    
     
   | DefPM (n, tel, t, ds) ->
      Debug.print_string ("\nTypechecking pattern matching definition: " ^ n);

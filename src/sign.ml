@@ -5,8 +5,10 @@ type signature_entry
   = Definition of def_name * tel * exp * exp (* the name, the type, and the definition *)
   (* name, parameters, constructed type *)
   | Constructor of def_name * tel * dsig
+  | SConstructor of def_name * stel * dsig
   (* name, parameters, indices, resulting universe *)
   | DataDef of def_name * tel * tel * universe
+  | SynDef of def_name * stel
   | Program of def_name * tel * exp * pat_decls
 
 type signature = signature_entry list
@@ -15,6 +17,8 @@ let signature_entry_name = function
     | Definition (n', _, _, _)
     | Program (n', _, _, _)
     | DataDef (n', _, _, _)
+    | SynDef (n', _)
+    | SConstructor (n', _, _)
     | Constructor (n', _, _) -> n'
 
 let rec lookup_sign_entry (n : def_name) (sign : signature) : signature_entry =
@@ -24,6 +28,11 @@ let rec lookup_sign_entry (n : def_name) (sign : signature) : signature_entry =
       List.find el sign
     with Not_found ->
       raise (Error.Violation ("Unable to find " ^ n ^ " in the signature"))
+
+let lookup_syn_def (n : def_name) (sign : signature) : stel =
+  match lookup_sign_entry n sign with
+  | SynDef (_, tel) -> tel
+  | _ -> raise (Error.Error ("Constant " ^ n ^ " not a syntactic type"))
 
 let lookup_cons_entry (c : def_name) (sign : signature) : tel * dsig =
   match lookup_sign_entry c sign with
@@ -40,6 +49,10 @@ let lookup_sign n sign =
      if Util.empty_list tel
      then Univ u
      else Pi (tel, Univ u)
+  | SynDef (_, tel) ->
+     if Util.empty_list tel
+     then SStar
+     else SPi (tel, SStar)
   | Constructor (_, is, (n', pes)) ->
      let t =
        if Util.empty_list pes then
@@ -52,6 +65,19 @@ let lookup_sign n sign =
      in
      Debug.print (fun () -> "Looked up constructor " ^ n ^ " which has type " ^ print_exp t');
      t'
+  | SConstructor (_, is, (n', pes)) ->
+     let t =
+       if Util.empty_list pes then
+         Const n'
+       else
+         App (Const n', pes)
+     in
+     let t' =
+       if Util.empty_list is then t else SPi (is, t)
+     in
+     Debug.print (fun () -> "Looked up constructor " ^ n ^ " which has type " ^ print_exp t');
+     t'
+
   | Program (_,tel,t, _) -> if tel = [] then t else Pi (tel, t)
 
 type lookup_result
@@ -64,6 +90,8 @@ let lookup_sign_def n sign =
   | Definition (_, _, _, e) -> D e
   | Constructor _ -> N
   | DataDef _ -> N
+  | SConstructor _ -> N
+  | SynDef _ -> N
   | Program (_, _, _, ds) -> P ds
 
 (* returns all the constructors of type n *)
