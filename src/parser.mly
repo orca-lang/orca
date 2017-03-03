@@ -5,7 +5,7 @@ open Syntax.Ext
 
 %}
 
-%token DATA SYN DEF MID RARR COLON SEMICOLON WHERE EQ UNDERSCORE PATTERNWILD
+%token DATA SYN DEF MID RARR COLON SEMICOLON WHERE EQ UNDERSCORE PATTERNWILD CTX
 %token LPAREN RPAREN LCURLY RCURLY LSQUARE RSQUARE
 %token FN LAM APPL
 %token STAR ARR SARR TURNSTILE TTS (* term turnstile *)
@@ -23,7 +23,7 @@ open Syntax.Ext
 %right ARR SARR
 %left APPL
 
-%nonassoc STAR SHIFT SET EMPTYS IDENT NIL UNDERSCORE HOLE
+%nonassoc STAR SHIFT SET EMPTYS IDENT NIL UNDERSCORE HOLE CTX
 %right LPAREN
 
 %start <Syntax.Ext.program list>program
@@ -89,6 +89,7 @@ simple_exp:
 | n = SHIFT {Shift n}
 | NIL {Nil}
 | UNDERSCORE {Under}
+| CTX {Ctx}
 
 simple_pattern:
 | x = IDENT {PIdent x}

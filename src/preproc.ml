@@ -103,43 +103,45 @@ let rec get_bound_var_ctx_in_pat (p : E.pat) : bctx =
   | E.PIdent _ -> []
   | p -> raise (Error.Error (E.print_pat p ^ " is a forbidden pattern on the left hand side of :>"))
 
-let rec pproc_exp (s : sign) (cG : ctx) (cP : bctx) (isSyn : bool) (e :E.exp) : I.exp =
-  Debug.print (fun () -> "Preprocessing expression " ^ E.print_exp e ^ " with flag " ^ string_of_bool isSyn);
-  let f e = pproc_exp s cG cP isSyn e in
+let rec pproc_exp (s : sign) (cG : ctx) (cP : bctx) (is_syntax : bool) (e :E.exp) : I.exp =
+  Debug.print (fun () -> "Preprocessing expression " ^ E.print_exp e ^ " with flag " ^ string_of_bool is_syntax);
+  let f e = pproc_exp s cG cP is_syntax e in
   match e with
+  | E.Star when is_syntax -> I.SStar
   | E.Star -> I.Univ I.Star
   | E.Set n -> I.Univ (I.Set n)
-  | E.Arr (t0, t1) when isSyn ->
-    let tel, t' = pproc_tel s cG cP isSyn (E.Arr (t0, t1)) in
+  | E.Ctx -> I.Ctx
+  | E.Arr (t0, t1) when is_syntax ->
+    let tel, t' = pproc_stel s cG cP is_syntax (E.Arr (t0, t1)) in
     I.SPi (tel, t')
   | E.SArr (t0, t1) ->
-    let tel, t' = pproc_tel s cG cP isSyn (E.Arr (t0, t1)) in
+    let tel, t' = pproc_stel s cG cP is_syntax (E.Arr (t0, t1)) in
     I.SPi (tel, t')
   | E.Arr (t0, t1) ->
-     let tel, t' = pproc_tel s cG cP isSyn (E.Arr (t0, t1)) in
+     let tel, t' = pproc_tel s cG cP is_syntax (E.Arr (t0, t1)) in
      I.Pi (tel, t')
   | E.Box (g, e) ->
     if isEmpty cP then
      let cP' = get_bound_var_ctx g in
-     I.Box(pproc_exp s cG cP' isSyn g, pproc_exp s cG cP' isSyn e)
+     I.Box(pproc_exp s cG cP' is_syntax g, pproc_exp s cG cP' is_syntax e)
     else
       raise (Error.Error "Bound variables bindings (|-) cannot be nested")
   | E.TBox (g, e) ->
     if isEmpty cP then
       let cP' = get_bound_var_ctx_no_annot g in
-      pproc_exp s cG cP' isSyn e
+      pproc_exp s cG cP' is_syntax e
     else
       raise (Error.Error "Bound variables bindings (:>) cannot be nested")
   | E.Fn (ns, e) ->
      let cG', n' = add_names_ctx cG ns in
-     I.Fn(n', pproc_exp s cG' cP isSyn e)
+     I.Fn(n', pproc_exp s cG' cP is_syntax e)
   | E.Lam (n, e) ->
-     I.Lam(n, pproc_exp s cG (add_name_bvars cP n) isSyn e)
+     I.Lam(n, pproc_exp s cG (add_name_bvars cP n) is_syntax e)
   | E.App (e1, e2) ->
-     let h, sp = pproc_app s cG cP isSyn (E.App(e1, e2)) in
+     let h, sp = pproc_app s cG cP is_syntax (E.App(e1, e2)) in
      I.App(h, sp)
   | E.AppL (e1, e2) ->
-    let h, sp = pproc_app s cG cP isSyn (E.AppL(e1, e2)) in
+    let h, sp = pproc_app s cG cP is_syntax (E.AppL(e1, e2)) in
      I.AppL(h, sp)
   | E.Ident n -> find_name s cG cP n
   | E.Clos (e, s) -> I.Clos(f e, f s)
@@ -154,29 +156,40 @@ let rec pproc_exp (s : sign) (cG : ctx) (cP : bctx) (isSyn : bool) (e :E.exp) : 
   | E.Hole (Some n) -> I.Hole (Name.gen_name n)
   | E.Hole None -> I.Hole (Name.gen_name "H")
 
-and pproc_tel (s : sign) (cG : ctx) (cP : bctx) (isSyn : bool) : E.exp -> I.tel * I.exp =
+and pproc_tel (s : sign) (cG : ctx) (cP : bctx) (is_syntax : bool) : E.exp -> I.tel * I.exp =
   function
   | E.Arr (E.Annot (E.Ident n, t0), t1) ->
      let cG', n' = add_name_ctx cG n in
-     let tel, t = pproc_tel s cG' cP isSyn t1 in
-     (Syntax.Explicit, n', pproc_exp s cG cP isSyn t0) :: tel, t
+     let tel, t = pproc_tel s cG' cP is_syntax t1 in
+     (Syntax.Explicit, n', pproc_exp s cG cP is_syntax t0) :: tel, t
   | E.Arr (t0, t1) ->
-     let tel, t = pproc_tel s cG cP isSyn t1 in
-     (Syntax.Explicit, Name.gen_floating_name (), pproc_exp s cG cP isSyn t0) :: tel , t
-  | t -> [], pproc_exp s cG cP isSyn t
+     let tel, t = pproc_tel s cG cP is_syntax t1 in
+     (Syntax.Explicit, Name.gen_floating_name (), pproc_exp s cG cP is_syntax t0) :: tel , t
+  | t -> [], pproc_exp s cG cP is_syntax t
 
-and pproc_app (s : sign) (cG : ctx) (cP : bctx) (isSyn : bool) : E.exp -> I.exp * I.exp list =
+and pproc_stel (s : sign) (cG : ctx) (cP : bctx) (is_syntax : bool) : E.exp -> I.stel * I.exp =
+  function
+  | E.SArr (E.Annot (E.Ident n, t0), t1) ->
+     let cP' = add_name_bvars cP [n] in
+     let tel, t = pproc_stel s cG cP' is_syntax t1 in
+     (Syntax.Explicit, n, pproc_exp s cG cP is_syntax t0) :: tel, t
+  | E.SArr (t0, t1) ->
+     let tel, t = pproc_stel s cG cP is_syntax t1 in
+     (Syntax.Explicit, "_", pproc_exp s cG cP is_syntax t0) :: tel , t
+  | t -> [], pproc_exp s cG cP is_syntax t
+    
+and pproc_app (s : sign) (cG : ctx) (cP : bctx) (is_syntax : bool) : E.exp -> I.exp * I.exp list =
   function
   | E.App(e1, e2) ->
-     let h, sp = pproc_app s cG cP isSyn e1 in
-     h, sp @[pproc_exp s cG cP isSyn e2]
+     let h, sp = pproc_app s cG cP is_syntax e1 in
+     h, sp @[pproc_exp s cG cP is_syntax e2]
   | E.AppL(e1, e2) ->
-     let h, sp = pproc_app s cG cP isSyn e1 in
-     h, sp @[pproc_exp s cG cP isSyn e2]
-  | e -> pproc_exp s cG cP isSyn e, []
+     let h, sp = pproc_app s cG cP is_syntax e1 in
+     h, sp @[pproc_exp s cG cP is_syntax e2]
+  | e -> pproc_exp s cG cP is_syntax e, []
 
-let pproc_decl s cG (n, e) (isSyn : bool) (d : I.def_name) =
-  let tel, e' = pproc_tel s cG [] isSyn e in
+let pproc_decl s cG (n, e) (is_syntax : bool) (d : I.def_name) =
+  let tel, e' = pproc_tel s cG [] is_syntax e in
   let (d', args) = match e' with
     | I.App (I.Const n', ds) -> n', ds
     | I.Const n' -> n', []
@@ -187,9 +200,9 @@ let pproc_decl s cG (n, e) (isSyn : bool) (d : I.def_name) =
   else
     raise (Error.Error ("Return type of constructor " ^ n ^ " should be " ^ d))
 
-let pproc_param s cG (isSyn : bool) (icit, n, e) =
+let pproc_param s cG (is_syntax : bool) (icit, n, e) =
   let cG', n' = add_name_ctx cG n in
-  cG', (icit, n', pproc_exp s cG [] isSyn e)
+  cG', (icit, n', pproc_exp s cG [] is_syntax e)
 
 let rec pproc_pat (s : sign) cG cP p =
   let print_ctx cG = "[" ^ String.concat ", " (List.map (fun (e, i) -> e ^ ", " ^ Name.print_name i) cG) ^ "]" in

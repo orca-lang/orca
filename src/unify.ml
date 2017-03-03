@@ -6,8 +6,8 @@ let rec occur_check n e =
   let f e = occur_check n e in
   match e with
   | Var n' -> n = n'
-  | Pi (tel, t) 
-  | SPi (tel, t) -> occur_check_tel n tel || occur_check n t
+  | Pi (tel, t) -> occur_check_tel n tel || occur_check n t
+  | SPi (tel, t) -> occur_check_stel n tel || occur_check n t
   | Box (g, e) -> f g || f e
   | Fn (xs, e) when List.mem n xs -> f e
   | Lam (_, e) -> f e
@@ -24,8 +24,11 @@ and occur_check_tel n tel =
   | [] -> false
   | (_, n', e)::tel when n <> n' ->
      occur_check n e || occur_check_tel n tel
-  | (_, _, e):: _ ->
-     occur_check n e
+  | (_, _, e):: _ -> occur_check n e
+and occur_check_stel n tel =
+  match tel with
+  | [] -> false
+  | (_, _, e):: _ ->  occur_check n e
 
 let print_subst sigma = "[" ^ String.concat ", " (List.map (fun (x, e) -> print_exp e ^ "/" ^ print_name x) sigma) ^ "]"
 
@@ -34,6 +37,7 @@ let rec unify_flex (sign, cG) flex e1 e2 =
   let unify_flex = unify_flex (sign, cG) flex in
   let unify_many cG e1 e2 = unify_flex_many (sign, cG) flex e1 e2 in
   let unify_pi = unify_flex_pi (sign, cG) flex in
+  let unify_spi = unify_flex_spi (sign, cG) flex in
     let is_flex n = List.mem n flex in
     Debug.print (fun () -> "Comparing: " ^ print_exp e1 ^ " and " ^ print_exp e2) ;
     Debug.indent() ;
@@ -42,7 +46,7 @@ let rec unify_flex (sign, cG) flex e1 e2 =
       | Univ (Set n) , Univ(Set n') when n = n' -> cG, []
       | Univ (Set n), Univ(Set n') -> raise (Error.Error ("Universes don't match: " ^ string_of_int n ^ " <> " ^ string_of_int n'))
       | Pi (tel, t), Pi(tel', t') -> unify_pi tel t tel' t'
-      | SPi (tel, t), SPi(tel', t') -> unify_pi tel t tel' t'
+      | SPi (tel, t), SPi(tel', t') -> unify_spi tel t tel' t'
       | Box(g, e), Box(g', e') -> unify_many cG [g; e] [g'; e']
       | Fn(ns, e), Fn(ns', e') ->
          let sigma = List.map2 (fun n n' -> (n, Var n')) ns ns' in
@@ -110,6 +114,21 @@ let rec unify_flex (sign, cG) flex e1 e2 =
        let tel2' = subst_list_in_tel sigma tel2 in
        let cD', sigma'' = (unify_flex_pi (sign, (n2, e2) :: cD) flex tel1' t1 tel2' t2) in
        cD', sigma @ sigma''
+         
+   and unify_flex_spi (sign, cG as ctxs: signature * ctx) (flex : name list) (tel1 : stel) (t1 : exp) (tel2 : stel) (t2 : exp) =
+    let subst_list_in_tel sigma tel =
+      List.map (fun (i, n, e) -> i, n, subst_list sigma e) tel
+    in
+    match tel1, tel2 with
+    | [], [] -> unify_flex ctxs flex t1 t2
+    | tel1, [] -> unify_flex ctxs flex (SPi (tel1, t1)) t2
+    | [], tel2 -> unify_flex ctxs flex t1 (SPi (tel2, t2))
+    | (_, n1, e1)::tel1, (_, n2, e2)::tel2 ->
+       let cD, sigma' = unify_flex ctxs flex e1 e2 in
+       let tel1' = subst_list_in_tel sigma' tel1 in
+       let tel2' = subst_list_in_tel sigma' tel2 in
+       let cD', sigma'' = (unify_flex_spi (sign, cD) flex tel1' t1 tel2' t2) in
+       cD', sigma' @ sigma''
 
 let get_flex_vars cG e1 e2 = fv cG e1 @ fv cG e2
 

@@ -25,6 +25,7 @@ module Ext = struct
     | Nil
     | Annot of exp * exp
     | Under
+    | Ctx
 
   type pat =
     | PIdent of name
@@ -78,6 +79,7 @@ module Ext = struct
     | Under -> "_"
     | Hole (Some s) -> "?" ^ s
     | Hole None -> "?"
+    | Ctx -> "ctx"
 
   let rec print_pat (p : pat) : string = match p with
     | PIdent n -> n
@@ -128,15 +130,17 @@ module Int = struct
 
   type exp
     = Univ of universe
+    | SStar (* Universe of syntax *)
     | Pi of tel * exp  (* A pi type *)
-    | SPi of tel * exp (* A syntactic type *)
+    | SPi of stel * exp (* A syntactic type *)
     | Box of exp * exp
-    | Fn of name list * exp
-    | Lam of string list * exp
-    | App of exp * exp list
-    | AppL of exp * exp list
+    | Ctx (* of exp *) (* Let's think about it *)
     | Const of def_name (* The name of a constant *)
     | Var of name
+    | Fn of name list * exp
+    | App of exp * exp list
+    | Lam of string list * exp
+    | AppL of exp * exp list
     | BVar of index
     | Clos of exp * exp
     | EmptyS
@@ -147,10 +151,12 @@ module Int = struct
     | Annot of exp * exp
     | Under
     | Hole of name
-    | Ctx
 
    and tel_entry = icit * name * exp
    and tel = tel_entry list
+
+   and stel_entry = icit * string * exp
+   and stel = stel_entry list
 
   type pat =
     | PVar of name
@@ -192,9 +198,10 @@ module Int = struct
     in
     function
     | Univ _ -> []
+    | SStar -> []
     | Ctx -> []
     | Pi (tel, t) -> fv_pi cG tel t
-    | SPi (tel, e) -> fv_pi cG tel e
+    | SPi (tel, e) -> fv_spi cG tel e
     | Box (ctx, e) -> fv ctx @ fv e
     | Fn (xs, e) ->
        List.fold_left (fun vars x -> vars -- x) (fv e) xs
@@ -218,6 +225,11 @@ module Int = struct
   and fv_pi cG (tel : tel) (t : exp) = match tel with
     | [] -> fv cG t
     | (_, n, e)::tel -> fv cG e @ (fv_pi cG tel t -- n)
+
+  and fv_spi cG (tel : stel) (t : exp) = match tel with
+    | [] -> fv cG t
+    | (_, n, e)::tel -> fv cG e @ (fv_spi cG tel t)
+
 
   let rec fv_pat =
     function
@@ -246,9 +258,10 @@ module Int = struct
       let f x = refresh rep x in
       function
       | Univ u -> Univ u
+      | SStar -> SStar
       | Ctx -> Ctx
       | Pi (tel, t) -> let tel', t' = refresh_tel rep tel t in Pi(tel', t')
-      | SPi (tel, t) -> let tel', t' = refresh_tel rep tel t in SPi(tel', t')
+      | SPi (tel, t) -> let tel', t' = refresh_stel rep tel t in SPi(tel', t')
       | Box (ctx, e) -> Box(f ctx, f e)
       | Fn (xs, e) ->
          let xs' = List.map refresh_name xs in
@@ -282,6 +295,13 @@ module Int = struct
          let n' = refresh_name n in
          let tel', t' = refresh_tel ((n, n')::rep) tel t in
          ((i, n', refresh rep e)::tel'), t'
+
+    and refresh_stel (rep : (name * name) list) (tel : stel) (t : exp) : stel * exp =
+      match tel with
+      | [] -> [], refresh rep t
+      | (i, n, e) :: tel ->
+         let tel', t' = refresh_stel rep tel t in
+         ((i, n, refresh rep e)::tel'), t'
     in
     refresh [] e
 
@@ -290,12 +310,13 @@ module Int = struct
     let f e = refresh_free_var (x, y) e in
     match e with
     | Univ u -> Univ u
+    | SStar -> SStar
     | Ctx -> Ctx
     | Pi (tel, t) ->
        let tel', t' = refresh_free_var_tel (x, y) tel t in
        Pi (tel', t')
     | SPi (tel, t) ->
-       let tel', t' = refresh_free_var_tel (x, y) tel t in
+       let tel', t' = refresh_free_var_stel (x, y) tel t in
        SPi (tel', t')
     | Box (ctx, e) -> Box(f ctx, f e)
     | Fn (xs, _) when List.mem x xs -> raise (Error.Violation "Duplicate variable name")
@@ -323,7 +344,14 @@ module Int = struct
     | (i, n, e) :: tel ->
        let tel', t' = refresh_free_var_tel (x, y) tel t in
        (i, n, refresh_free_var (x, y) e) :: tel', t'
+  and refresh_free_var_stel (x, y) tel t =
+    match tel with
+    | [] -> [], refresh_free_var (x, y) t
+    | (i, n, e) :: tel ->
+       let tel', t' = refresh_free_var_stel (x, y) tel t in
+       (i, n, refresh_free_var (x, y) e) :: tel', t'
 
+         
   let refresh_free_vars (rep : (name * name) list) e =
     List.fold_left (fun e (y, y') -> refresh_free_var (y, y') e) e rep
 
@@ -340,12 +368,13 @@ module Int = struct
     let f e = subst (x, es) e in
     match e with
     | Univ u -> Univ u
+    | SStar -> SStar
     | Ctx -> Ctx
     | Pi (tel, t) ->
        let tel', t' = subst_pi (x, es) tel t in
        Pi(tel', t')
     | SPi (tel, t) ->
-      let tel', t' = subst_pi (x, es) tel t in
+      let tel', t' = subst_spi (x, es) tel t in
        SPi(tel', t')
     | Box (ctx, e) -> Box(f ctx, f e)
     | Fn (ys, e) ->
@@ -381,7 +410,14 @@ module Int = struct
        let tel', t' = refresh_free_var_tel (n, n') tel t in
        let tel'', t'' = subst_pi (x, es) tel' t' in
        (i, n', subst (x, es) e) :: tel'', t''
+  and subst_spi (x, es) tel t =
+    match tel with
+    | [] -> [], subst (x, es) t
+    | (i, n, e) :: tel ->
+       let tel', t' = subst_spi (x, es) tel t in
+       (i, n, subst (x, es) e) :: tel', t'
 
+         
   let subst_list sigma e =
     List.fold_left (fun e s -> subst s e) e sigma
 
@@ -436,6 +472,7 @@ module Int = struct
 
   let rec print_exp = function
     | Univ u -> print_universe u
+    | SStar -> "★"
     | Ctx -> "ctx"
     | Pi (tel, t) -> print_pi tel t
     | SPi (tel, t) -> print_spi tel t
@@ -463,9 +500,7 @@ module Int = struct
     | (_, x, e) :: tel -> "(pi " ^ print_name x ^ " " ^ print_exp e ^ " " ^ print_pi tel t ^ ")"
   and print_spi tel t = match tel with
     | [] -> print_exp t
-    | (_, x, e) :: tel when is_name_floating x ->
-       "(->> " ^ print_exp e ^ " " ^ print_pi tel t ^ ")"
-    | (_, x, e) :: tel -> "(spi " ^ print_name x ^ " " ^ print_exp e ^ " " ^ print_pi tel t ^ ")"
+    | (_, x, e) :: tel -> "(spi " ^ x ^ " " ^ print_exp e ^ " " ^ print_spi tel t ^ ")"
 
   let print_exps es = "(" ^ String.concat ", " (List.map print_exp es) ^ ")"
 

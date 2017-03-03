@@ -111,8 +111,10 @@ let rec infer (sign, cG : signature * ctx) (e : exp) : exp =
        check_pi (sign, cG) tel t
 
     | Box (ctx, e) ->
-       (* TODO: only if ctx is a context and e is a syntactic type *)
-       Univ Star
+      check (sign, cG) ctx Ctx;
+      let cP = contextify sign ctx in
+      check_syn_type (sign, cG) cP e;
+      Univ Star
 
     | _ ->
        begin
@@ -195,7 +197,7 @@ and check_spine (sign, cG) sp tel t =
   | e::sp', (_, x, s)::tel ->
      check (sign, cG) e s ;
      let tel', t' = subst_pi (x, e) tel t in
-     check_spine (sign, (x, s)::cG) sp' tel' t'
+     check_spine (sign, cG) sp' tel' t'
   | [], [] -> t
   | _ -> raise (Error.Error "Spine and telescope of different lengths while type checking.")
 
@@ -204,13 +206,14 @@ and check_pi (sign, cG) tel t =
   | [] -> infer (sign, cG) t
   | (_, x, s)::tel' ->
      let us = check_type (sign, cG) s in
-     let ut = check_type (sign, (x, s)::cG) (Pi(tel', t)) in
+     let ut = check_pi (sign, (x, s)::cG) tel' t in
      begin match ut with
-     | Star -> Univ Star (* Star is impredicative *)
-     | Set n -> Univ (max_universe us ut)
+     | Univ Star -> Univ Star (* Star is impredicative *)
+     | Univ (Set n) -> Univ (max_universe us (Set n))
+     | _ -> raise (Error.Error ("Expression " ^ print_exp (Pi(tel,t)) ^ " cannot be checked to be a type."))
      end
 
-and is_syn_type (sign, cG) cP (e : exp) =
+and check_syn_type (sign, cG) cP (e : exp) : unit =
   assert false
 
 and check_syn (sign, cG) cP (e : exp) (t : exp) =
@@ -224,30 +227,48 @@ and check_syn (sign, cG) cP (e : exp) (t : exp) =
   | Snoc (g, _, e), Ctx ->
     check_syn (sign, cG) cP g Ctx;
     let cP' = contextify sign g in
-    is_syn_type (sign, cG) (cP' @ cP) e
+    check_syn_type (sign, cG) (cP' @ cP) e
   | Nil, Ctx -> ()
   | _ -> raise (Error.Error "It's not a syntactic check")
 
 and infer_syn (sign, cG) cP (e : exp) =
   match e with
-    | AppL (e, es) ->
-      begin match infer_syn (sign, cG) cP e with
-      | SPi (tel, t) -> assert false
-      | _ -> raise (Error.Error "Term in function position is not of function type")
-      end
-    | Var x -> check_box (sign, cG) cP (lookup x cG)
-    | Const n -> check_box (sign, cG) cP (lookup_sign n sign)
-    | BVar i ->
-      lookup_bound i cP
-    | EmptyS -> Nil
-    | Shift n -> decontextify (drop_suffix cP n)
-    | Dot (s, e) ->
-      let g = infer_syn (sign, cG) cP s in
-      let cP' = contextify sign g in
-      let t = infer_syn (sign, cG) cP' e in
-      Snoc (g, "_", t)
-    | _ -> raise (Error.Error "It's not a syntactic inference")
+  | SPi (tel, t) -> check_spi (sign, cG) cP tel t; SStar
+  | AppL (e, es) ->
+    begin match infer_syn (sign, cG) cP e with
+    | SPi (tel, t) -> check_syn_spine (sign, cG) cP es tel t
+    | _ -> raise (Error.Error "Term in function position is not of function type")
+    end
+  | Var x -> check_box (sign, cG) cP (lookup x cG)
+  | Const n -> check_box (sign, cG) cP (lookup_sign n sign)
+  | BVar i ->
+    lookup_bound i cP
+  | EmptyS -> Nil
+  | Shift n -> decontextify (drop_suffix cP n)
+  | Dot (s, e) ->
+    let g = infer_syn (sign, cG) cP s in
+    let cP' = contextify sign g in
+    let t = infer_syn (sign, cG) cP' e in
+    Snoc (g, "_", t)
+  | _ -> raise (Error.Error "It's not a syntactic inference")
 
+and check_syn_spine (sign, cG) cP sp tel t =
+  match sp, tel with
+  | e::sp', (_, x, s)::tel ->
+    let wrap t = Clos (t, (Dot (Shift 1, e))) in
+    check_syn (sign, cG) cP e s;
+    let tel' = List.map (fun (i, n, e) -> i, n, wrap e) tel in
+    check_syn_spine (sign, cG) cP sp' tel' (wrap t)
+  | [], [] -> t
+  | _ -> raise (Error.Error "Spine and telescope of different lengths while type checking.")
+    
+and check_spi (sign, cG) cP tel t =
+  match tel with
+  | [] -> infer_syn (sign, cG) cP t
+  | (_, x, s)::tel' ->
+    check_syn_type (sign, cG) cP s;
+    check_spi (sign, cG) ((x, s) :: cP) tel' t
+      
 let rec check_tel (sign, cG) u tel =
   match tel with
   | [] -> u
