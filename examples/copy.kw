@@ -3,7 +3,7 @@ syn tm where
 | lam: (tm -> tm) -> tm
 | one : tm
 
-syn tp where
+lf tp where
 | unit : tp
 | arr : tp -> tp -> tp
 

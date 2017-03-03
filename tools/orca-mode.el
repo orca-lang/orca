@@ -17,7 +17,7 @@
 
 (define-generic-mode 'orca-mode
   '("(*)") ;; comments
-  '("data" "syn" "def" "where" "|" "=>" "fn" "\\" ":>" "|-") ;; keywords
+  '("data" "syn" "lf" "def" "where" "|" "=>" "fn" "\\" ":>" "|-") ;; keywords
   '()
   '("\\.kw$") ;; file extension
   nil ;; (list 'orca-bind-keys) ;; other functions to call
