@@ -195,9 +195,10 @@ module Int = struct
 
   let rec fv cG =
     let fv e = fv cG e in
-    let in_ctx n = function
-      | (x, _)::_ when x = n -> true
-      | _ -> false
+    let rec in_ctx n = function
+      | (x, _) :: _ when x = n -> true
+      | _ :: cG -> in_ctx n cG
+      | [] -> false
     in
     function
     | Univ _ -> []
@@ -212,8 +213,8 @@ module Int = struct
     | App (e1, es) -> fv e1 @ List.concat (List.map fv es)
     | AppL (e, es) -> fv e @ List.concat (List.map fv es)
     | Const n -> []
-    | Var n when not (in_ctx n cG) -> [n]
-    | Var n -> []
+    | Var n when in_ctx n cG -> []
+    | Var n -> [n]
     | BVar i -> []
     | Clos (e1, e2) -> fv e1 @ fv e2
     | EmptyS -> []

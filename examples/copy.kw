@@ -22,3 +22,8 @@ syn oft : tm -> tp -> * where
 data isctx : (g:ctx) -> * where
 | Empty : isctx 0
 | Cons : (g:ctx) -> isctx g -> (t:tp) -> isctx (g, tp)
+
+data oft' (g:ctx) : isctx g -> (g |- tm) -> (|- tp) -> * where
+| t-unit' : (G : isctx g) -> oft' g G one unit
+| t-app' : (G : isctx g) -> (f : (g |- tm)) -> (e : (g |- tm)) -> (s : |- tp) -> (t: |- tp)
+         -> oft' g G f (arr s t) -> oft' g G e s -> oft' g G (app f e) t

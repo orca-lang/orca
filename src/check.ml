@@ -37,20 +37,6 @@ let lookup x cG =
       raise (Error.Violation
                ("Unbound var after preprocessing, this cannot happen. (Var: " ^ print_name x ^ ")"))
   end
-
-let rec compare_ctxs (sign, cG : signature * ctx) cP cP' =
-  match cP, cP' with
-  | BNil, BNil -> true
-  | CtxVar x, CtxVar y -> x = y
-  | BSnoc (cP, _, t), BSnoc (cP', _, t') ->
-    let r =
-      try
-        let _ = Unify.unify_flex (sign, cG) [] t t' in true
-      with _ -> false
-    in
-    r && compare_ctxs (sign, cG) cP cP'
-  | _ -> raise (Error.Error ("cP's are of different lengths"))
-
     
 let rec contextify (sign, cG) (g : exp) =
   match Whnf.whnf sign g with
@@ -74,59 +60,16 @@ let rec decontextify cP =
     
 let unify_ctx (sign, cG) g cP =
   let g' = decontextify cP in
+  Debug.print(fun () -> "Unifying contexts.\ng  = " ^ print_exp g ^ "\ng' = " ^ print_exp g' ^ "\n with ctx " ^ print_ctx cG);
   let cD, sigma = Unify.unify (sign, cG) g g' in
   let cP' = contextify (sign, cG) (subst_list sigma g) in
   cD, sigma, cP'
-
-
-let lookup_sign sign cP n =
-  match lookup_sign_entry n sign with
-  | Definition (_, [], t, _) -> t
-  | Definition (_, tel, t, _) -> Pi(tel, t)
-
-  | DataDef (_, ps, is, u) ->
-     let tel = ps @ is in
-     if Util.empty_list tel
-     then Univ u
-     else Pi (tel, Univ u)
-  | SynDef (_, tel) ->
-     if Util.empty_list tel
-     then Box (decontextify cP, SStar)
-     else Box (decontextify cP, SPi (tel, SStar))
-  | Constructor (_, is, (n', pes)) ->
-     let t =
-       if Util.empty_list pes then
-         Const n'
-       else
-         App (Const n', pes)
-     in
-     let t' =
-       if Util.empty_list is then t else Pi (is, t)
-     in
-     Debug.print (fun () -> "Looked up constructor " ^ n ^ " which has type " ^ print_exp t');
-     t'
-  | SConstructor (_, is, (n', pes)) ->
-     let t =
-       if Util.empty_list pes then
-         Const n'
-       else
-         App (Const n', pes)
-     in
-     let t' =
-       if Util.empty_list is then t else SPi (is, t)
-     in
-     Debug.print (fun () -> "Looked up constructor " ^ n ^ " which has type " ^ print_exp t');
-     Box (decontextify cP, t')
-
-  | Program (_,tel,t, _) -> if tel = [] then t else Pi (tel, t)
-    
     
 let check_box (sign, cG) cP = function
   | Box (g, t) ->
-    let cP' = contextify (sign, cG) g in
-    if compare_ctxs (sign, cG) cP cP'
-    then t
-    else raise (Error.Error "Wrong contexts. Tip: use a substitution?")
+    let cD, sigma, cP' = unify_ctx (sign, cG) g cP in
+    subst_list sigma t
+    (* else raise (Error.Error "Wrong contexts. Tip: use a substitution?") *)
   | Ctx -> Ctx
   | _ -> raise (Error.Error "Not a box. Don't think outside of the box.")
 
@@ -138,7 +81,7 @@ let rec infer (sign, cG : signature * ctx) cP (e : exp) : exp =
     | Annot (e, t) ->
        check (sign, cG) cP e t ; t
     | Const n ->
-       lookup_sign sign cP n
+       lookup_sign sign n
     | Var n -> lookup n cG
     | App (h, sp) ->
        begin match infer (sign, cG) cP h with
@@ -212,6 +155,8 @@ and check (sign , cG : signature * ctx) cP (e : exp) (t : exp) : unit =
     let cP = contextify (sign, cG) g in
     check_syn (sign, cG) cP e alpha
 
+  (* | App(e, es), t ->  *)
+
   | _ ->
      let t' =
        try infer (sign, cG) cP e
@@ -221,7 +166,6 @@ and check (sign , cG : signature * ctx) cP (e : exp) (t : exp) : unit =
      in
      try
        let _, sigma = Unify.unify (sign, cG) t t' in
-       (* TODO check, that sigma instantiates all the pending variables (No free vars remaining) *)
        Debug.print (fun () -> "Unification for " ^ print_exp t ^ " with " ^
                                 print_exp t' ^ " succeeded with substitution "
                                 ^ Unify.print_subst sigma ^ ".")
@@ -300,7 +244,8 @@ and check_syn_type (sign, cG) cP (e : exp) : unit =
       
     
 and check_syn (sign, cG) cP (e : exp) (t : exp) =
-  Debug.print (fun () -> "Checking syntactic expression " ^ print_exp e ^ " against type " ^ print_exp t);
+  Debug.print (fun () -> "Checking syntactic expression " ^ print_exp e ^ " against type "
+    ^ print_exp t ^ " in bound context " ^ print_bctx cP);
   Debug.indent ();
   begin
     match e, Whnf.whnf sign t with
@@ -325,7 +270,8 @@ and check_syn (sign, cG) cP (e : exp) (t : exp) =
     
 
 and infer_syn (sign, cG) cP (e : exp) =
-  Debug.print (fun () -> "Inferring type of syntactic expression " ^ print_exp e);
+  Debug.print (fun () -> "Inferring type of syntactic expression " ^ print_exp e
+    ^ " in bound context " ^ print_bctx cP);
   Debug.indent ();
   let res = 
     match e with
@@ -336,7 +282,7 @@ and infer_syn (sign, cG) cP (e : exp) =
       | _ -> raise (Error.Error "Term in function position is not of function type")
       end
     | Var x -> check_box (sign, cG) cP (lookup x cG)
-    | Const n -> check_box (sign, cG) cP (lookup_sign sign cP n)
+    | Const n -> check_box (sign, cG) cP (lookup_sign sign n)
     | BVar i ->
       let t = lookup_bound i cP in
       Debug.print (fun () -> "Looking bound variable " ^ string_of_int i ^ " resulted in type " ^ print_exp t
