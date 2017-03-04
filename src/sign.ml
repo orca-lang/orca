@@ -49,40 +49,40 @@ let lookup_sign sign n =
 
   | DataDef (_, ps, is, u) ->
      let tel = ps @ is in
-     if Util.empty_list tel
+     if tel = []
      then Univ u
      else Pi (tel, Univ u)
   | SynDef (_, tel) ->
-     if Util.empty_list tel
+     if tel = []
      then flex_box SStar
      else flex_box (SPi (tel, SStar))
   | Constructor (_, is, (n', pes)) ->
      let t =
-       if Util.empty_list pes then
+       if pes = [] then
          Const n'
        else
          App (Const n', pes)
      in
      let t' =
-       if Util.empty_list is then t else Pi (is, t)
+       if is = [] then t else Pi (is, t)
      in
      Debug.print (fun () -> "Looked up constructor " ^ n ^ " which has type " ^ print_exp t');
      t'
   | SConstructor (_, is, (n', pes)) ->
      let t =
-       if Util.empty_list pes then
+       if pes = [] then
          Const n'
        else
          App (Const n', pes)
      in
      let t' =
-       if Util.empty_list is then t else SPi (is, t)
+       if is = [] then t else SPi (is, t)
      in
      Debug.print (fun () -> "Looked up constructor " ^ n ^ " which has type " ^ print_exp t');
      flex_box t'
 
   | Program (_,tel,t, _) -> if tel = [] then t else Pi (tel, t)
-    
+
 
 type lookup_result
   = D of exp                    (* A definition without pattern matching *)
@@ -228,8 +228,8 @@ let bctx_of_stel tel =
     | (_, x, s)::tel' -> BSnoc (make tel', x, s)
   in
   make (List.rev tel)
-      
-let print_bctx cP = 
+
+let print_bctx cP =
   let rec print = function
     | BNil -> ""
     | CtxVar x -> print_name x
@@ -237,7 +237,7 @@ let print_bctx cP =
     | BSnoc(g, x, t) -> print g ^ ", " ^ x ^ ":" ^ print_exp t
   in
   "{" ^ print cP ^ "}"
-  
+
 let drop_suffix cP n =
     let rec drop cP' n' =
       match cP', n' with
