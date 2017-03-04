@@ -18,3 +18,7 @@ syn oft : tm -> tp -> * where
 (*) | g (app M N) => app (copy g M) (copy g N)
 (*) | g (lam (\x. M)) => lam (\x. copy (g, x) M)
 (*) | g x => x
+
+data isctx : (g:ctx) -> * where
+| Empty : isctx 0
+| Cons : (g:ctx) -> isctx g -> (t:tp) -> isctx (g, tp)

@@ -491,7 +491,7 @@ module Int = struct
     | SPi (tel, t) -> print_spi tel t
     | Box (ctx, e) -> "(|- " ^ print_exp ctx ^ " " ^ print_exp e ^ ")"
     | Fn (fs, e) -> "(fn " ^ (String.concat " " (List.map print_name fs)) ^ " " ^ print_exp e ^ ")"
-    | Lam (f, e) -> "(\ " ^ String.concat " " f ^ " " ^ print_exp e ^ ")"
+    | Lam (f, e) -> "(\\ " ^ String.concat " " f ^ " " ^ print_exp e ^ ")"
     | App (e, es) -> "(" ^ print_exp e ^ " " ^ String.concat " " (List.map print_exp es) ^ ")"
     | AppL (e1, es) -> "(' " ^ print_exp e1 ^ " " ^ String.concat " " (List.map print_exp es) ^ ")"
     | Const n -> n

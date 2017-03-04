@@ -213,7 +213,7 @@ let rec check_innacs (sign, cD : signature * ctx) (p : pats) (sigma : ctx_map) (
   match p, sigma with
   | p::ps, q::qs ->
      begin match cG with
-     | (x, t) :: cG' -> check_innac (sign, cD) [] p q t ; check_innacs (sign, cD) ps qs (ctx_subst (x, exp_of_pat q) cG')
+     | (x, t) :: cG' -> check_innac (sign, cD) BNil p q t ; check_innacs (sign, cD) ps qs (ctx_subst (x, exp_of_pat q) cG')
      | _ -> raise (Error.Error "The context ended unexpectedly.")
      end
   | [], [] -> ()
@@ -256,7 +256,7 @@ let check_clause (sign : signature) (f : def_name) (p : pats) (telG : tel) (t : 
     let cD, sigma = check_lhs sign p (ctx_of_tel telG) in
     Debug.print (fun () -> "LHS was checked:\n cD = " ^ print_ctx cD ^ "\n sigma = "^ print_pats sigma ^ "\n telG = " ^ print_tel telG);
     match rhs with
-    | Just e -> check (sign, cD) [] e (subst_list (subst_of_ctx_map sigma telG) t)
+    | Just e -> check (sign, cD) BNil e (subst_list (subst_of_ctx_map sigma telG) t)
     | Impossible x -> caseless sign cD x t
   with
     Unification_failure msg -> raise (Error.Error msg)

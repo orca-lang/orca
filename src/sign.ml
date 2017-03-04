@@ -151,3 +151,54 @@ let rec rename_ctx_using_psubst (cG : ctx) (sigma : psubst) =
      match lookup_ctx sigma x with
      | Some (PVar y) -> (y, t) :: (rename_ctx_using_psubst cG' sigma)
      | _ -> (x, t) :: (rename_ctx_using_psubst cG' sigma)
+
+
+type bctx =
+| BNil
+| CtxVar of name
+| BSnoc of bctx * string * exp
+
+let rec append_bctx cP cP' =
+  match cP with
+  | BNil -> cP'
+  | CtxVar _ -> raise (Error.Violation "Appended a bctx terminating with a CtxVar to another bctx")
+  | BSnoc (cP, x, e) -> BSnoc (append_bctx cP cP', x, e)
+
+let rec lookup_bound i cP =
+  match i, cP with
+  | 0, BSnoc (_, _, t) -> t
+  | n, BSnoc (cP', _, _) -> lookup_bound (n-1) cP'
+  | _ -> raise (Error.Error ("Bound variable had index larger than bound context"))
+
+let rec bctx_of_lam_stel (f : string list) (tel : stel) =
+    match f, tel with
+    | [], tel' -> BNil, tel'
+    | f::fs, (_, _, t)::tel' ->
+      let cP, tel'' = bctx_of_lam_stel fs tel' in
+      BSnoc (cP, f, t), tel''
+    | _, [] -> raise (Error.Error ("Too many variables declared in lambda"))
+
+let bctx_of_stel tel =
+  let rec make = function
+    | [] -> BNil
+    | (_, x, s)::tel' -> BSnoc (make tel', x, s)
+  in
+  make (List.rev tel)
+      
+let print_bctx cP = 
+  let rec print = function
+    | BNil -> ""
+    | CtxVar x -> print_name x
+    | BSnoc(BNil, x, t) -> x ^ ":" ^ print_exp t
+    | BSnoc(g, x, t) -> print g ^ ", " ^ x ^ ":" ^ print_exp t
+  in
+  "{" ^ print cP ^ "}"
+  
+let drop_suffix cP n =
+    let rec drop cP' n' =
+      match cP', n' with
+      | _, 0 -> cP
+      | BSnoc(cP', _, _), n' -> drop cP' (n'-1)
+      | _ -> raise (Error.Error ("Tried to drop " ^ string_of_int n ^ " terms out of " ^ print_bctx cP ^ " which is too short."))
+    in
+    drop cP n

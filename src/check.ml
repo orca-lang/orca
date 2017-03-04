@@ -30,32 +30,55 @@ let is_syntax = function
   | Under -> true
   | _ -> false
 
-let drop_suffix cP n =
-  if List.length cP < n then
-    raise (Error.Error ("Shifted too far"))
-  else
-    let rec drop cP n =
-      match cP, n with
-      | _, 0 -> cP
-      | _::cP', n -> drop cP' (n-1)
-      | _ -> raise (Error.Violation "move on, there's nothing to see here!")
-    in
-    drop cP n
+let lookup x cG =
+  begin
+    try List.assoc x cG
+    with Not_found ->
+      raise (Error.Violation
+               ("Unbound var after preprocessing, this cannot happen. (Var: " ^ print_name x ^ ")"))
+  end
 
-let rec contextify sign (g : exp) =
+let rec compare_ctxs (sign, cG : signature * ctx) cP cP' =
+  match cP, cP' with
+  | BNil, BNil -> true
+  | CtxVar x, CtxVar y -> x = y
+  | BSnoc (cP, _, t), BSnoc (cP', _, t') ->
+    let r =
+      try
+        let _ = Unify.unify_flex (sign, cG) [] t t' in true
+      with _ -> false
+    in
+    r && compare_ctxs (sign, cG) cP cP'
+  | _ -> raise (Error.Error ("cP's are of different lengths"))
+
+    
+let rec contextify (sign, cG) (g : exp) =
   match Whnf.whnf sign g with
-  | Nil -> []
+  | Nil -> BNil
+  | Var x ->
+    begin match lookup x cG with
+    | Ctx -> CtxVar x
+    | _ -> raise (Error.Violation ("Tried to contextify non context variable " ^ print_name x))
+    end
   | Snoc (g', x, e) ->
-    let cP = contextify sign g' in
+    let cP = contextify (sign, cG) g' in
     (* is_syn_type (sign, cG) cP e; *)
-    (x, e) :: cP
+    BSnoc (cP, x, e)
   | _ -> raise (Error.Error ("Expected context, obtained " ^ print_exp g))
 
 let rec decontextify cP =
   match cP with
-  | [] -> Nil
-  | (x, e) :: cP' -> Snoc (decontextify cP', x, e)
+  | BNil -> Nil
+  | CtxVar x -> Var x
+  | BSnoc (cP', x, e) -> Snoc (decontextify cP', x, e)
     
+let unify_ctx (sign, cG) g cP =
+  let g' = decontextify cP in
+  let cD, sigma = Unify.unify (sign, cG) g g' in
+  let cP' = contextify (sign, cG) (subst_list sigma g) in
+  cD, sigma, cP'
+
+
 let lookup_sign sign cP n =
   match lookup_sign_entry n sign with
   | Definition (_, [], t, _) -> t
@@ -96,45 +119,16 @@ let lookup_sign sign cP n =
      Box (decontextify cP, t')
 
   | Program (_,tel,t, _) -> if tel = [] then t else Pi (tel, t)
-
-
-let unify_ctx (sign, cG) g cP =
-  let g' = decontextify cP in
-  let cD, sigma = Unify.unify (sign, cG) g g' in
-  let cP' = contextify sign (subst_list sigma g) in
-  cD, sigma, cP'
     
-let lookup x cG =
-  begin
-    try List.assoc x cG
-    with Not_found ->
-      raise (Error.Violation
-               ("Unbound var after preprocessing, this cannot happen. (Var: " ^ print_name x ^ ")"))
-  end
-
-let lookup_bound i  cP =
-  try snd (List.nth cP i)
-  with _ -> raise (Error.Error ("Bound variable had index larger than bound context"))
-
-let rec compare_ctxs (sign, cG) cP cP' =
-  match cP, cP' with
-  | [], [] -> true
-  | (_,t)::cP, (_,t')::cP' ->
-    let r = try
-              let _ = Unify.unify_flex (sign, cG) [] t t' in true
-      with
-      | _ -> false
-    in
-    r && compare_ctxs (sign, cG) cP cP'
-  | _ -> raise (Error.Error ("cP's are of different lengths"))
-
+    
 let check_box (sign, cG) cP = function
-      | Box (g, t) ->
-        let cP' = contextify sign g in
-        if compare_ctxs (sign, cG) cP cP'
-        then t
-        else raise (Error.Error "Wrong contexts. Tip: use a substitution?")
-      | _ -> raise (Error.Error "Not a box. Don't think outside of the box.")
+  | Box (g, t) ->
+    let cP' = contextify (sign, cG) g in
+    if compare_ctxs (sign, cG) cP cP'
+    then t
+    else raise (Error.Error "Wrong contexts. Tip: use a substitution?")
+  | Ctx -> Ctx
+  | _ -> raise (Error.Error "Not a box. Don't think outside of the box.")
 
 let rec infer (sign, cG : signature * ctx) cP (e : exp) : exp =
   Debug.print (fun () -> "Infer called with: " ^ print_exp e ^ " in context: " ^ print_ctx cG);
@@ -171,12 +165,13 @@ let rec infer (sign, cG : signature * ctx) cP (e : exp) : exp =
 
     | _ ->
       try
-        let t = infer_syn (sign, cG) cP e in
-        Box (decontextify cP, t)
-      with Error.Error _ -> 
+        match infer_syn (sign, cG) cP e with
+        | Ctx -> Ctx
+        | t -> Box (decontextify cP, t)
+      with Error.Error msg -> 
          Debug.print (fun() -> "Was asked to infer the type of " ^ print_exp e
                                ^ " but the type is not inferrable") ;
-         raise (Error.Error "Cannot infer the type of this expression")
+         raise (Error.Error ("Cannot infer the type of " ^ print_exp e ^ "\n" ^ msg))
   in
   Debug.deindent ();
   Debug.print(fun() -> "Result of infer for " ^ print_exp e ^ " was " ^ print_exp res) ;
@@ -214,7 +209,7 @@ and check (sign , cG : signature * ctx) cP (e : exp) (t : exp) : unit =
      Debug.deindent()
 
   | _, Box (g, alpha) when is_syntax e ->
-    let cP = contextify sign g in
+    let cP = contextify (sign, cG) g in
     check_syn (sign, cG) cP e alpha
 
   | _ ->
@@ -259,7 +254,7 @@ and check_spine (sign, cG) cP sp tel t =
       match Whnf.whnf sign t with
       | Pi (tel', t') -> check_spine (sign, cG) cP sp tel' t'
       | Box (g, SPi (tel', t')) ->
-        let cP = contextify sign g in
+        let cP = contextify (sign, cG) g in
         check_syn_spine (sign, cG) cP sp tel' t'
       | _ -> raise (Error.Error ("Unconsumed application cannot check against type " ^ print_exp t))
     end
@@ -288,7 +283,7 @@ and check_syn_type (sign, cG) cP (e : exp) : unit =
         | [] -> cP
         | (_, x, s) :: tel ->
           check_syn_type (sign, cG) cP s;
-          check_tel_type ((x, s) :: cP) tel
+          check_tel_type (BSnoc (cP, x, s)) tel
       in
       let cP' = check_tel_type cP tel in
       check_syn_type (sign, cG) cP' e'
@@ -310,16 +305,14 @@ and check_syn (sign, cG) cP (e : exp) (t : exp) =
   begin
     match e, Whnf.whnf sign t with
     | Lam (f, e), SPi (tel, t) ->
-      let cP' = List.map2 (fun f (_, _, e) -> f, e) f tel in
-      check_syn (sign, cG) (cP' @ cP) e t
+      let cP', tel' = bctx_of_lam_stel f tel in
+      begin match tel' with
+      | [] -> check_syn (sign, cG) (append_bctx cP' cP) e t
+      | _ -> check_syn (sign, cG) (append_bctx cP' cP) e (SPi (tel', t))
+      end
     | Clos (e, s), _ ->
-      let cP' = contextify sign (infer_syn (sign, cG) cP s) in
+      let cP' = contextify (sign, cG) (infer_syn (sign, cG) cP s) in
       check_syn (sign, cG) cP' e t
-    | Snoc (g, _, e), Ctx ->
-      check_syn (sign, cG) cP g Ctx;
-      let cP' = contextify sign g in
-      check_syn_type (sign, cG) (cP' @ cP) e
-    | Nil, Ctx -> ()
     | e, t when is_syntax e ->
       Debug.print(fun ()-> "Expression " ^ print_exp e ^ " is syntactic and thus being inferred");
       let t' = infer_syn (sign, cG) cP e in
@@ -347,25 +340,34 @@ and infer_syn (sign, cG) cP (e : exp) =
     | BVar i ->
       let t = lookup_bound i cP in
       Debug.print (fun () -> "Looking bound variable " ^ string_of_int i ^ " resulted in type " ^ print_exp t
-        ^ "\n Context is [" ^ String.concat "; " (List.map (fun (x, t) -> x ^ ": " ^ print_exp t) cP) ^ "].");
+        ^ "\n Context is " ^ print_bctx cP);
       t
+    | Snoc (g, _, e) ->
+      begin match infer_syn (sign, cG) cP g with
+      | Ctx ->
+        let cP' = contextify (sign, cG) g in
+        check_syn_type (sign, cG) cP' e; Ctx
+      | _ -> raise (Error.Error ("Expression " ^ print_exp g ^ " was expected to be a context."))
+      end
+    | Nil -> Ctx
     | EmptyS -> Nil
     | Shift n -> decontextify (drop_suffix cP n)
     | Dot (s, e) ->
       let g = infer_syn (sign, cG) cP s in
-      let cP' = contextify sign g in
+      let cP' = contextify (sign, cG) g in
       let t = infer_syn (sign, cG) cP' e in
       Snoc (g, "_", t)
     | Comp (s1, s2) ->
       let g1 = infer_syn (sign, cG) cP s1 in
-      let cP' = contextify sign g1 in
+      let cP' = contextify (sign, cG) g1 in
       infer_syn (sign, cG) cP' s2
     | ShiftS s ->
       begin match cP with
-      | [] -> raise (Error.Error ("Shifting a substitution in an empty context"))
-      | (x, t) :: cP' ->
+      | BNil -> raise (Error.Error ("Shifting a substitution in an empty context"))
+      | BSnoc (cP', x, t) ->
         let g = infer_syn (sign, cG) cP' s in
         Snoc (g, x, t)
+      | CtxVar x -> raise (Error.Violation ("We're not too sure what to do here"))
       end
     | _ -> raise (Error.Error ("Cannot infer syntactic expression " ^ print_exp e))
   in Debug.deindent (); res
@@ -395,7 +397,7 @@ and check_spi (sign, cG) cP tel t =
   | [] -> infer_syn (sign, cG) cP t
   | (_, x, s)::tel' ->
     check_syn_type (sign, cG) cP s;
-    check_spi (sign, cG) ((x, s) :: cP) tel' t
+    check_spi (sign, cG) (BSnoc (cP, x, s)) tel' t
       
 let rec check_tel (sign, cG) cP u tel =
   match tel with
@@ -417,4 +419,4 @@ let rec check_stel (sign, cG) cP tel =
   | [] -> ()
   | (_, x, s) :: tel' ->
     check_syn_type (sign, cG) cP s;
-    check_stel (sign, cG) ((x, s) :: cP) tel'
+    check_stel (sign, cG) (BSnoc (cP, x, s)) tel'

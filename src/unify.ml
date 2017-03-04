@@ -82,6 +82,7 @@ let rec unify_flex (sign, cG) flex e1 e2 =
       | Annot(e1, e2), Annot(e1', e2') -> unify_many cG [e1;e2] [e1';e2']
       | Under, _ -> cG, []
       | _, Under -> cG, []
+      | Ctx, Ctx -> cG, []
       | _, _ ->
          raise (Error.Error ("Expression " ^ print_exp e1 ^ " does not unify with " ^ print_exp e2 ^ "."))
     in

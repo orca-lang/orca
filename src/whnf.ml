@@ -74,7 +74,7 @@ and reduce_with_clauses sign sp cls =
 
 
 and whnf (sign : signature) (e : exp) : exp =
-  Debug.print (fun () -> "Computing the whnf of " ^ print_exp e ^ ".") ;
+  (* Debug.print (fun () -> "Computing the whnf of " ^ print_exp e ^ ".") ; *)
   Debug.indent();
   let res = match e with
     (* this removes degenerate applications should they occur *)
@@ -135,5 +135,5 @@ and whnf (sign : signature) (e : exp) : exp =
     | e -> e (* No reduction necessary *)
   in
   Debug.deindent();
-  Debug.print (fun () -> "Whnf of " ^ print_exp e ^ " is " ^ print_exp res ^ ".");
+  (* Debug.print (fun () -> "Whnf of " ^ print_exp e ^ " is " ^ print_exp res ^ "."); *)
   res
