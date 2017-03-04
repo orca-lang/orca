@@ -15,4 +15,3 @@
 * Improve holes: add synthesizable holes
 * Improve holes: list their types when done)
 * Fix pretty printing when printing datatypes (removed the telescopified things)
-* Eliminate Star, and make Set 0 the impredicative universe

@@ -4,7 +4,7 @@ data nat where
 
 def 1 : nat = s z
 
-data eq (A : *) : A -> A -> * where
+data eq (A : set) : A -> A -> set where
 | refl: (x : A) -> eq A x x
 
 

@@ -7,5 +7,5 @@ data bar (a : set) : set_1 where
 def fooz : bar foo = foobar baz
 
 (*) Star is impredicative so fbar can be applied to something of universe set 2
-data bbar (a : set2) : * where
+data bbar (a : set2) : set where
 | fbar : (x : a) -> bbar a

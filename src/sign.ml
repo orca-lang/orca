@@ -50,12 +50,12 @@ let lookup_sign sign n =
   | DataDef (_, ps, is, u) ->
      let tel = ps @ is in
      if tel = []
-     then Univ u
-     else Pi (tel, Univ u)
+     then Set u
+     else Pi (tel, Set u)
   | SynDef (_, tel) ->
      if tel = []
-     then flex_box SStar
-     else flex_box (SPi (tel, SStar))
+     then flex_box Star
+     else flex_box (SPi (tel, Star))
   | Constructor (_, is, (n', pes)) ->
      let t =
        if pes = [] then

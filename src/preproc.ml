@@ -107,9 +107,8 @@ let rec pproc_exp (s : sign) (cG : ctx) (cP : bctx) (is_syntax : bool) (e :E.exp
   Debug.print (fun () -> "Preprocessing expression " ^ E.print_exp e ^ " with flag " ^ string_of_bool is_syntax);
   let f e = pproc_exp s cG cP is_syntax e in
   match e with
-  | E.Star when is_syntax -> I.SStar
-  | E.Star -> I.Univ I.Star
-  | E.Set n -> I.Univ (I.Set n)
+  | E.Star -> I.Star
+  | E.Set n -> I.Set n
   | E.Ctx -> I.Ctx
   | E.Arr (t0, t1) when is_syntax ->
     let tel, t' = pproc_stel s cG cP is_syntax (E.Arr (t0, t1)) in
@@ -180,7 +179,7 @@ and pproc_stel (s : sign) (cG : ctx) (cP : bctx) (is_syntax : bool) : E.exp -> I
      let tel, t = pproc_stel s cG cP' is_syntax t1 in
      (Syntax.Explicit, "_", pproc_exp s cG cP is_syntax t0) :: tel , t
   | t -> [], pproc_exp s cG cP is_syntax t
-    
+
 and pproc_app (s : sign) (cG : ctx) (cP : bctx) (is_syntax : bool) : E.exp -> I.exp * I.exp list =
   function
   | E.App(e1, e2) ->
@@ -213,7 +212,7 @@ let pproc_sdecl s cG (n, e) (is_syntax : bool) (d : I.def_name) =
   if d = d' then
     (add_name_sign s n, (n, tel, (d', args)))
   else
-    raise (Error.Error ("Return type of constructor " ^ n ^ " should be " ^ d))      
+    raise (Error.Error ("Return type of constructor " ^ n ^ " should be " ^ d))
 
 let pproc_param s cG (is_syntax : bool) (icit, n, e) =
   let cG', n' = add_name_ctx cG n in
@@ -283,16 +282,16 @@ let pre_process s = function
      let _, ps' = List.fold_left (fun (cG, ps) p -> let cG', p' = pproc_param s cG false p in cG', (p'::ps)) ([], []) ps in
      let cG = params_to_ctx ps ps' in
      let is, u = match pproc_tel s cG [] false e with
-       | tel, I.Univ u -> tel, u
+       | tel, I.Set u -> tel, u
        | _, t -> raise (Error.Error ("Expected universe but instead got expression " ^ I.print_exp t))
      in
      let s' = add_name_sign s n in
      let s'', ds' = List.fold_left (fun (s, dos) d -> let ss, dd = pproc_decl s cG d false n in ss, (dd :: dos)) (s', []) ds in
      s'', I.Data (n, ps', is, u, ds')
-  | E.Syn (n, e, ds) ->   
+  | E.Syn (n, e, ds) ->
     let tel, e' = pproc_stel s [] [] true e in
     let _ = match e' with
-      | I.SStar -> ()
+      | I.Star -> ()
       | _ -> raise (Error.Error ("Syntax definition for " ^ n ^ " should have kind ★ instead of " ^ I.print_exp e'))
     in
      let s' = add_name_sign s n in

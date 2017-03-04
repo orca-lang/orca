@@ -2,18 +2,18 @@ open Syntax.Int
 open Sign
 open Name
 
-let max_universe (u1 : universe) (u2 : universe) : universe =
-  match u1, u2 with
-  | Set n, Set n' -> Set (max n n')
-  | Star, u -> u
-  | u, Star -> u
+(* let max_universe (u1 : universe) (u2 : universe) : universe = *)
+(*   match u1, u2 with *)
+(*   | Set n, Set n' -> Set (max n n') *)
+(*   | Star, u -> u *)
+(*   | u, Star -> u *)
 
-(* <= for universes *)
-let le_universe (u1 : universe) (u2 : universe) : bool =
-  match u1, u2 with
-  | Set n, Set n' -> n <= n'
-  | Star, _ -> true
-  | _, Star -> false
+(* (\* <= for universes *\) *)
+(* let le_universe (u1 : universe) (u2 : universe) : bool = *)
+(*   match u1, u2 with *)
+(*   | Set n, Set n' -> n <= n' *)
+(*   | Star, _ -> true *)
+(*   | _, Star -> false *)
 
 let is_syntax = function
   | Lam _
@@ -37,7 +37,7 @@ let lookup x cG =
       raise (Error.Violation
                ("Unbound var after preprocessing, this cannot happen. (Var: " ^ print_name x ^ ")"))
   end
-    
+
 let rec contextify (sign, cG) (g : exp) =
   match Whnf.whnf sign g with
   | Nil -> BNil
@@ -57,14 +57,14 @@ let rec decontextify cP =
   | BNil -> Nil
   | CtxVar x -> Var x
   | BSnoc (cP', x, e) -> Snoc (decontextify cP', x, e)
-    
+
 let unify_ctx (sign, cG) g cP =
   let g' = decontextify cP in
   Debug.print(fun () -> "Unifying contexts.\ng  = " ^ print_exp g ^ "\ng' = " ^ print_exp g' ^ "\n with ctx " ^ print_ctx cG);
   let cD, sigma = Unify.unify (sign, cG) g g' in
   let cP' = contextify (sign, cG) (subst_list sigma g) in
   cD, sigma, cP'
-    
+
 let check_box (sign, cG) cP = function
   | Box (g, t) ->
     let cD, sigma, cP' = unify_ctx (sign, cG) g cP in
@@ -96,7 +96,7 @@ let rec infer (sign, cG : signature * ctx) cP (e : exp) : exp =
                                   ^ print_exp t ^ " which is not of function type"))
        end
 
-    | Univ u -> Univ (infer_universe u)
+    | Set n -> Set (n + 1)
     | Pi (tel, t) ->
        check_pi (sign, cG) cP tel t
 
@@ -104,14 +104,14 @@ let rec infer (sign, cG : signature * ctx) cP (e : exp) : exp =
       check (sign, cG) cP g Ctx;
       let cD, sigma, cP' = unify_ctx (sign, cG) g cP in
       check_syn_type (sign, cD) cP' (subst_list sigma e);
-      Univ Star
+      Set 0
 
     | _ ->
       try
         match infer_syn (sign, cG) cP e with
         | Ctx -> Ctx
         | t -> Box (decontextify cP, t)
-      with Error.Error msg -> 
+      with Error.Error msg ->
          Debug.print (fun() -> "Was asked to infer the type of " ^ print_exp e
                                ^ " but the type is not inferrable") ;
          raise (Error.Error ("Cannot infer the type of " ^ print_exp e ^ "\n" ^ msg))
@@ -120,13 +120,9 @@ let rec infer (sign, cG : signature * ctx) cP (e : exp) : exp =
   Debug.print(fun() -> "Result of infer for " ^ print_exp e ^ " was " ^ print_exp res) ;
   res
 
-and infer_universe = function
-  | Star -> Set 0
-  | Set n -> Set (n + 1)
-
 and check_type (sign, cG : signature * ctx) cP (s : exp) : universe =
   match infer (sign, cG) cP s with
-  | Univ u -> u
+  | Set n -> n
   | e ->
      Debug.print (fun () -> "Assert universe failed for " ^ print_exp e ^ ".") ;
      raise (Error.Error "Not a universe.")
@@ -211,8 +207,8 @@ and check_pi (sign, cG) cP tel t =
      let us = check_type (sign, cG) cP s in
      let ut = check_pi (sign, (x, s)::cG) cP tel' t in
      begin match ut with
-     | Univ Star -> Univ Star (* Star is impredicative *)
-     | Univ (Set n) -> Univ (max_universe us (Set n))
+     | Set 0 -> Set 0 (* Set 0 is impredicative *)
+     | Set n -> Set (max us n)
      | _ -> raise (Error.Error ("Expression " ^ print_exp (Pi(tel,t)) ^ " cannot be checked to be a type."))
      end
 
@@ -221,7 +217,7 @@ and check_syn_type (sign, cG) cP (e : exp) : unit =
   Debug.indent ();
   begin
     match Whnf.whnf sign e with
-    | SStar -> ()
+    | Star -> ()
     | SPi (tel, e') ->
       let rec check_tel_type cP = function
         | [] -> cP
@@ -241,8 +237,8 @@ and check_syn_type (sign, cG) cP (e : exp) : unit =
       end
     | _ -> raise (Error.Error (print_exp e ^ " is not a syntactic type."))
   end; Debug.deindent ()
-      
-    
+
+
 and check_syn (sign, cG) cP (e : exp) (t : exp) =
   Debug.print (fun () -> "Checking syntactic expression " ^ print_exp e ^ " against type "
     ^ print_exp t ^ " in bound context " ^ print_bctx cP);
@@ -267,13 +263,13 @@ and check_syn (sign, cG) cP (e : exp) (t : exp) =
       Debug.print(fun ()-> "Expression " ^ print_exp e ^ " is not syntactic and thus back to check");
       check (sign, cG) cP e (Box (decontextify cP, t))
   end; Debug.deindent ()
-    
+
 
 and infer_syn (sign, cG) cP (e : exp) =
   Debug.print (fun () -> "Inferring type of syntactic expression " ^ print_exp e
     ^ " in bound context " ^ print_bctx cP);
   Debug.indent ();
-  let res = 
+  let res =
     match e with
     | SPi (tel, t) -> check_spi (sign, cG) cP tel t
     | AppL (e, es) ->
@@ -317,7 +313,7 @@ and infer_syn (sign, cG) cP (e : exp) =
       end
     | _ -> raise (Error.Error ("Cannot infer syntactic expression " ^ print_exp e))
   in Debug.deindent (); res
-      
+
 and check_syn_spine (sign, cG) cP sp tel t =
   match sp, tel with
   | e::sp', (_, x, s)::tel ->
@@ -337,23 +333,23 @@ and check_syn_spine (sign, cG) cP sp tel t =
       | _ -> raise (Error.Error ("Unconsumed application cannot check against type " ^ print_exp t))
     end
   | [], _ -> SPi (tel, t)
-    
+
 and check_spi (sign, cG) cP tel t =
   match tel with
   | [] -> infer_syn (sign, cG) cP t
   | (_, x, s)::tel' ->
     check_syn_type (sign, cG) cP s;
     check_spi (sign, cG) (BSnoc (cP, x, s)) tel' t
-      
+
 let rec check_tel (sign, cG) cP u tel =
   match tel with
   | [] -> u
   | (_, x, s) :: tel' ->
-     if u = Star then
+     if u = 0 then
        check_tel (sign, (x, s) :: cG) cP u tel'
      else
        let us = check_type (sign, cG) cP s in
-       let u' = max_universe us u in
+       let u' = max us u in
        Debug.print (fun () -> "Checking telescope at variable " ^ print_name x
                            ^ " which has universe " ^ print_universe us
                            ^ " upgrading telescope's universe from "

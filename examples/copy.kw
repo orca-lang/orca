@@ -19,11 +19,11 @@ syn oft : tm -> tp -> * where
 (*) | g (lam (\x. M)) => lam (\x. copy (g, x) M)
 (*) | g x => x
 
-data isctx : (g:ctx) -> * where
+data isctx : (g:ctx) -> set where
 | Empty : isctx 0
 | Cons : (g:ctx) -> isctx g -> (t:tp) -> isctx (g, tp)
 
-data oft' (g:ctx) : isctx g -> (g |- tm) -> (|- tp) -> * where
+data oft' (g:ctx) : isctx g -> (g |- tm) -> (|- tp) -> set where
 | t-unit' : (G : isctx g) -> oft' g G one unit
 | t-app' : (G : isctx g) -> (f : (g |- tm)) -> (e : (g |- tm)) -> (s : |- tp) -> (t: |- tp)
          -> oft' g G f (arr s t) -> oft' g G e s -> oft' g G (app f e) t

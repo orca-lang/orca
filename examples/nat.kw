@@ -18,7 +18,7 @@ def plus' : (x : nat) -> (y : nat) -> nat where
 | m zero => m
 | m (suc n) => plus' (suc m) n
 
-data eq (A : *) : A -> A -> * where
+data eq (A : set) : A -> A -> set where
 | refl: (x : A) -> eq A x x
 
 def test0 : eq nat (suc zero) (plus zero (suc zero)) = refl (suc zero)
@@ -27,7 +27,7 @@ def test2 : eq nat Z Z2 = refl Z
 
 (* singletons over naturals *)
 
-data singl : nat -> * where
+data singl : nat -> set where
 | sZ : singl zero
 | sS : (n : nat) -> singl n -> singl (suc n)
 
@@ -40,28 +40,28 @@ def singl_plus : (m : nat) -> (n : nat) -> singl m -> singl n -> singl m where
 
 (* finite numbers *)
 
-data fin : nat -> * where
+data fin : nat -> set where
 | fZ : (n : nat) -> fin (suc n)
 | fS : (n : nat) -> fin n -> fin (suc n)
 
 (* lists *)
 
-data list : * -> * where (*) no parameters here
-| nil: (A : *) -> list A
-| cons: (A : *) -> A -> list A -> list A
+data list : set -> set where (*) no parameters here
+| nil: (A : set) -> list A
+| cons: (A : set) -> A -> list A -> list A
 
 def empty_nat_list : list nat = nil nat
 def unary_nat_list : list nat = cons nat 1 (nil nat)
 
 (* biiig numbers *)
 
-data big_nat : set_0 where
+data big_nat : set_1 where
 | big_zero : big_nat
 | big_suc : big_nat -> big_nat
 
 def big_1 : big_nat = big_suc big_zero
 
-(*) data big_list (A : set) : * where (*) we use parameters here
+(*) data big_list (A : set) : set where (*) we use parameters here
 (*) | big_nil: big_list A
 (*) | big_cons: A -> big_list A -> big_list A
 

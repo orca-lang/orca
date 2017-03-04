@@ -42,9 +42,8 @@ let rec unify_flex (sign, cG) flex e1 e2 =
     Debug.print (fun () -> "Comparing: " ^ print_exp e1 ^ " and " ^ print_exp e2) ;
     Debug.indent() ;
     let cD, sigma = match Whnf.whnf sign e1, Whnf.whnf sign e2 with
-      | Univ Star, Univ Star -> cG, []
-      | Univ (Set n) , Univ(Set n') when n = n' -> cG, []
-      | Univ (Set n), Univ(Set n') -> raise (Error.Error ("Universes don't match: " ^ string_of_int n ^ " <> " ^ string_of_int n'))
+      | Set n , Set n' when n = n' -> cG, []
+      | Set n, Set n' -> raise (Error.Error ("Universes don't match: " ^ string_of_int n ^ " <> " ^ string_of_int n'))
       | Pi (tel, t), Pi(tel', t') -> unify_pi tel t tel' t'
       | SPi (tel, t), SPi(tel', t') -> unify_spi tel t tel' t'
       | Box(g, e), Box(g', e') -> unify_many cG [g; e] [g'; e']
@@ -115,7 +114,7 @@ let rec unify_flex (sign, cG) flex e1 e2 =
        let tel2' = subst_list_in_tel sigma tel2 in
        let cD', sigma'' = (unify_flex_pi (sign, (n2, e2) :: cD) flex tel1' t1 tel2' t2) in
        cD', sigma @ sigma''
-         
+
    and unify_flex_spi (sign, cG as ctxs: signature * ctx) (flex : name list) (tel1 : stel) (t1 : exp) (tel2 : stel) (t2 : exp) =
     let subst_list_in_tel sigma tel =
       List.map (fun (i, n, e) -> i, n, subst_list sigma e) tel

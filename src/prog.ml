@@ -7,7 +7,7 @@ let tc_constructor (sign , cG : signature * ctx) (u : universe) (tel : tel)
                    (n , tel', (n', es) : def_name * tel * dsig) : signature_entry =
   Debug.print_string ("Typechecking constructor: " ^ n) ;
   let uc = check_tel (sign, cG) BNil u tel' in
-  if le_universe uc u then
+  if uc <= u then
     begin
       List.iter2 (check (sign, (ctx_of_tel tel') @ cG) BNil) es (List.map (fun (_,_,t) -> t) tel);
       Constructor (n, tel', (n', es))
@@ -40,8 +40,8 @@ let tc_program (sign : signature) : program -> signature = function
     let () = check_stel (sign, []) BNil tel in
     let sign' = SynDef (n, tel) :: sign in
     (List.map (tc_syn_constructor (sign', []) tel) ds) @ sign'
-    
-    
+
+
   | DefPM (n, tel, t, ds) ->
      Debug.print_string ("\nTypechecking pattern matching definition: " ^ n);
      Debug.indent ();

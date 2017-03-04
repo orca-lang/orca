@@ -120,17 +120,14 @@ module Int = struct
   open Name
 
   type index = int
+  type universe = int
   type def_name = string
 
   let (--) l n = List.filter ((<>) n) l
 
-  type universe
-    = Star
-    | Set of int
-
   type exp
-    = Univ of universe
-    | SStar (* Universe of syntax *)
+    = Set of universe
+    | Star (* Universe of syntax *)
     | Pi of tel * exp  (* A pi type *)
     | SPi of stel * exp (* A syntactic type *)
     | Box of exp * exp
@@ -201,8 +198,8 @@ module Int = struct
       | [] -> false
     in
     function
-    | Univ _ -> []
-    | SStar -> []
+    | Set _ -> []
+    | Star -> []
     | Ctx -> []
     | Pi (tel, t) -> fv_pi cG tel t
     | SPi (tel, e) -> fv_spi cG tel e
@@ -263,8 +260,8 @@ module Int = struct
     let rec refresh (rep : (name * name) list) : exp -> exp =
       let f x = refresh rep x in
       function
-      | Univ u -> Univ u
-      | SStar -> SStar
+      | Set n -> Set n
+      | Star -> Star
       | Ctx -> Ctx
       | Pi (tel, t) -> let tel', t' = refresh_tel rep tel t in Pi(tel', t')
       | SPi (tel, t) -> let tel', t' = refresh_stel rep tel t in SPi(tel', t')
@@ -317,8 +314,8 @@ module Int = struct
   let rec refresh_free_var (x , y : name * name) (e : exp) : exp =
     let f e = refresh_free_var (x, y) e in
     match e with
-    | Univ u -> Univ u
-    | SStar -> SStar
+    | Set n -> Set n
+    | Star -> Star
     | Ctx -> Ctx
     | Pi (tel, t) ->
        let tel', t' = refresh_free_var_tel (x, y) tel t in
@@ -361,7 +358,7 @@ module Int = struct
        let tel', t' = refresh_free_var_stel (x, y) tel t in
        (i, n, refresh_free_var (x, y) e) :: tel', t'
 
-         
+
   let refresh_free_vars (rep : (name * name) list) e =
     List.fold_left (fun e (y, y') -> refresh_free_var (y, y') e) e rep
 
@@ -377,8 +374,8 @@ module Int = struct
   let rec subst (x, es : single_subst) (e : exp) :  exp =
     let f e = subst (x, es) e in
     match e with
-    | Univ u -> Univ u
-    | SStar -> SStar
+    | Set n -> Set n
+    | Star -> Star
     | Ctx -> Ctx
     | Pi (tel, t) ->
        let tel', t' = subst_pi (x, es) tel t in
@@ -428,7 +425,7 @@ module Int = struct
     | (i, n, e) :: tel ->
        let tel', t' = subst_spi (x, es) tel t in
        (i, n, subst (x, es) e) :: tel', t'
-         
+
   let subst_list sigma e =
     List.fold_left (fun e s -> subst s e) e sigma
 
@@ -480,13 +477,11 @@ module Int = struct
   let exp_list_of_tel tel = List.map (fun (_, _, s) -> s) tel
 
   (* Pretty printer -- could be prettier *)
-  let print_universe = function
-    | Star -> "*"
-    | Set n -> "set_" ^ string_of_int n
+  let print_universe = string_of_int
 
   let rec print_exp = function
-    | Univ u -> print_universe u
-    | SStar -> "★"
+    | Set n -> print_universe n
+    | Star -> "*"
     | Ctx -> "ctx"
     | Pi (tel, t) -> print_pi tel t
     | SPi (tel, t) -> print_spi tel t
