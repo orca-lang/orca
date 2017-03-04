@@ -42,8 +42,6 @@ let rec flexible (p : pats)(cG : ctx) : name list =
   Debug.deindent ();
   res
 
-exception Unification_failure of string
-
 let split (sign : signature) (p1 : pats) (c, ps : def_name * pats) (cD2 : ctx) (x, t : name * exp) (cD1 : ctx) : ctx * ctx_map =
   Debug.indent ();
   Debug.print (fun () -> "Split type " ^ print_exp t) ;
@@ -66,11 +64,12 @@ let split (sign : signature) (p1 : pats) (c, ps : def_name * pats) (cD2 : ctx) (
     let flex = flexible (p1 @ ps) (cD1 @ cT) in
     Debug.print (fun () -> "Flexibles variables are " ^ print_names flex);
     let cD', delta =
+      Debug.print (fun () -> "Split unifies vs = " ^ print_exps vs ^ ", ws = " ^ print_exps ws);
       try
-        Debug.print (fun () -> "Split unifies vs = " ^ print_exps vs ^ ", ws = " ^ print_exps ws);
         Unify.unify_flex_many (sign, cT @ cD1) flex vs ws
-         with
-         | Error.Error msg -> raise (Unification_failure msg)
+      with
+        Unify.Unification_failure prob ->
+        raise (Error.Error ("Split failed with unification problem " ^ Unify.print_unification_problem prob))
     in
     let cT' = simul_subst_on_ctx delta (rename_ctx_using_subst cT delta) in
     Debug.print (fun () -> "delta = " ^ print_subst delta ^ ", cT = " ^ print_ctx cT ^ ", cT' = " ^ print_ctx cT');
@@ -143,7 +142,7 @@ let split_set sign (x : name) (cG : ctx) : ctx_map =
             try
               snd (split_rec sign ps (cG2 @ [(x, t)] @ cG1))
             with
-            | Unification_failure _ -> []
+            | Unify.Unification_failure _ -> []
           in
           sigma @ (split_constrs constrs')
        end
@@ -227,7 +226,10 @@ and check_innac (sign, cD : signature * ctx) cP (p : pat) (q : pat) (t : exp) : 
      Debug.indent ();
      check (sign, cD) cP ep t ;
      check (sign, cD) cP eq t ;
-     let _ = Unify.unify (sign, cD) ep eq in
+     let _ = try Unify.unify (sign, cD) ep eq
+             with Unify.Unification_failure prob ->
+               raise (Error.Error ("Inaccessible pattern check failed with:\n" ^ Unify.print_unification_problem prob))
+     in
      Debug.deindent ();
      ()
   | PVar x, PVar y when x = y -> ()
@@ -259,7 +261,11 @@ let check_clause (sign : signature) (f : def_name) (p : pats) (telG : tel) (t : 
     | Just e -> check (sign, cD) BNil e (simul_subst (subst_of_ctx_map sigma telG) t)
     | Impossible x -> caseless sign cD x t
   with
-    Unification_failure msg -> raise (Error.Error msg)
+    Unify.Unification_failure prob ->
+    raise (Error.Error ("Check clause failed for definition " ^ f
+                        ^ "\nclause: " ^ print_pats p
+                        ^ "\nwith unification problem:\n"
+                        ^ Unify.print_unification_problem prob))
 
 let check_clauses (sign : signature) (f : def_name) (telG : tel) (t : exp) (ds : pat_decls) : signature =
   (* we add a non-reducing version of f to the signature *)

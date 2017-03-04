@@ -2,6 +2,40 @@ open Syntax.Int
 open Sign
 open Name
 
+type unification_problem
+   = Different_constuctors of def_name * def_name
+   | Occur_check of name  * exp
+   | Expressions_dont_unify of exp * exp
+   | Universes_dont_match of int * int
+   | Unequal_number_params of  exp list * exp list
+   | Unification_didnt_solve_all_problems of exp * exp * ctx * name list * ctx
+
+let print_unification_problem = function
+  | Different_constuctors (n, n') ->
+     "Constructor " ^ n ^ " and " ^ n' ^ " do not unify."
+  | Occur_check (n, e) ->
+     "Occurs check failed for " ^ print_name n ^ " in expression " ^ print_exp e ^ "."
+  | Expressions_dont_unify (e1, e2) ->
+     "Expressions\ne1 = " ^ print_exp e1
+     ^ "\ne2 = " ^ print_exp e2
+     ^ "\nDo not unify."
+  | Universes_dont_match (n, n') ->
+     "Universe " ^ string_of_int n
+     ^ " and universe " ^ string_of_int n'
+     ^ " do not match."
+  | Unequal_number_params (es1, es2) ->
+     "Unequal number of params " ^ string_of_int(List.length es1)
+     ^ " <> " ^ string_of_int(List.length es1)
+     ^ "For expressions\n" ^ print_exps es1
+     ^ "\nand\n" ^ print_exps es2
+  | Unification_didnt_solve_all_problems (e1, e2, cG, remaining_vars, cG') ->
+     "Unification of " ^ print_exp e1 ^ " and " ^ print_exp e2
+     ^ " in context " ^ print_ctx cG
+     ^ " did not find instances for " ^ print_names remaining_vars
+     ^ " which remain free in " ^ print_ctx cG' ^ "."
+
+exception Unification_failure of unification_problem
+
 let rec occur_check n e =
   let f e = occur_check n e in
   match e with
@@ -43,7 +77,7 @@ let rec unify_flex (sign, cG) flex e1 e2 =
     Debug.indent() ;
     let cD, sigma = match Whnf.whnf sign e1, Whnf.whnf sign e2 with
       | Set n , Set n' when n = n' -> cG, []
-      | Set n, Set n' -> raise (Error.Error ("Universes don't match: " ^ string_of_int n ^ " <> " ^ string_of_int n'))
+      | Set n, Set n' -> raise (Unification_failure (Universes_dont_match (n, n')))
       | Pi (tel, t), Pi(tel', t') -> unify_pi tel t tel' t'
       | SPi (tel, t), SPi(tel', t') -> unify_spi tel t tel' t'
       | Box(g, e), Box(g', e') -> unify_many cG [g; e] [g'; e']
@@ -57,7 +91,7 @@ let rec unify_flex (sign, cG) flex e1 e2 =
          if n = n' then
            cG, []
          else
-           raise (Error.Error ("Constructor " ^ n ^ " does not unify_flex with constructor " ^ n' ^ "."))
+           raise (Unification_failure (Different_constuctors (n, n')))
 
       | Var n, Var n' when n = n' -> cG, [n, Var n]
 
@@ -65,12 +99,12 @@ let rec unify_flex (sign, cG) flex e1 e2 =
          if not (occur_check n e2) then
            rem n cG, [n, e2]
          else
-           raise (Error.Error ("Occur check failed for " ^ print_name n ^ " in term " ^ print_exp e2 ^ "."))
+           raise (Unification_failure (Occur_check (n, e2)))
       | _, Var n when is_flex n ->
          if not (occur_check n e1) then
            rem n cG, [n, e1]
          else
-           raise (Error.Error ("Occur check failed for " ^ print_name n ^ " in term " ^ print_exp e1 ^ "."))
+           raise (Unification_failure (Occur_check (n, e1)))
       | BVar i, BVar i' when i = i' -> cG, []
       | Clos(e1, e2), Clos(e1', e2') -> unify_many cG [e1;e2] [e1';e2']
       | EmptyS, EmptyS -> cG, []
@@ -83,7 +117,7 @@ let rec unify_flex (sign, cG) flex e1 e2 =
       | _, Under -> cG, []
       | Ctx, Ctx -> cG, []
       | _, _ ->
-         raise (Error.Error ("Expression " ^ print_exp e1 ^ " does not unify with " ^ print_exp e2 ^ "."))
+         raise (Unification_failure(Expressions_dont_unify (e1, e2)))
     in
     Debug.deindent();
     Debug.print (fun () -> "Resulted in " ^ print_subst sigma ^ " and context " ^ print_ctx cD);
@@ -97,7 +131,7 @@ let rec unify_flex (sign, cG) flex e1 e2 =
     if List.length es1 = List.length es2
     then
       List.fold_left2 unify_each (cG, []) es1 es2
-    else raise (Error.Error "Unequal number of parameters during unification.")
+    else raise (Unification_failure (Unequal_number_params (es1, es2)))
 
   and unify_flex_pi (sign, cG as ctxs: signature * ctx) (flex : name list) (tel1 : tel) (t1 : exp) (tel2 : tel) (t2 : exp) =
     let simul_subst_in_tel sigma tel =
@@ -144,10 +178,7 @@ let unify (sign, cG) e1 e2 =
   if remaining_vars = []
   then cG', sigma
   else
-    raise (Error.Error ("Unification of " ^ print_exp e1 ^ " and " ^ print_exp e2
-                        ^ " in context " ^ print_ctx cG
-                          ^ " did not find instances for " ^ print_names remaining_vars
-                          ^ " which remain free in " ^ print_ctx cG' ^ "."))
+    raise (Unification_failure(Unification_didnt_solve_all_problems(e1, e2, cG, remaining_vars, cG')))
 
 let unify_many (sign, cG) es1 es2 =
   let flex = List.fold_left2 (fun ns e e' -> ns @ get_flex_vars cG e e') [] es1 es2 in

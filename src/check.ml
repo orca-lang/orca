@@ -48,7 +48,14 @@ let rec decontextify cP =
 let unify_ctx (sign, cG) g cP =
   let g' = decontextify cP in
   Debug.print(fun () -> "Unifying contexts.\ng  = " ^ print_exp g ^ "\ng' = " ^ print_exp g' ^ "\n with ctx " ^ print_ctx cG);
-  let cD, sigma = Unify.unify (sign, cG) g g' in
+  let cD, sigma = try
+      Unify.unify (sign, cG) g g'
+    with
+      Unify.Unification_failure problem ->
+      raise (Error.Error ("Unification of context:\ng  = " ^ print_exp g
+                          ^ "\nand\ng' = " ^ print_exp g'
+                          ^ "\nfailed with the following problem:\n" ^ Unify.print_unification_problem problem))
+  in
   let cP' = contextify (sign, cG) (simul_subst sigma g) in
   cD, sigma, cP'
 
@@ -148,19 +155,20 @@ and check (sign , cG : signature * ctx) cP (e : exp) (t : exp) : unit =
          raise (Error.Error ("Cannot check expression " ^ print_exp e ^ "\n" ^ msg))
      in
      try
-       let _, sigma = Unify.unify (sign, cG) t t' in
+       let _, sigma =
+         Unify.unify (sign, cG) t t' in
        Debug.print (fun () -> "Unification for " ^ print_exp t ^ " with " ^
                                 print_exp t' ^ " succeeded with substitution "
                                 ^ Unify.print_subst sigma ^ ".")
      with
-     | Error.Error msg ->
+     | Unify.Unification_failure prob ->
        let string_e = print_exp e in
        let string_t = print_exp t in
        let string_t' = print_exp t' in
        let message = "Expression: " ^ string_e
                      ^ "\nwas inferred type: " ^ string_t'
-                     ^ "\nwhich is not equal to: " ^ string_t ^ " that was checked against.\n"
-                     ^"Unification failed with " ^ msg
+                     ^ "\nwhich is not equal to: " ^ string_t ^ " that was checked against."
+                     ^ "\nUnification failed with " ^ Unify.print_unification_problem prob
        in
        Debug.print_string message;
        raise (Error.Error ("Term's inferred type is not equal to checked type.\n" ^ message))
@@ -244,7 +252,13 @@ and check_syn (sign, cG) cP (e : exp) (t : exp) =
     | e, t when is_syntax e ->
       Debug.print(fun ()-> "Expression " ^ print_exp e ^ " is syntactic and thus being inferred");
       let t' = infer_syn (sign, cG) cP e in
-      let _ = Unify.unify (sign, cG) t t' in
+      let _ = try
+          Unify.unify (sign, cG) t t'
+      with
+        Unify.Unification_failure prob ->
+        raise (Error.Error ("Checking syntactic term " ^ print_exp e ^ " against type " ^ print_exp t
+                            ^ "\nFailed with unification problem:\n" ^ Unify.print_unification_problem prob))
+      in
       ()
     | e, t ->
       Debug.print(fun ()-> "Expression " ^ print_exp e ^ " is not syntactic and thus back to check");
