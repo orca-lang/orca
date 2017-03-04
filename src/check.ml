@@ -140,7 +140,7 @@ let rec infer (sign, cG : signature * ctx) cP (e : exp) : exp =
   Debug.print (fun () -> "Infer called with: " ^ print_exp e ^ " in context: " ^ print_ctx cG);
   Debug.indent() ;
   let res =
-    begin match e with
+    match e with
     | Annot (e, t) ->
        check (sign, cG) cP e t ; t
     | Const n ->
@@ -170,12 +170,14 @@ let rec infer (sign, cG : signature * ctx) cP (e : exp) : exp =
       Univ Star
 
     | _ ->
-       begin
+      try
+        let t = infer_syn (sign, cG) cP e in
+        Box (decontextify cP, t)
+      with Error.Error _ -> 
          Debug.print (fun() -> "Was asked to infer the type of " ^ print_exp e
-                               ^ "but the type is not inferrable") ;
+                               ^ " but the type is not inferrable") ;
          raise (Error.Error "Cannot infer the type of this expression")
-       end
-    end in
+  in
   Debug.deindent ();
   Debug.print(fun() -> "Result of infer for " ^ print_exp e ^ " was " ^ print_exp res) ;
   res
@@ -220,7 +222,7 @@ and check (sign , cG : signature * ctx) cP (e : exp) (t : exp) : unit =
        try infer (sign, cG) cP e
        with Error.Error msg ->
          Debug.print_string msg;
-         raise (Error.Error ("Cannot check expression " ^ print_exp e))
+         raise (Error.Error ("Cannot check expression " ^ print_exp e ^ "\n" ^ msg))
      in
      try
        let _, sigma = Unify.unify (sign, cG) t t' in

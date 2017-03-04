@@ -21,7 +21,7 @@ let tc_syn_constructor (sign , cG : signature * ctx) (tel : stel)
                        (n , tel', (n', es) : def_name * stel * dsig) : signature_entry =
   Debug.print_string ("Typechecking syntax constructor: " ^ n) ;
   check_stel (sign, cG) [] tel';
-  let cP = List.map (fun (_, x, s) -> x, s) tel' in
+  let cP = List.map (fun (_, x, s) -> x, s) (List.rev tel') in
   List.iter2 (check_syn (sign, cG) cP) es (List.map (fun (_,_,t) -> t) tel);
   SConstructor (n, tel', (n', es))
 

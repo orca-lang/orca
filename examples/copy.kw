@@ -9,11 +9,12 @@ lf tp where
 
 syn oft : tm -> tp -> * where
 | t-unit: oft one unit
-| t-app: (f: tm) -> (e : tm) -> (s: tp) -> (t: tp) ->
-  oft f (arr s t) -> oft e s -> oft (app f e) t
-(*) | t-lam:
+| t-app: (f: tm) -> (e : tm) -> (s: tp) -> (t: tp)
+         -> oft f (arr s t) -> oft e s -> oft (app f e) t
+| t-lam: (s:tp) -> (t:tp) -> (e:tm -> tm)
+         -> ((x:tm) -> oft x s -> oft (e x) t) -> oft (lam (\x.e x)) (arr s t)
 
-def copy : (g : ctx) -> (g |- tm) -> (g |- tm) where
-| g (app M N) => app (copy g M) (copy g N)
-| g (lam (\x. M)) => lam (\x. copy (g, x) M)
-| g x => x
+(*) def copy : (g : ctx) -> (g |- tm) -> (g |- tm) where
+(*) | g (app M N) => app (copy g M) (copy g N)
+(*) | g (lam (\x. M)) => lam (\x. copy (g, x) M)
+(*) | g x => x

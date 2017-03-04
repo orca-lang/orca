@@ -176,7 +176,8 @@ and pproc_stel (s : sign) (cG : ctx) (cP : bctx) (is_syntax : bool) : E.exp -> I
      (Syntax.Explicit, n, pproc_exp s cG cP is_syntax t0) :: tel, t
   | E.Arr (t0, t1)
   | E.SArr (t0, t1) ->
-     let tel, t = pproc_stel s cG cP is_syntax t1 in
+    let cP' = add_name_bvars cP ["_"] in
+     let tel, t = pproc_stel s cG cP' is_syntax t1 in
      (Syntax.Explicit, "_", pproc_exp s cG cP is_syntax t0) :: tel , t
   | t -> [], pproc_exp s cG cP is_syntax t
     
