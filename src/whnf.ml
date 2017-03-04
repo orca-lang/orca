@@ -37,7 +37,7 @@ and reduce_with_clause sign sp (pats, rhs) =
   begin try
       let sigma = match_pats sign pats sp in
       match rhs with
-      | Just e -> Some (subst_list sigma e) (* TODO this should call whnf *)
+      | Just e -> Some (simul_subst sigma e) (* TODO this should call whnf *)
       | Impossible _ -> raise (Error.Violation "This case is impossible, it did not happen!")
     with
       Matching_failure (p, e) ->
@@ -103,7 +103,7 @@ and whnf (sign : signature) (e : exp) : exp =
        begin match whnf sign h with
        | Fn(xs, e) ->
           let sigma = List.map2 (fun x e -> x, e) xs sp in
-          whnf sign (subst_list sigma e) (* Beta reduction *)
+          whnf sign (simul_subst sigma e) (* Beta reduction *)
        | h -> App(h, sp)
        end
     | Annot(e, _) -> whnf sign e
@@ -131,7 +131,7 @@ and whnf (sign : signature) (e : exp) : exp =
     | Comp (Comp (s1, ShiftS s2), ShiftS s3) -> whnf sign (Comp (s1, ShiftS (Comp (s2, s3))))
     | ShiftS (Shift 0) -> Shift 0
     | Clos (Lam (xs, e), s) -> Lam (xs, Clos (e, List.fold_left (fun s _ -> ShiftS s) s xs))
-      
+
     | e -> e (* No reduction necessary *)
   in
   Debug.deindent();

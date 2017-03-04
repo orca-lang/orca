@@ -49,7 +49,7 @@ let rec unify_flex (sign, cG) flex e1 e2 =
       | Box(g, e), Box(g', e') -> unify_many cG [g; e] [g'; e']
       | Fn(ns, e), Fn(ns', e') ->
          let sigma = List.map2 (fun n n' -> (n, Var n')) ns ns' in
-         unify_flex (subst_list sigma e) (subst_list sigma e')
+         unify_flex (simul_subst sigma e) (simul_subst sigma e')
       | Lam(_,e), Lam(_, e') -> unify_flex e e'
       | App(e, es1), App(e', es2) -> unify_many cG (e::es1) (e'::es2)
       | AppL(e1, es), AppL(e1', es') -> unify_many cG (e1::es) (e1'::es')
@@ -91,7 +91,7 @@ let rec unify_flex (sign, cG) flex e1 e2 =
 
   and unify_flex_many (sign, cG) flex es1 es2 =
     let unify_each (cD, sigma1) e1 e2 =
-      let cD', sigma' = unify_flex (sign, cD) flex (subst_list sigma1 e1) (subst_list sigma1 e2) in
+      let cD', sigma' = unify_flex (sign, cD) flex (simul_subst sigma1 e1) (simul_subst sigma1 e2) in
       cD', sigma' @ sigma1
     in
     if List.length es1 = List.length es2
@@ -100,8 +100,8 @@ let rec unify_flex (sign, cG) flex e1 e2 =
     else raise (Error.Error "Unequal number of parameters during unification.")
 
   and unify_flex_pi (sign, cG as ctxs: signature * ctx) (flex : name list) (tel1 : tel) (t1 : exp) (tel2 : tel) (t2 : exp) =
-    let subst_list_in_tel sigma tel =
-      List.map (fun (i, n, e) -> i, n, subst_list sigma e) tel
+    let simul_subst_in_tel sigma tel =
+      List.map (fun (i, n, e) -> i, n, simul_subst sigma e) tel
     in
     match tel1, tel2 with
     | [], [] -> unify_flex ctxs flex t1 t2
@@ -110,14 +110,14 @@ let rec unify_flex (sign, cG) flex e1 e2 =
     | (_, n1, e1)::tel1, (_, n2, e2)::tel2 ->
        let cD, sigma' = unify_flex ctxs flex e1 e2 in
        let sigma = (n1, Var n2) :: sigma'  in
-       let tel1' = subst_list_in_tel sigma tel1 in
-       let tel2' = subst_list_in_tel sigma tel2 in
+       let tel1' = simul_subst_in_tel sigma tel1 in
+       let tel2' = simul_subst_in_tel sigma tel2 in
        let cD', sigma'' = (unify_flex_pi (sign, (n2, e2) :: cD) flex tel1' t1 tel2' t2) in
        cD', sigma @ sigma''
 
    and unify_flex_spi (sign, cG as ctxs: signature * ctx) (flex : name list) (tel1 : stel) (t1 : exp) (tel2 : stel) (t2 : exp) =
-    let subst_list_in_tel sigma tel =
-      List.map (fun (i, n, e) -> i, n, subst_list sigma e) tel
+    let simul_subst_in_tel sigma tel =
+      List.map (fun (i, n, e) -> i, n, simul_subst sigma e) tel
     in
     match tel1, tel2 with
     | [], [] -> unify_flex ctxs flex t1 t2
@@ -125,8 +125,8 @@ let rec unify_flex (sign, cG) flex e1 e2 =
     | [], tel2 -> unify_flex ctxs flex t1 (SPi (tel2, t2))
     | (_, n1, e1)::tel1, (_, n2, e2)::tel2 ->
        let cD, sigma' = unify_flex ctxs flex e1 e2 in
-       let tel1' = subst_list_in_tel sigma' tel1 in
-       let tel2' = subst_list_in_tel sigma' tel2 in
+       let tel1' = simul_subst_in_tel sigma' tel1 in
+       let tel2' = simul_subst_in_tel sigma' tel2 in
        let cD', sigma'' = (unify_flex_spi (sign, cD) flex tel1' t1 tel2' t2) in
        cD', sigma' @ sigma''
 

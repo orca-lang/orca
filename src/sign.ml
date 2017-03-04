@@ -161,8 +161,8 @@ let shift_psubst_by_ctx sigma cG =
                          ^ ".");
   sigma'
 
-let subst_list_on_ctx sigma =
-    List.map (fun (x, e) -> x, subst_list sigma e)
+let simul_subst_on_ctx sigma =
+    List.map (fun (x, e) -> x, simul_subst sigma e)
 
 let simul_psubst_on_ctx sigma =
     List.map (fun (x, e) -> x, simul_psubst sigma e)

@@ -72,7 +72,7 @@ let split (sign : signature) (p1 : pats) (c, ps : def_name * pats) (cD2 : ctx) (
          with
          | Error.Error msg -> raise (Unification_failure msg)
     in
-    let cT' = subst_list_on_ctx delta (rename_ctx_using_subst cT delta) in
+    let cT' = simul_subst_on_ctx delta (rename_ctx_using_subst cT delta) in
     Debug.print (fun () -> "delta = " ^ print_subst delta ^ ", cT = " ^ print_ctx cT ^ ", cT' = " ^ print_ctx cT');
     Debug.print (fun () -> "cD1 = " ^ print_ctx cD1);
     (* let delta = compose_subst delta id_cD' in (\* to get the eta-long subst *\) *)
@@ -92,7 +92,7 @@ let split (sign : signature) (p1 : pats) (c, ps : def_name * pats) (cD2 : ctx) (
     let pdelta_shift = pdelta @ [x, PVar x] in
     let pdelta' = compose_single_with_psubst pss pdelta_shift in
     Debug.print (fun () -> "pdelta' = " ^ print_psubst pdelta');
-    let cD'', delta'' = cD' @ (subst_list_on_ctx delta' cD2), (pats_of_psubst (shift_psubst_by_ctx pdelta' cD2)) in
+    let cD'', delta'' = cD' @ (simul_subst_on_ctx delta' cD2), (pats_of_psubst (shift_psubst_by_ctx pdelta' cD2)) in
     Debug.print (fun () -> "Split! \ncD2 = " ^ print_ctx cD2 ^ "\ndelta' = " ^ print_psubst pdelta'
                            ^ "\n delta'' = " ^ print_pats delta'' ^ "\n cD'' = " ^ print_ctx cD'');
     Debug.deindent ();
@@ -256,7 +256,7 @@ let check_clause (sign : signature) (f : def_name) (p : pats) (telG : tel) (t : 
     let cD, sigma = check_lhs sign p (ctx_of_tel telG) in
     Debug.print (fun () -> "LHS was checked:\n cD = " ^ print_ctx cD ^ "\n sigma = "^ print_pats sigma ^ "\n telG = " ^ print_tel telG);
     match rhs with
-    | Just e -> check (sign, cD) BNil e (subst_list (subst_of_ctx_map sigma telG) t)
+    | Just e -> check (sign, cD) BNil e (simul_subst (subst_of_ctx_map sigma telG) t)
     | Impossible x -> caseless sign cD x t
   with
     Unification_failure msg -> raise (Error.Error msg)

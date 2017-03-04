@@ -2,19 +2,6 @@ open Syntax.Int
 open Sign
 open Name
 
-(* let max_universe (u1 : universe) (u2 : universe) : universe = *)
-(*   match u1, u2 with *)
-(*   | Set n, Set n' -> Set (max n n') *)
-(*   | Star, u -> u *)
-(*   | u, Star -> u *)
-
-(* (\* <= for universes *\) *)
-(* let le_universe (u1 : universe) (u2 : universe) : bool = *)
-(*   match u1, u2 with *)
-(*   | Set n, Set n' -> n <= n' *)
-(*   | Star, _ -> true *)
-(*   | _, Star -> false *)
-
 let is_syntax = function
   | Lam _
   | AppL _
@@ -62,13 +49,13 @@ let unify_ctx (sign, cG) g cP =
   let g' = decontextify cP in
   Debug.print(fun () -> "Unifying contexts.\ng  = " ^ print_exp g ^ "\ng' = " ^ print_exp g' ^ "\n with ctx " ^ print_ctx cG);
   let cD, sigma = Unify.unify (sign, cG) g g' in
-  let cP' = contextify (sign, cG) (subst_list sigma g) in
+  let cP' = contextify (sign, cG) (simul_subst sigma g) in
   cD, sigma, cP'
 
 let check_box (sign, cG) cP = function
   | Box (g, t) ->
     let cD, sigma, cP' = unify_ctx (sign, cG) g cP in
-    subst_list sigma t
+    simul_subst sigma t
     (* else raise (Error.Error "Wrong contexts. Tip: use a substitution?") *)
   | Ctx -> Ctx
   | _ -> raise (Error.Error "Not a box. Don't think outside of the box.")
@@ -91,7 +78,7 @@ let rec infer (sign, cG : signature * ctx) cP (e : exp) : exp =
          check_syn_spine (sign, cG) cP sp tel t
        | Box (g, SPi (tel, t)) ->
          let cD, sigma, cP' = unify_ctx (sign, cG) g cP in
-         Box (g, check_syn_spine (sign, cD) cP' sp (subst_list_on_stel sigma tel) (subst_list sigma t))
+         Box (g, check_syn_spine (sign, cD) cP' sp (simul_subst_on_stel sigma tel) (simul_subst sigma t))
        | t -> raise (Error.Error ("The left hand side (" ^ print_exp h ^ ") of the application was of type "
                                   ^ print_exp t ^ " which is not of function type"))
        end
@@ -103,7 +90,7 @@ let rec infer (sign, cG : signature * ctx) cP (e : exp) : exp =
     | Box (g, e) ->
       check (sign, cG) cP g Ctx;
       let cD, sigma, cP' = unify_ctx (sign, cG) g cP in
-      check_syn_type (sign, cD) cP' (subst_list sigma e);
+      check_syn_type (sign, cD) cP' (simul_subst sigma e);
       Set 0
 
     | _ ->
@@ -136,9 +123,9 @@ and check (sign , cG : signature * ctx) cP (e : exp) (t : exp) : unit =
   | Hole _, _ -> () (* holes are always of the right type *)
   | Fn (fs, e), Pi(tel, t) ->
      let sigma = List.map2 (fun f (_, n, _) -> n, Var f) fs tel in
-     let t' = subst_list sigma t in
-     let cG' = subst_list_on_ctx sigma cG in
-     let cGext = List.map2 (fun f (_, _, s) -> f, s) fs (subst_list_on_tel sigma tel) in
+     let t' = simul_subst sigma t in
+     let cG' = simul_subst_on_ctx sigma cG in
+     let cGext = List.map2 (fun f (_, _, s) -> f, s) fs (simul_subst_on_tel sigma tel) in
      Debug.indent();
      Debug.print (fun () -> "Checking function: " ^ print_exp (Fn (fs, e)) ^ "\nin context " ^ print_ctx cG ^ ".");
      Debug.print (fun () -> "Resulted in ctx " ^ print_ctx cG'
@@ -329,7 +316,7 @@ and check_syn_spine (sign, cG) cP sp tel t =
       | SPi (tel', t') -> check_syn_spine (sign, cG) cP sp tel' t
       | Box (g, SPi (tel', t')) ->
         let cD, sigma, cP' = unify_ctx (sign, cG) g cP in
-        check_syn_spine (sign, cD) cP' sp (subst_list_on_stel sigma tel') (subst_list sigma t')
+        check_syn_spine (sign, cD) cP' sp (simul_subst_on_stel sigma tel') (simul_subst sigma t')
       | _ -> raise (Error.Error ("Unconsumed application cannot check against type " ^ print_exp t))
     end
   | [], _ -> SPi (tel, t)

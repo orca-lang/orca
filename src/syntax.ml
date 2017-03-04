@@ -426,20 +426,20 @@ module Int = struct
        let tel', t' = subst_spi (x, es) tel t in
        (i, n, subst (x, es) e) :: tel', t'
 
-  let subst_list sigma e =
+  let simul_subst sigma e =
     List.fold_left (fun e s -> subst s e) e sigma
 
-  let subst_list_on_tel sigma tel =
-    List.map (fun (i, x, e) -> (i, x, subst_list sigma e)) tel
+  let simul_subst_on_tel sigma tel =
+    List.map (fun (i, x, e) -> (i, x, simul_subst sigma e)) tel
 
-  let subst_list_on_stel sigma tel =
-    List.map (fun (i, x, e) -> (i, x, subst_list sigma e)) tel
+  let simul_subst_on_stel sigma tel =
+    List.map (fun (i, x, e) -> (i, x, simul_subst sigma e)) tel
 
   let rec compose_single_with_subst s = function
     | [] -> []
     | (y, t') :: sigma -> (y, subst s t') :: (compose_single_with_subst s sigma)
 
-  let compose_subst sigma delta = List.map (fun (x, t) -> x, subst_list sigma t) delta
+  let compose_subst sigma delta = List.map (fun (x, t) -> x, simul_subst sigma t) delta
 
   let rec psubst ((x, p') as s) (p : pat) :  pat =
     match p with
