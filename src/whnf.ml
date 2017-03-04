@@ -106,8 +106,32 @@ and whnf (sign : signature) (e : exp) : exp =
           whnf sign (subst_list sigma e) (* Beta reduction *)
        | h -> App(h, sp)
        end
-
-    | Annot(e, _) -> e
+    | Annot(e, _) -> whnf sign e
+    (* Rewriting rules here (Work in progress) *)
+    | Clos (Const n, _) -> whnf sign (Const n)
+    | Clos (BVar 0, Dot (_, e)) -> whnf sign e
+    | Clos (BVar n, Dot (s, _)) -> whnf sign (Clos (BVar (n-1), s))
+    | Clos (App (e, es), s) -> whnf sign (App (Clos (e, s), List.map (fun e -> Clos (e, s)) es))
+    (* We might be missing the case for lam here *)
+    | Comp (s1, (Dot (s2, e))) -> whnf sign (Dot (Comp (s1, s2), Clos (e, s1)))
+    | Clos (Clos (e, s1), s2) -> whnf sign (Clos (e, Comp (s1, s2)))
+    | Comp (Dot (s1, e), ShiftS s2) -> whnf sign (Dot (Comp (s1, s2), e))
+    | Clos (e, Shift 0) -> whnf sign e
+    | Comp (Shift 0, s) -> whnf sign s
+    | Comp (s, Shift 0) -> whnf sign s
+    | Comp (ShiftS s, Shift n) -> whnf sign (Comp (Comp (Shift 1, s), Shift (n-1)))
+    | Comp (Comp (s1, ShiftS s2), Shift n) -> whnf sign (Comp (Comp (Comp (s1, Shift 1), s2), Shift (n-1)))
+    | Clos (BVar i, Shift n) -> BVar (i+n)
+    | Clos (BVar 0, ShiftS _) -> BVar 0
+    | Clos (BVar n, ShiftS s) -> whnf sign (Clos (BVar (n-1), (Comp (Shift 1, s))))
+    | Clos (BVar n, Comp (s1, ShiftS s2)) when n > 0 -> whnf sign (Clos (BVar (n-1), Comp (Comp (s1, Shift 1), s2)))
+    | Comp (Dot (e, s), Shift n) when n>0 -> whnf sign (Comp (s, Shift (n-1)))
+    | Clos (BVar i, Comp (s, Shift n)) -> whnf sign (Clos (BVar (i+n), s))
+    | Comp (ShiftS s1, ShiftS s2) -> whnf sign (ShiftS (Comp (s1, s2)))
+    | Comp (Comp (s1, ShiftS s2), ShiftS s3) -> whnf sign (Comp (s1, ShiftS (Comp (s2, s3))))
+    | ShiftS (Shift 0) -> Shift 0
+    | Clos (Lam (xs, e), s) -> Lam (xs, Clos (e, List.fold_left (fun s _ -> ShiftS s) s xs))
+      
     | e -> e (* No reduction necessary *)
   in
   Debug.deindent();

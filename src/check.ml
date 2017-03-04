@@ -55,6 +55,48 @@ let rec decontextify cP =
   match cP with
   | [] -> Nil
   | (x, e) :: cP' -> Snoc (decontextify cP', x, e)
+    
+let lookup_sign sign cP n =
+  match lookup_sign_entry n sign with
+  | Definition (_, [], t, _) -> t
+  | Definition (_, tel, t, _) -> Pi(tel, t)
+
+  | DataDef (_, ps, is, u) ->
+     let tel = ps @ is in
+     if Util.empty_list tel
+     then Univ u
+     else Pi (tel, Univ u)
+  | SynDef (_, tel) ->
+     if Util.empty_list tel
+     then Box (decontextify cP, SStar)
+     else Box (decontextify cP, SPi (tel, SStar))
+  | Constructor (_, is, (n', pes)) ->
+     let t =
+       if Util.empty_list pes then
+         Const n'
+       else
+         App (Const n', pes)
+     in
+     let t' =
+       if Util.empty_list is then t else Pi (is, t)
+     in
+     Debug.print (fun () -> "Looked up constructor " ^ n ^ " which has type " ^ print_exp t');
+     t'
+  | SConstructor (_, is, (n', pes)) ->
+     let t =
+       if Util.empty_list pes then
+         Const n'
+       else
+         App (Const n', pes)
+     in
+     let t' =
+       if Util.empty_list is then t else SPi (is, t)
+     in
+     Debug.print (fun () -> "Looked up constructor " ^ n ^ " which has type " ^ print_exp t');
+     Box (decontextify cP, t')
+
+  | Program (_,tel,t, _) -> if tel = [] then t else Pi (tel, t)
+
 
 let unify_ctx (sign, cG) g cP =
   let g' = decontextify cP in
@@ -102,7 +144,7 @@ let rec infer (sign, cG : signature * ctx) cP (e : exp) : exp =
     | Annot (e, t) ->
        check (sign, cG) cP e t ; t
     | Const n ->
-       lookup_sign n sign
+       lookup_sign sign cP n
     | Var n -> lookup n cG
     | App (h, sp) ->
        begin match infer (sign, cG) cP h with
@@ -299,9 +341,12 @@ and infer_syn (sign, cG) cP (e : exp) =
       | _ -> raise (Error.Error "Term in function position is not of function type")
       end
     | Var x -> check_box (sign, cG) cP (lookup x cG)
-    | Const n -> check_box (sign, cG) cP (lookup_sign n sign)
+    | Const n -> check_box (sign, cG) cP (lookup_sign sign cP n)
     | BVar i ->
-      lookup_bound i cP
+      let t = lookup_bound i cP in
+      Debug.print (fun () -> "Looking bound variable " ^ string_of_int i ^ " resulted in type " ^ print_exp t
+        ^ "\n Context is [" ^ String.concat "; " (List.map (fun (x, t) -> x ^ ": " ^ print_exp t) cP) ^ "].");
+      t
     | EmptyS -> Nil
     | Shift n -> decontextify (drop_suffix cP n)
     | Dot (s, e) ->
@@ -309,6 +354,17 @@ and infer_syn (sign, cG) cP (e : exp) =
       let cP' = contextify sign g in
       let t = infer_syn (sign, cG) cP' e in
       Snoc (g, "_", t)
+    | Comp (s1, s2) ->
+      let g1 = infer_syn (sign, cG) cP s1 in
+      let cP' = contextify sign g1 in
+      infer_syn (sign, cG) cP' s2
+    | ShiftS s ->
+      begin match cP with
+      | [] -> raise (Error.Error ("Shifting a substitution in an empty context"))
+      | (x, t) :: cP' ->
+        let g = infer_syn (sign, cG) cP' s in
+        Snoc (g, x, t)
+      end
     | _ -> raise (Error.Error ("Cannot infer syntactic expression " ^ print_exp e))
   in Debug.deindent (); res
       

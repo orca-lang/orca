@@ -146,6 +146,8 @@ module Int = struct
     | EmptyS
     | Shift of int
     | Dot of exp * exp
+    | Comp of exp * exp
+    | ShiftS of exp
     | Snoc of exp * string * exp
     | Nil
     | Annot of exp * exp
@@ -216,7 +218,9 @@ module Int = struct
     | Clos (e1, e2) -> fv e1 @ fv e2
     | EmptyS -> []
     | Shift n -> []
+    | Comp (e1, e2)
     | Dot (e1, e2) -> fv e1 @ fv e2
+    | ShiftS e -> fv e
     | Snoc (g, _, e) -> fv g @ fv e
     | Nil -> []
     | Annot (e1, e2) -> fv e1 @ fv e2
@@ -282,6 +286,8 @@ module Int = struct
       | Clos (e1, e2) -> Clos(f e1, f e2)
       | EmptyS -> EmptyS
       | Shift n -> Shift n
+      | Comp (e1, e2) -> Comp (f e1, f e2)
+      | ShiftS e -> ShiftS (f e)
       | Dot (e1, e2) -> Dot (f e1, f e2)
       | Snoc (e1, x, e2) -> Snoc (f e1, x, f e2)
       | Nil -> Nil
@@ -332,6 +338,8 @@ module Int = struct
     | Clos (e1, e2) -> Clos(f e1, f e2)
     | EmptyS -> EmptyS
     | Shift n -> Shift n
+    | Comp (e1, e2) -> Comp (f e1, f e2)
+    | ShiftS e -> ShiftS (f e)
     | Dot (e1, e2) -> Dot (f e1, f e2)
     | Snoc (g, x, e2) -> Snoc(f g, x, f e2)
     | Nil -> Nil
@@ -395,6 +403,8 @@ module Int = struct
     | Clos (e1, e2) -> Clos(f e1, f e2)
     | EmptyS -> EmptyS
     | Shift n -> Shift n
+    | ShiftS e -> ShiftS (f e)
+    | Comp (e1, e2) -> Comp (f e1, f e2)
     | Dot (e1, e2) -> Dot (f e1, f e2)
     | Snoc (e1, x, e2) -> Snoc (f e1, x, f e2)
     | Nil -> Nil
@@ -490,6 +500,8 @@ module Int = struct
     | Clos (e1, e2) -> "([] " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
     | EmptyS -> "^"
     | Shift n -> "^" ^ string_of_int n
+    | ShiftS e -> "(^^ " ^ print_exp e ^ ")"
+    | Comp (e1, e2) -> "(o " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
     | Dot (e1, e2) -> "(; " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
     | Snoc (e1, x, e2) -> "(, " ^ print_exp e1 ^ ", " ^ x ^ " : " ^ print_exp e2 ^ ")"
     | Nil -> "0"

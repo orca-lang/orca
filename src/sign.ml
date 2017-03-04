@@ -39,46 +39,6 @@ let lookup_cons_entry (c : def_name) (sign : signature) : tel * dsig =
   | Constructor (_, tel, dsig) -> tel, dsig
   | _ -> raise (Error.Error ("Constant " ^ c ^ " was expected to be a constructor."))
 
-let lookup_sign n sign =
-  match lookup_sign_entry n sign with
-  | Definition (_, [], t, _) -> t
-  | Definition (_, tel, t, _) -> Pi(tel, t)
-
-  | DataDef (_, ps, is, u) ->
-     let tel = ps @ is in
-     if Util.empty_list tel
-     then Univ u
-     else Pi (tel, Univ u)
-  | SynDef (_, tel) ->
-     if Util.empty_list tel
-     then SStar
-     else SPi (tel, SStar)
-  | Constructor (_, is, (n', pes)) ->
-     let t =
-       if Util.empty_list pes then
-         Const n'
-       else
-         App (Const n', pes)
-     in
-     let t' =
-       if Util.empty_list is then t else Pi (is, t)
-     in
-     Debug.print (fun () -> "Looked up constructor " ^ n ^ " which has type " ^ print_exp t');
-     t'
-  | SConstructor (_, is, (n', pes)) ->
-     let t =
-       if Util.empty_list pes then
-         Const n'
-       else
-         App (Const n', pes)
-     in
-     let t' =
-       if Util.empty_list is then t else SPi (is, t)
-     in
-     Debug.print (fun () -> "Looked up constructor " ^ n ^ " which has type " ^ print_exp t');
-     t'
-
-  | Program (_,tel,t, _) -> if tel = [] then t else Pi (tel, t)
 
 type lookup_result
   = D of exp                    (* A definition without pattern matching *)
