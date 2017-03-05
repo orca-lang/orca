@@ -9,7 +9,17 @@ let tc_constructor (sign , cG : signature * ctx) (u : universe) (tel : tel)
   let uc = check_tel (sign, cG) u tel' in
   if uc <= u then
     begin
-      List.iter2 (check (sign, (ctx_of_tel tel') @ cG)) es (List.map (fun (_,_,t) -> t) tel);
+      let check' = check (sign, (ctx_of_tel tel') @ cG) in
+      let rec check_indices es tel = 
+        match es, tel with
+        | [], [] -> ()
+        | e::es', (_, x, t)::tel' ->
+          check' e t;
+          check_indices es' (simul_subst_on_tel [x,e] tel')
+        | _ -> raise (Error.Error ("Constructor " ^ n
+             ^ " does not return a term of the fully applied type for " ^ n'))
+      in
+      check_indices es tel;
       Constructor (n, tel', (n', es))
     end
   else
@@ -22,7 +32,17 @@ let tc_syn_constructor (sign , cG : signature * ctx) (tel : stel)
   Debug.print_string ("Typechecking syntax constructor: " ^ n) ;
   check_stel (sign, cG) BNil tel';
   let cP = bctx_of_stel tel' in
-  List.iter2 (check_syn (sign, cG) cP) es (List.map (fun (_,_,t) -> t) tel);
+  let check' = check_syn (sign, cG) cP in
+  let rec check_indices es tel = 
+    match es, tel with
+    | [], [] -> ()
+    | e::es', (_, _, t)::tel' ->
+      check' e t;
+      check_indices es' (List.map (fun (i, x, t) -> i, x, (Clos(t, Dot (Shift 1, e)))) tel')
+    | _ -> raise (Error.Error ("Constructor " ^ n
+             ^ " does not return a term of the fully applied type for " ^ n'))
+  in
+  check_indices es tel;
   SConstructor (n, tel', (n', es))
 
 let tc_program (sign : signature) : program -> signature = function

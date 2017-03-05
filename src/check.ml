@@ -350,7 +350,10 @@ and infer_syn (sign, cG) cP (e : exp) =
       let cP' = contextify (sign, cG) (infer_syn (sign, cG) cP s) in
       infer_syn (sign, cG) cP' e
     | EmptyS -> Nil
-    | Shift n -> decontextify (drop_suffix cP n)
+    | Shift n -> let cP' = drop_suffix cP n in
+                 Debug.print(fun () -> "Shift " ^ string_of_int n
+                   ^ " bring context " ^ print_bctx cP ^ " to context " ^ print_bctx cP');
+                 decontextify cP'
     | Dot (s, e) ->
       let g = infer_syn (sign, cG) cP s in
       let cP' = contextify (sign, cG) g in

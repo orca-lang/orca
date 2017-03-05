@@ -21,9 +21,20 @@ syn oft : tm -> tp -> * where
 
 data isctx : (g:ctx) -> set where
 | Empty : isctx 0
-| Cons : (g:ctx) -> isctx g -> (t:tp) -> isctx (g, tp)
+| Cons : (g:ctx) -> isctx g -> (t:tp) -> isctx (g, tm)
+
+data isvar : (h : ctx) -> (h |- tm) -> set where
+(*) | is-here: (g:ctx) -> isvar (g, x:tm) (x :> x)
+| is-there : (g:ctx) -> (m : (g |- tm)) -> isvar g (g |- m)
+   -> isvar (g,x:tm) (m [ ^1 ])
+   
+(*) data lookup : (g:ctx) -> isctx g -> (g |- tm) -> (|- tp) -> set where
+(*) | l-top : (g : ctx) -> (G : isctx g) -> (t : |- tp) -> lookup (g, tp) G -> 
 
 data oft' (g:ctx) : isctx g -> (g |- tm) -> (|- tp) -> set where
 | t-unit' : (G : isctx g) -> oft' g G one unit
-| t-app' : (G : isctx g) -> (f : (g |- tm)) -> (e : (g |- tm)) -> (s : |- tp) -> (t: |- tp)
+| t-app' : (G : isctx g) -> (f : (g |- tm)) -> (e : (g |- tm)) -> (s : |- tp) -> (t : |- tp)
          -> oft' g G f (arr s t) -> oft' g G e s -> oft' g G (app f e) t
+| t-lam'  : (G : isctx g) -> (e : (g, x:tm |- tm)) -> (s : tp) -> (t : tp)
+          -> oft' (g, tp) (Cons g G s) e t -> oft' g G (lam (\x.e)) (arr s t)
+(*) | t-var : (G : ixctx g) -> 

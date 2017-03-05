@@ -241,7 +241,7 @@ let print_bctx cP =
 let drop_suffix cP n =
     let rec drop cP' n' =
       match cP', n' with
-      | _, 0 -> cP
+      | _, 0 -> cP'
       | BSnoc(cP', _, _), n' -> drop cP' (n'-1)
       | _ -> raise (Error.Error ("Tried to drop " ^ string_of_int n ^ " terms out of " ^ print_bctx cP ^ " which is too short."))
     in
