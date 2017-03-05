@@ -24,7 +24,7 @@ data isctx : (g:ctx) -> set where
 | Cons : (g:ctx) -> isctx g -> (t:tp) -> isctx (g, tm)
 
 data isvar : (h : ctx) -> (h |- tm) -> set where
-(*) | is-here: (g:ctx) -> isvar (g, x:tm) (x :> x)
+| is-here: (g:ctx) -> isvar (g, x:tm) (x:tm :> x)
 | is-there : (g:ctx) -> (m : (g |- tm)) -> isvar g (g |- m)
    -> isvar (g,x:tm) (m [ ^1 ])
    

@@ -93,6 +93,7 @@ let rec get_bound_var_ctx_no_annot (e : E.exp) : bctx =
   match content e with
   | E.Comma (g, P(_, E.Annot(P(_, E.Ident n), _))) -> n :: (get_bound_var_ctx_no_annot g)
   | E.Comma (g, P(_, E.Ident n)) -> n :: (get_bound_var_ctx_no_annot g)
+  | E.Annot(P(_, E.Ident n), _) -> [n]
   | E.Nil -> []
   | E.Ident _ -> []
   | _ -> raise (Error.Error_loc (loc e, E.print_exp e ^ " is a forbidden expression on the left hand side of :>"))
