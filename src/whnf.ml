@@ -107,33 +107,121 @@ and whnf (sign : signature) (e : exp) : exp =
        | h -> App(h, sp)
        end
     | Annot(e, _) -> whnf sign e
-    (* Rewriting rules here (Work in progress) *)
-    | Clos (Const n, _) -> whnf sign (Const n)
-    | Clos (BVar 0, Dot (_, e)) -> whnf sign e
-    | Clos (BVar n, Dot (s, _)) -> whnf sign (Clos (BVar (n-1), s))
-    | Clos (App (e, es), s) -> whnf sign (App (Clos (e, s), List.map (fun e -> Clos (e, s)) es))
-    (* We might be missing the case for lam here *)
-    | Comp (s1, (Dot (s2, e))) -> whnf sign (Dot (Comp (s1, s2), Clos (e, s1)))
-    | Clos (Clos (e, s1), s2) -> whnf sign (Clos (e, Comp (s1, s2)))
-    | Comp (Dot (s1, e), ShiftS s2) -> whnf sign (Dot (Comp (s1, s2), e))
-    | Clos (e, Shift 0) -> whnf sign e
-    | Comp (Shift 0, s) -> whnf sign s
-    | Comp (s, Shift 0) -> whnf sign s
-    | Comp (ShiftS s, Shift n) -> whnf sign (Comp (Comp (Shift 1, s), Shift (n-1)))
-    | Comp (Comp (s1, ShiftS s2), Shift n) -> whnf sign (Comp (Comp (Comp (s1, Shift 1), s2), Shift (n-1)))
-    | Clos (BVar i, Shift n) -> BVar (i+n)
-    | Clos (BVar 0, ShiftS _) -> BVar 0
-    | Clos (BVar n, ShiftS s) -> whnf sign (Clos (BVar (n-1), (Comp (Shift 1, s))))
-    | Clos (BVar n, Comp (s1, ShiftS s2)) when n > 0 -> whnf sign (Clos (BVar (n-1), Comp (Comp (s1, Shift 1), s2)))
-    | Comp (Dot (e, s), Shift n) when n>0 -> whnf sign (Comp (s, Shift (n-1)))
-    | Clos (BVar i, Comp (s, Shift n)) -> whnf sign (Clos (BVar (i+n), s))
-    | Comp (ShiftS s1, ShiftS s2) -> whnf sign (ShiftS (Comp (s1, s2)))
-    | Comp (Comp (s1, ShiftS s2), ShiftS s3) -> whnf sign (Comp (s1, ShiftS (Comp (s2, s3))))
-    | ShiftS (Shift 0) -> Shift 0
-    | Clos (Lam (xs, e), s) -> Lam (xs, Clos (e, List.fold_left (fun s _ -> ShiftS s) s xs))
 
-    | e -> e (* No reduction necessary *)
+    | e -> rewrite sign e
   in
   Debug.deindent();
   (* Debug.print (fun () -> "Whnf of " ^ print_exp e ^ " is " ^ print_exp res ^ "."); *)
+  res
+
+and rewrite (sign : signature) (e : exp) : exp =
+  let w = whnf sign in
+  let res = match e with
+
+  (* Syntactic rewriting rules *)
+
+  (* Beta reduction *)
+  | App(Lam (_, e1), e2::es) -> w (App((Clos(e1, Dot(Shift 0, e2))), es))
+  | AppL(Lam (_, e1), e2::es) -> w (AppL((Clos(e1, Dot(Shift 0, e2))), es))
+
+  (* VarShift 1 *)
+  | Clos(BVar n, Shift n') -> BVar (n + n')
+
+  (* VarShift 2 *)
+  | Clos(BVar n, Comp(s, Shift n')) -> w (Clos(BVar (n + n'), s))
+
+  (* FVarsCons *)
+  | Clos(BVar 1, Dot (s, e)) -> w e
+
+  (* FVarLift 1 *)
+  | Clos(BVar 1, ShiftS s) -> BVar 1
+
+  (* FVarLift 2 *)
+  | Clos(BVar 1, Comp(s2, ShiftS s1)) -> w (Clos(BVar 1, s2))
+
+  (* RVarCons *)
+  | Clos (BVar n, Dot(s, _)) when n > 0 -> w (Clos(BVar (n-1), s))
+
+  (* RVarLift 1 *)
+  | Clos (BVar n, ShiftS s) when n > 0 -> w (Clos(BVar (n-1), Comp(Shift 1, s)))
+
+  (* RVarLift 2 *)
+  | Clos (BVar n, Comp(s2, ShiftS s1)) when n > 0 -> w (Clos(BVar (n-1), Comp (s1, Comp(Shift 1, s2))))
+
+  (* AssEnv *)
+  | Comp(s1, Comp(s2, s3)) -> w (Comp(Comp(s1, s2), s3))
+
+  (* MapEnv *)
+  | Comp(s2, Dot(s1, e)) -> w (Dot(Comp(s2, s1), Clos(e, s2)))
+
+  (* ShiftCons *)
+  | Comp(Dot(s, e), Shift n) -> w (Clos(e, Shift (n-1)))
+
+  (* ShiftLift 1 *)
+  | Comp(ShiftS s, Shift n) -> w (Comp(Shift n, s)) (* MMMM *)
+
+  (* ShiftLift 2 *)
+  | Comp(Comp(s2, ShiftS s), Shift n) -> w (Comp(Comp(Shift n, s2), s)) (* MMMM *)
+
+  (* Lift 1 *)
+  | Comp(ShiftS s1, ShiftS s2) -> w (ShiftS(Comp (s1, s2)))
+
+  (* Lift 2 *)
+  | Comp(Comp(ShiftS s2,s3), s1) -> Comp(s3, ShiftS(Comp(s2, s1)))
+
+  (* LiftEnv *)
+  | Comp(Dot(s2,e), ShiftS s1) -> w (Dot(Comp(s2, s1), e))
+
+  (* IdL *)
+  | Comp(Shift 0, s) -> w s
+
+  (* IdR *)
+  | Comp(s, Shift 0) -> w s
+
+  (* LiftId *)
+  | ShiftS(Shift 0) -> Shift 0
+
+  (* Id *)
+  | Clos (e, Shift 0) -> w e
+
+  (* Congruence rules *)
+  | Clos (Const n, _) -> w (Const n)
+  | Clos (Clos (e, s1), s2) -> w (Clos (e, Comp(s2, s1)))
+  | Clos (App(e, es), s) -> App(Clos(e, s), List.map (fun e-> Clos(e, s)) es)
+  | Clos (AppL(e, es), s) -> AppL(Clos(e, s), List.map (fun e-> Clos(e, s)) es)
+  | Clos (Lam (xs, e), s) -> Lam (xs, Clos (e, List.fold_left (fun s _ -> ShiftS s) s xs))
+  (* TODO add the remaining congruence rules *)
+
+      (*
+  (* rewriting rules here (Work in progress) *)
+  | Clos (Const n, _) -> whnf sign (Const n)
+  | Clos (BVar 0, Dot (_, e)) -> whnf sign e
+  | Clos (BVar n, Dot (s, _)) -> whnf sign (Clos (BVar (n-1), s))
+  | Clos (App (e, es), s) -> whnf sign (App (Clos (e, s), List.map (fun e -> Clos (e, s)) es))
+  (* We might be missing the case for lam here *)
+  | Comp (s1, (Dot (s2, e))) -> whnf sign (Dot (Comp (s1, s2), Clos (e, s1)))
+  | Clos (Clos (e, s1), s2) -> whnf sign (Clos (e, Comp (s1, s2)))
+  | Comp (Dot (s1, e), ShiftS s2) -> whnf sign (Dot (Comp (s1, s2), e))
+  | Clos (e, Shift 0) -> whnf sign e
+  | Comp (Shift 0, s) -> whnf sign s
+  | Comp (s, Shift 0) -> whnf sign s
+  | Comp (ShiftS s, Shift n) -> whnf sign (Comp (Comp (Shift 1, s), Shift (n-1)))
+  | Comp (Comp (s1, ShiftS s2), Shift n) -> whnf sign (Comp (Comp (Comp (s1, Shift 1), s2), Shift (n-1)))
+  | Clos (BVar i, Shift n) -> BVar (i+n)
+  | Clos (BVar 0, ShiftS _) -> BVar 0
+  | Clos (BVar n, ShiftS s) -> whnf sign (Clos (BVar (n-1), (Comp (Shift 1, s))))
+  | Clos (BVar n, Comp (s1, ShiftS s2)) when n > 0 -> whnf sign (Clos (BVar (n-1), Comp (Comp (s1, Shift 1), s2)))
+  | Comp (Dot (e, s), Shift n) when n>0 -> whnf sign (Comp (s, Shift (n-1)))
+  | Clos (BVar i, Comp (s, Shift n)) -> whnf sign (Clos (BVar (i+n), s))
+  | Comp (ShiftS s1, ShiftS s2) -> whnf sign (ShiftS (Comp (s1, s2)))
+  | Comp (Comp (s1, ShiftS s2), ShiftS s3) -> whnf sign (Comp (s1, ShiftS (Comp (s2, s3))))
+  | ShiftS (Shift 0) -> Shift 0
+  | Clos (Lam (xs, e), s) -> Lam (xs, Clos (e, List.fold_left (fun s _ -> ShiftS s) s xs))
+       *)
+
+  | e -> e (* No reduction necessary *)
+
+  in
+  Debug.print (fun () -> "Rewrite this " ^ print_exp e
+                         ^ "\n===> " ^ print_exp res);
   res

@@ -146,7 +146,7 @@ module Int = struct
     | Shift of int
     | Dot of exp * exp
     | Comp of exp * exp
-    | ShiftS of exp
+    | ShiftS of exp (* consider shifting by more than one, to improve efficiency *)
     | Snoc of exp * string * exp
     | Nil
     | Annot of exp * exp
