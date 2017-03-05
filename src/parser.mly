@@ -37,12 +37,18 @@ let unwrap_or def = function
 
 %%
 
+located(X):
+  x = X
+  { Location.make $startpos $endpos x }
+
 program:
 | d = toplevel* EOF {d}
 
 toplevel:
-| DATA s = IDENT p = params t = type_dec? WHERE option(MID) d = separated_list (MID, decl) {Data (s, p, unwrap_or (Set 0) t, d)}
-| SYN s = IDENT t = type_dec? WHERE option(MID) d = separated_list (MID, decl) {Syn (s, unwrap_or Star t, d)}
+| DATA s = IDENT p = params t = type_dec? WHERE option(MID) d = separated_list (MID, decl)
+    {Data (s, p, unwrap_or (Location.ghost (Set 0)) t, d)}
+| SYN s = IDENT t = type_dec? WHERE option(MID) d = separated_list (MID, decl)
+    {Syn (s, unwrap_or (Location.ghost Star) t, d)}
 | DEF f = IDENT COLON t = exp WHERE option(MID) d = separated_list (MID, def_decl) {DefPM (f, t, d)}
 | DEF f = IDENT COLON t = exp EQ e = exp {Def (f, t, e)}
 
@@ -61,8 +67,12 @@ def_decl:
 | p = simple_pattern+ RARR e = exp {p, e}
 
 exp:
+| e = located(raw_exp) {e}
+| e = almost_simple_exp {e}
+
+raw_exp:
 | g = exp TURNSTILE e = exp {Box (g, e)}
-| TURNSTILE e = exp {Box (Nil, e)}
+| TURNSTILE e = exp {Box (Location.ghost Nil, e)}
 | g = exp TTS e = exp {TBox (g, e)}
 | e1 = exp e2 = almost_simple_exp {App (e1, e2)}
 | e1 = exp APPL e2 = exp {AppL (e1, e2)}
@@ -73,14 +83,19 @@ exp:
 | s = exp SARR t = exp {SArr (s, t)}
 | s = exp COMMA e = exp {Comma (s, e)}
 | s = exp SEMICOLON e = exp {Semicolon (s, e)}
-| e = almost_simple_exp {e}
 
 almost_simple_exp:
-| e1 = almost_simple_exp LSQUARE e2 = exp RSQUARE {Clos (e1, e2)}
 | e = simple_exp {e}
+| e = located(raw_almost_simple_exp) {e}
+
+raw_almost_simple_exp:
+| e1 = almost_simple_exp LSQUARE e2 = exp RSQUARE {Clos (e1, e2)}
 
 simple_exp:
 | LPAREN t = exp RPAREN {t}
+| e = located(raw_simple_exp) {e}
+
+raw_simple_exp:
 | STAR {Star}
 | n = SET {Set n}
 | s = HOLE { Hole s }

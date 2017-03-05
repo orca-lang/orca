@@ -103,6 +103,14 @@ let () =
      Debug.print_string "There was a lexing error in the file.(2)" ;
      Printf.printf "Ulexing Error\n";
      exit 1
+  | Error.Error_loc (pos, msg) ->
+     Debug.print_string ("An error occured while processing the input:\n" ^ msg
+                        ^ "\n at position " ^ Location.string_of_position pos) ;
+     Printf.printf "An error occured while processing your input.\n\t%s\nAt %s.\n"
+                   msg
+                   (Location.string_of_position pos);
+     exit 1
+
   | Error.Error msg ->
      Debug.print_string ("An error occured while processing the input:\n" ^ msg) ;
      Printf.printf "An error occured while processing your input.\n\t%s\n" msg ;

@@ -4,28 +4,29 @@ module Ext = struct
 
   type name = string
 
-  type exp =
-    | Star
-    | Set of int
-    | Arr of exp * exp
-    | SArr of exp * exp
-    | Box of exp * exp
-    | TBox of exp * exp (* term box, only in external syntax *)
-    | Fn of name list * exp
-    | Lam of name list * exp
-    | App of exp * exp
-    | AppL of exp * exp
-    | Hole of name option
-    | Ident of name
-    | Clos of exp * exp
-    | EmptyS
-    | Shift of int
-    | Comma of exp * exp
-    | Semicolon of exp * exp
-    | Nil
-    | Annot of exp * exp
-    | Under
-    | Ctx
+  type exp = raw_exp Location.t
+   and raw_exp
+     = Star
+     | Set of int
+     | Arr of exp * exp
+     | SArr of exp * exp
+     | Box of exp * exp
+     | TBox of exp * exp (* term box, only in external syntax *)
+     | Fn of name list * exp
+     | Lam of name list * exp
+     | App of exp * exp
+     | AppL of exp * exp
+     | Hole of name option
+     | Ident of name
+     | Clos of exp * exp
+     | EmptyS
+     | Shift of int
+     | Comma of exp * exp
+     | Semicolon of exp * exp
+     | Nil
+     | Annot of exp * exp
+     | Under
+     | Ctx
 
   type pat =
     | PIdent of name
@@ -56,7 +57,8 @@ module Ext = struct
     | DefPM of name * exp * def_decls
     | Def of name * exp * exp
 
-  let rec print_exp = function
+  let rec print_exp e =
+    match Location.content e with
     | Star -> "*"
     | Set n -> "set" ^ string_of_int n
     | Arr (t, e) -> "(-> " ^ print_exp t ^ " " ^ print_exp e ^ ")"
