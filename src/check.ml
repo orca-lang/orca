@@ -11,6 +11,8 @@ let is_syntax = function
   | Clos _
   | EmptyS
   | Shift _
+  | ShiftS _
+  | Comp _
   | Dot _
   | Snoc _
   | Nil
@@ -64,64 +66,59 @@ let check_box (sign, cG) cP = function
     let cD, sigma, cP' = unify_ctx (sign, cG) g cP in
     simul_subst sigma t
     (* else raise (Error.Error "Wrong contexts. Tip: use a substitution?") *)
-  | Ctx -> Ctx
-  | _ -> raise (Error.Error "Not a box. Don't think outside of the box.")
+  | t -> t
+(* raise (Error.Error "Not a box. Don't think outside of the box.") *)
 
-let rec infer (sign, cG : signature * ctx) cP (e : exp) : exp =
+let rec infer (sign, cG : signature * ctx) (e : exp) : exp =
   Debug.print (fun () -> "Infer called with: " ^ print_exp e ^ " in context: " ^ print_ctx cG);
   Debug.indent() ;
   let res =
     match e with
     | Annot (e, t) ->
-       check (sign, cG) cP e t ; t
+       check (sign, cG) e t ; t
     | Const n ->
        lookup_sign sign n
     | Var n -> lookup n cG
     | App (h, sp) ->
-       begin match infer (sign, cG) cP h with
+      begin match infer (sign, cG) h with
        | Pi (tel, t) ->
-         check_spine (sign, cG) cP sp tel t
-       | SPi (tel, t) ->
-         check_syn_spine (sign, cG) cP sp tel t
-       | Box (g, SPi (tel, t)) ->
-         let cD, sigma, cP' = unify_ctx (sign, cG) g cP in
-         Box (g, check_syn_spine (sign, cD) cP' sp (simul_subst_on_stel sigma tel) (simul_subst sigma t))
+         check_spine (sign, cG) sp tel t
+       (* | SPi (tel, t) -> *)
+       (*   check_syn_spine (sign, cG) cP sp tel t *)
+       (* | Box (g, SPi (tel, t)) -> *)
+       (*   let cD, sigma, cP' = unify_ctx (sign, cG) g cP in *)
+       (*   Box (g, check_syn_spine (sign, cD) cP' sp (simul_subst_on_stel sigma tel) (simul_subst sigma t)) *)
        | t -> raise (Error.Error ("The left hand side (" ^ print_exp h ^ ") of the application was of type "
                                   ^ print_exp t ^ " which is not of function type"))
        end
 
     | Set n -> Set (n + 1)
     | Pi (tel, t) ->
-       check_pi (sign, cG) cP tel t
+       check_pi (sign, cG) tel t
 
     | Box (g, e) ->
-      check (sign, cG) cP g Ctx;
-      let cD, sigma, cP' = unify_ctx (sign, cG) g cP in
-      check_syn_type (sign, cD) cP' (simul_subst sigma e);
+      check (sign, cG) g Ctx;
+      let cP = contextify (sign, cG) g in
+      check_syn_type (sign, cG) cP e;
       Set 0
 
     | _ ->
-      try
-        match infer_syn (sign, cG) cP e with
-        | Ctx -> Ctx
-        | t -> Box (decontextify cP, t)
-      with Error.Error msg ->
-         Debug.print (fun() -> "Was asked to infer the type of " ^ print_exp e
-                               ^ " but the type is not inferrable") ;
-         raise (Error.Error ("Cannot infer the type of " ^ print_exp e ^ "\n" ^ msg))
+      Debug.print (fun() -> "Was asked to infer the type of " ^ print_exp e
+        ^ " but the type is not inferrable") ;
+      raise (Error.Error ("Cannot infer the type of "))
   in
   Debug.deindent ();
   Debug.print(fun() -> "Result of infer for " ^ print_exp e ^ " was " ^ print_exp res) ;
   res
 
-and check_type (sign, cG : signature * ctx) cP (s : exp) : universe =
-  match infer (sign, cG) cP s with
+and check_type (sign, cG : signature * ctx) (s : exp) : universe =
+  match infer (sign, cG) s with
   | Set n -> n
   | e ->
      Debug.print (fun () -> "Assert universe failed for " ^ print_exp e ^ ".") ;
      raise (Error.Error "Not a universe.")
 
-and check (sign , cG : signature * ctx) cP (e : exp) (t : exp) : unit =
+and check (sign , cG : signature * ctx) (e : exp) (t : exp) : unit =
   Debug.print (fun () ->
       "Check called with: " ^ print_exp e ^ ":" ^ print_exp t ^ " in context: " ^ print_ctx cG);
   Debug.indent();
@@ -138,18 +135,21 @@ and check (sign , cG : signature * ctx) cP (e : exp) (t : exp) : unit =
      Debug.print (fun () -> "Resulted in ctx " ^ print_ctx cG'
                             ^ "\nwith extension " ^ print_ctx cGext
                             ^ "\nwith renaming " ^ print_subst sigma ^ ".");
-     check (sign, cGext @ cG') cP e t' ;
+     check (sign, cGext @ cG') e t' ;
      Debug.deindent()
 
   | _, Box (g, alpha) when is_syntax e ->
     let cP = contextify (sign, cG) g in
     check_syn (sign, cG) cP e alpha
 
-  (* | App(e, es), t ->  *)
+  | _, Ctx when is_syntax e -> check_ctx (sign, cG) e
 
+  | App(h, sp), Box (g, alpha) ->
+    check_app (sign, cG) h sp g alpha
+    
   | _ ->
      let t' =
-       try infer (sign, cG) cP e
+       try infer (sign, cG) e
        with Error.Error msg ->
          Debug.print_string msg;
          raise (Error.Error ("Cannot check expression " ^ print_exp e ^ "\n" ^ msg))
@@ -177,17 +177,17 @@ and check (sign , cG : signature * ctx) cP (e : exp) (t : exp) : unit =
   Debug.print (fun() -> "Finished check for " ^ print_exp e) ;
   ()
 
-and check_spine (sign, cG) cP sp tel t =
+and check_spine (sign, cG) sp tel t =
   match sp, tel with
   | e::sp', (_, x, s)::tel ->
-     check (sign, cG) cP e s ;
+     check (sign, cG) e s ;
      let tel', t' = subst_pi (x, e) tel t in
-     check_spine (sign, cG) cP sp' tel' t'
+     check_spine (sign, cG) sp' tel' t'
   | [], [] -> t
   | _, [] ->
     begin
       match Whnf.whnf sign t with
-      | Pi (tel', t') -> check_spine (sign, cG) cP sp tel' t'
+      | Pi (tel', t') -> check_spine (sign, cG) sp tel' t'
       | Box (g, SPi (tel', t')) ->
         let cP = contextify (sign, cG) g in
         check_syn_spine (sign, cG) cP sp tel' t'
@@ -195,17 +195,68 @@ and check_spine (sign, cG) cP sp tel t =
     end
   | [], _ -> Pi (tel, t)
 
-and check_pi (sign, cG) cP tel t =
+and check_pi (sign, cG) tel t =
   match tel with
-  | [] -> infer (sign, cG) cP t
+  | [] -> infer (sign, cG) t
   | (_, x, s)::tel' ->
-     let us = check_type (sign, cG) cP s in
-     let ut = check_pi (sign, (x, s)::cG) cP tel' t in
+     let us = check_type (sign, cG) s in
+     let ut = check_pi (sign, (x, s)::cG) tel' t in
      begin match ut with
      | Set 0 -> Set 0 (* Set 0 is impredicative *)
      | Set n -> Set (max us n)
      | _ -> raise (Error.Error ("Expression " ^ print_exp (Pi(tel,t)) ^ " cannot be checked to be a type."))
      end
+
+(* This function is used because we overload application *)
+and check_app (sign, cG) (h : exp) (sp : exp list) (g : exp) (t : exp) : unit =
+  let t' =
+    match h with
+    | Const n ->
+      begin match lookup_sign sign n with
+      | Pi (tel, t) -> check_spine (sign, cG) sp tel t
+      | SPi (tel, t) -> Box(g, check_syn_spine (sign, cG) (contextify (sign, cG) g) sp tel t)
+      | t -> raise (Error.Error ("Head of application " ^ print_exp h ^ " had type "
+                                 ^ print_exp t ^ " which is not of function type."))
+      end
+    | Var n ->
+      begin match lookup n cG with
+      | Pi (tel, t) -> check_spine (sign, cG) sp tel t
+      | SPi (tel, t) -> Box (g, check_syn_spine (sign, cG) (contextify (sign, cG) g) sp tel t)
+      | t -> raise (Error.Error ("Head of application " ^ print_exp h ^ " had type "
+                                 ^ print_exp t ^ " which is not of function type."))
+      end
+    | _ when is_syntax h ->
+      let cP = contextify (sign, cG) g in
+      begin match infer_syn (sign, cG) cP h with
+      | SPi (tel, t) -> Box (g, check_syn_spine (sign, cG) cP sp tel t)
+      | _ -> raise (Error.Error "Term in function position is not of function type")
+      end
+    | _ -> raise (Error.Error ("Term " ^ print_exp h ^ " cannot by the head of an application."))
+  in
+  try
+       let _, sigma =
+       Unify.unify (sign, cG) (Box (g, t)) t' in
+       Debug.print (fun () -> "Unification for " ^ print_exp (Box (g, t)) ^ " with " ^
+                                print_exp t' ^ " succeeded with substitution "
+                                ^ Unify.print_subst sigma ^ ".")
+     with
+     | Unify.Unification_failure prob ->
+       let string_e = print_exp (App (h, sp)) in
+       let string_t = print_exp (Box (g, t)) in
+       let string_t' = print_exp t' in
+       let message = "Expression: " ^ string_e
+                     ^ "\nwas inferred type: " ^ string_t'
+                     ^ "\nwhich is not equal to: " ^ string_t ^ " that was checked against."
+                     ^ "\nUnification failed with " ^ Unify.print_unification_problem prob
+       in
+       Debug.print_string message;
+       raise (Error.Error ("Term's inferred type is not equal to checked type.\n" ^ message))
+    
+    (*     try match infer (sign, cG) h with *)
+    (*    | Pi (tel, t) -> *)
+    (*      check_spine (sign, cG) sp tel t *)
+    (* with  *)
+
 
 and check_syn_type (sign, cG) cP (e : exp) : unit =
   Debug.print (fun () -> "Checking syntactic type " ^ print_exp e);
@@ -232,6 +283,20 @@ and check_syn_type (sign, cG) cP (e : exp) : unit =
       end
     | _ -> raise (Error.Error (print_exp e ^ " is not a syntactic type."))
   end; Debug.deindent ()
+    
+and check_ctx (sign, cG) g =
+  match g with
+  | Snoc (g, _, e) ->
+    check_ctx (sign, cG) g;
+    let cP' = contextify (sign, cG) g in
+    check_syn_type (sign, cG) cP' e
+  | Nil -> ()
+  | Var x ->
+    begin match lookup x cG with
+    | Ctx -> ()
+    | _ -> raise (Error.Error ("Variable " ^ print_name x ^ " was expected to be a context variable."))
+    end
+  | _ -> raise (Error.Error ("Expression " ^ print_exp g ^ " was expected to be a context."))
 
 
 and check_syn (sign, cG) cP (e : exp) (t : exp) =
@@ -246,9 +311,6 @@ and check_syn (sign, cG) cP (e : exp) (t : exp) =
       | [] -> check_syn (sign, cG) (append_bctx cP' cP) e t
       | _ -> check_syn (sign, cG) (append_bctx cP' cP) e (SPi (tel', t))
       end
-    | Clos (e, s), _ ->
-      let cP' = contextify (sign, cG) (infer_syn (sign, cG) cP s) in
-      check_syn (sign, cG) cP' e t
     | e, t when is_syntax e ->
       Debug.print(fun ()-> "Expression " ^ print_exp e ^ " is syntactic and thus being inferred");
       let t' = infer_syn (sign, cG) cP e in
@@ -262,9 +324,8 @@ and check_syn (sign, cG) cP (e : exp) (t : exp) =
       ()
     | e, t ->
       Debug.print(fun ()-> "Expression " ^ print_exp e ^ " is not syntactic and thus back to check");
-      check (sign, cG) cP e (Box (decontextify cP, t))
+      check (sign, cG) e (Box (decontextify cP, t))
   end; Debug.deindent ()
-
 
 and infer_syn (sign, cG) cP (e : exp) =
   Debug.print (fun () -> "Inferring type of syntactic expression " ^ print_exp e
@@ -285,14 +346,9 @@ and infer_syn (sign, cG) cP (e : exp) =
       Debug.print (fun () -> "Looking bound variable " ^ string_of_int i ^ " resulted in type " ^ print_exp t
         ^ "\n Context is " ^ print_bctx cP);
       t
-    | Snoc (g, _, e) ->
-      begin match infer_syn (sign, cG) cP g with
-      | Ctx ->
-        let cP' = contextify (sign, cG) g in
-        check_syn_type (sign, cG) cP' e; Ctx
-      | _ -> raise (Error.Error ("Expression " ^ print_exp g ^ " was expected to be a context."))
-      end
-    | Nil -> Ctx
+    | Clos (e, s) ->
+      let cP' = contextify (sign, cG) (infer_syn (sign, cG) cP s) in
+      infer_syn (sign, cG) cP' e
     | EmptyS -> Nil
     | Shift n -> decontextify (drop_suffix cP n)
     | Dot (s, e) ->
@@ -326,11 +382,12 @@ and check_syn_spine (sign, cG) cP sp tel t =
   | _, [] ->
     begin
       match Whnf.whnf sign t with
-      | Pi (tel', t') -> check_spine (sign, cG) cP sp tel' t'
+      (* Not sure if Pi's are allowed inside boxes *)
+      (* | Pi (tel', t') -> check_spine (sign, cG) sp tel' t' *)
       | SPi (tel', t') -> check_syn_spine (sign, cG) cP sp tel' t
-      | Box (g, SPi (tel', t')) ->
-        let cD, sigma, cP' = unify_ctx (sign, cG) g cP in
-        check_syn_spine (sign, cD) cP' sp (simul_subst_on_stel sigma tel') (simul_subst sigma t')
+      (* | Box (g, SPi (tel', t')) -> *)
+      (*   let cD, sigma, cP' = unify_ctx (sign, cG) g cP in *)
+      (*   check_syn_spine (sign, cD) cP' sp (simul_subst_on_stel sigma tel') (simul_subst sigma t') *)
       | _ -> raise (Error.Error ("Unconsumed application cannot check against type " ^ print_exp t))
     end
   | [], _ -> SPi (tel, t)
@@ -342,20 +399,20 @@ and check_spi (sign, cG) cP tel t =
     check_syn_type (sign, cG) cP s;
     check_spi (sign, cG) (BSnoc (cP, x, s)) tel' t
 
-let rec check_tel (sign, cG) cP u tel =
+let rec check_tel (sign, cG) u tel =
   match tel with
   | [] -> u
   | (_, x, s) :: tel' ->
      if u = 0 then
-       check_tel (sign, (x, s) :: cG) cP u tel'
+       check_tel (sign, (x, s) :: cG) u tel'
      else
-       let us = check_type (sign, cG) cP s in
+       let us = check_type (sign, cG) s in
        let u' = max us u in
        Debug.print (fun () -> "Checking telescope at variable " ^ print_name x
                            ^ " which has universe " ^ print_universe us
                            ^ " upgrading telescope's universe from "
                            ^ print_universe u ^ " to " ^ print_universe u');
-       check_tel (sign, (x, s) :: cG) cP u' tel'
+       check_tel (sign, (x, s) :: cG) u' tel'
 
 let rec check_stel (sign, cG) cP tel =
   match tel with

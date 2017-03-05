@@ -40,9 +40,9 @@ let lookup_cons_entry (c : def_name) (sign : signature) : tel * dsig =
   | _ -> raise (Error.Error ("Constant " ^ c ^ " was expected to be a constructor."))
 
 let lookup_sign sign n =
-  (* We generate a new context variable to allow it to be unified with
-     any context from the environment. *)
-  let flex_box e = Box (Var (gen_floating_name ()) , e) in
+  (* (\* We generate a new context variable to allow it to be unified with *)
+  (*    any context from the environment. *\) *)
+  (* let flex_box e = Box (Var (gen_floating_name ()) , e) in *)
   match lookup_sign_entry n sign with
   | Definition (_, [], t, _) -> t
   | Definition (_, tel, t, _) -> Pi(tel, t)
@@ -54,8 +54,8 @@ let lookup_sign sign n =
      else Pi (tel, Set u)
   | SynDef (_, tel) ->
      if tel = []
-     then flex_box Star
-     else flex_box (SPi (tel, Star))
+     then Star
+     else (SPi (tel, Star))
   | Constructor (_, is, (n', pes)) ->
      let t =
        if pes = [] then
@@ -79,7 +79,7 @@ let lookup_sign sign n =
        if is = [] then t else SPi (is, t)
      in
      Debug.print (fun () -> "Looked up constructor " ^ n ^ " which has type " ^ print_exp t');
-     flex_box t'
+     t'
 
   | Program (_,tel,t, _) -> if tel = [] then t else Pi (tel, t)
 
