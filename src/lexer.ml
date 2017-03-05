@@ -12,7 +12,7 @@ let regexp lower = ['a'-'z']
 let regexp upper = ['A'-'Z']
 
 (* Old regexp: (lower | upper) (lower | upper | digit)* *)
-let regexp identifier = [^ '\x09'-'\x0a' '\x20' '\x0d' '(' ')' ':' ',' '\\' '.']+
+let regexp identifier = [^ '\x09'-'\x0a' '\x20' '\x0d' '(' ')' ':' ',' '\\' '.' '[' ']']+
 
 let regexp hole = "?" identifier
 
@@ -33,9 +33,9 @@ let add_word pos length = { pos with Lexing.pos_cnum = pos.Lexing.pos_cnum + len
 let remove_set_ s = String.sub s 4 (String.length s - 4)
 let remove_set s = String.sub s 3 (String.length s - 3)
 
-let remove_question_mark s =
+let remove_leading_char ch s =
   try
-    if '?' = String.get s 0
+    if ch = String.get s 0
     then String.sub s 1 (String.length s - 1)
     else s
   with
@@ -60,7 +60,8 @@ let rec main_scanner pos = lexer
   | ":" -> add_word pos (Ulexing.lexeme_length lexbuf), COLON
   | "," -> add_word pos (Ulexing.lexeme_length lexbuf), COMMA
   | ";" -> add_word pos (Ulexing.lexeme_length lexbuf), SEMICOLON
-  | "^" numeral -> add_word pos (Ulexing.lexeme_length lexbuf), SHIFT (int_of_string (Ulexing.utf8_lexeme lexbuf))
+  | "^" numeral -> add_word pos (Ulexing.lexeme_length lexbuf)
+                 , SHIFT (int_of_string (remove_leading_char '^' (Ulexing.utf8_lexeme lexbuf)))
   | "^" -> add_word pos (Ulexing.lexeme_length lexbuf), EMPTYS
   | ".." -> add_word pos (Ulexing.lexeme_length lexbuf), SHIFT 0
   | "0" ->  add_word pos (Ulexing.lexeme_length lexbuf), NIL
@@ -80,12 +81,15 @@ let rec main_scanner pos = lexer
   | "_" -> add_word pos (Ulexing.lexeme_length lexbuf), UNDERSCORE
   | "where" -> add_word pos (Ulexing.lexeme_length lexbuf), WHERE
   | "=" -> add_word pos (Ulexing.lexeme_length lexbuf), EQ
-  | "set_" numeral -> add_word pos (Ulexing.lexeme_length lexbuf), SET (int_of_string (remove_set_ (Ulexing.utf8_lexeme lexbuf)))
-  | "set" numeral -> add_word pos (Ulexing.lexeme_length lexbuf), SET (int_of_string (remove_set (Ulexing.utf8_lexeme lexbuf)))
+  | "set_" numeral -> add_word pos (Ulexing.lexeme_length lexbuf)
+                    , SET (int_of_string (remove_set_ (Ulexing.utf8_lexeme lexbuf)))
+  | "set" numeral -> add_word pos (Ulexing.lexeme_length lexbuf)
+                   , SET (int_of_string (remove_set (Ulexing.utf8_lexeme lexbuf)))
   | "set" -> add_word pos (Ulexing.lexeme_length lexbuf), SET 0
   | "ctx" -> add_word pos (Ulexing.lexeme_length lexbuf), CTX
   | "._" -> add_word pos (Ulexing.lexeme_length lexbuf), PATTERNWILD
-  | hole -> add_word pos (Ulexing.lexeme_length lexbuf), HOLE (Some (remove_question_mark (Ulexing.utf8_lexeme lexbuf)))
+  | hole -> add_word pos (Ulexing.lexeme_length lexbuf)
+          , HOLE (Some (remove_leading_char '?' (Ulexing.utf8_lexeme lexbuf)))
   | "?" -> add_word pos (Ulexing.lexeme_length lexbuf), HOLE None
   | identifier -> add_word pos (Ulexing.lexeme_length lexbuf), IDENT (Ulexing.utf8_lexeme lexbuf)
 
