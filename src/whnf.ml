@@ -3,6 +3,13 @@ open Sign
 
 exception Matching_failure of pat * exp
 
+let rec cong_stel tel s =
+  match tel with
+  | [] -> [], s
+  | (i, x, e)::tel ->
+     let tel', s = cong_stel tel (ShiftS s) in
+     (i, x, Clos(e, s)) :: tel', s
+
 let rec match_pat sign p e =
   let e = whnf sign e in
   Debug.print (fun () -> "Matching pattern " ^ print_pat p ^ " against term " ^ print_exp e);
@@ -30,7 +37,6 @@ let rec match_pat sign p e =
 
 and match_pats sign ps es =
   List.concat (List.map2 (match_pat sign) ps es)
-
 
 and reduce_with_clause sign sp (pats, rhs) =
   Debug.print (fun () -> "Matching spine " ^ print_exps sp ^ " against patterns " ^ print_pats pats);
@@ -187,10 +193,25 @@ and rewrite (sign : signature) (e : exp) : exp =
   (* Congruence rules *)
   | Clos (Const n, _) -> w (Const n)
   | Clos (Clos (e, s1), s2) -> w (Clos (e, Comp(s2, s1)))
-  | Clos (App(e, es), s) -> App(Clos(e, s), List.map (fun e-> Clos(e, s)) es)
-  | Clos (AppL(e, es), s) -> AppL(Clos(e, s), List.map (fun e-> Clos(e, s)) es)
+  | Clos (App(e, es), s) -> w (App(Clos(e, s), List.map (fun e-> Clos(e, s)) es))
+  | Clos (AppL(e, es), s) -> w (AppL(Clos(e, s), List.map (fun e-> Clos(e, s)) es))
   | Clos (Lam (xs, e), s) -> Lam (xs, Clos (e, List.fold_left (fun s _ -> ShiftS s) s xs))
-  (* TODO add the remaining congruence rules *)
+  | Clos (Set n, s) -> Set n
+  | Clos (Star, s) -> Star
+  | Clos (Pi(tel, t), s) ->
+     let tel' = List.map (fun (i, x, e) -> i, x, Clos (e, s)) tel in
+     Pi(tel', Clos (t, s))
+  | Clos (SPi(tel, t), s) ->
+     let tel', s = cong_stel tel s in
+     SPi (tel', Clos (t, s))
+  | Clos (Fn (x, e), s) -> Fn (x, Clos(e, s))
+  | Clos (Annot (e, t), s) -> Annot (Clos(e,s), Clos(t, s))
+  (* IDK what to do with these *)
+  (* | Clos (Under, s) -> assert false *)
+  (* | Clos (Snoc (g, x, t), s) -> assert false *)
+  (* | Clos (Nil, s) -> assert false *)
+  (* | Clos (Box(g, t), s) -> assert false *)
+  (* | Clos (Ctx, s) -> assert false *)
 
       (*
   (* rewriting rules here (Work in progress) *)
