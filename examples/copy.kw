@@ -13,28 +13,27 @@ syn oft : tm -> tp -> * where
          -> oft f (arr s t) -> oft e s -> oft (app f e) t
 | t-lam: (s:tp) -> (t:tp) -> (e:tm -> tm)
          -> ((x:tm) -> oft x s -> oft (e x) t) -> oft (lam (\x.e x)) (arr s t)
+         
+data isctx : (g:ctx) -> set where
+| Empty : isctx 0
+| Cons : (g:ctx) -> isctx g -> (t: |- tp) -> isctx (g, tm)
+
+data lookup : (g : ctx) -> isctx g -> (g |- tm) -> (|- tp) -> set where
+| is-here : (g:ctx) -> (G : isctx g) -> (t : |- tp)
+          -> lookup (g, x:tm) (Cons g G t) (x:tm :> x) t
+| is-there : (g:ctx) -> (G : isctx g) -> (t : |- tp) -> (m : (g |- tm)) -> (t' : |- tp)
+          -> lookup g G m t -> lookup (g,x:tm) (Cons g G t') (m [ ^1 ]) t
+   
+data oft' (g:ctx) : isctx g -> (g |- tm) -> (|- tp) -> set where
+| t-unit' : (G : isctx g) -> oft' g G one unit
+| t-app' : (G : isctx g) -> (f : (g |- tm)) -> (e : (g |- tm)) -> (s : |- tp) -> (t : |- tp)
+         -> oft' g G f (arr s t) -> oft' g G e s -> oft' g G (app f e) t
+| t-lam'  : (G : isctx g) -> (e : (g, x:tm |- tm)) -> (s : |- tp) -> (t : |- tp)
+          -> oft' (g, tp) (Cons g G s) e t -> oft' g G (lam (\x.e)) (arr s t)
+| t-var : (G : isctx g) -> (e : (g |- tm)) -> (t : |- tp)
+          -> lookup g G e t -> oft' g G e t
 
 (*) def copy : (g : ctx) -> (g |- tm) -> (g |- tm) where
 (*) | g (app M N) => app (copy g M) (copy g N)
 (*) | g (lam (\x. M)) => lam (\x. copy (g, x) M)
 (*) | g x => x
-
-data isctx : (g:ctx) -> set where
-| Empty : isctx 0
-| Cons : (g:ctx) -> isctx g -> (t:tp) -> isctx (g, tm)
-
-data isvar : (h : ctx) -> (h |- tm) -> set where
-| is-here: (g:ctx) -> isvar (g, x:tm) (x:tm :> x)
-| is-there : (g:ctx) -> (m : (g |- tm)) -> isvar g (g |- m)
-   -> isvar (g,x:tm) (m [ ^1 ])
-   
-(*) data lookup : (g:ctx) -> isctx g -> (g |- tm) -> (|- tp) -> set where
-(*) | l-top : (g : ctx) -> (G : isctx g) -> (t : |- tp) -> lookup (g, tp) G -> 
-
-data oft' (g:ctx) : isctx g -> (g |- tm) -> (|- tp) -> set where
-| t-unit' : (G : isctx g) -> oft' g G one unit
-| t-app' : (G : isctx g) -> (f : (g |- tm)) -> (e : (g |- tm)) -> (s : |- tp) -> (t : |- tp)
-         -> oft' g G f (arr s t) -> oft' g G e s -> oft' g G (app f e) t
-| t-lam'  : (G : isctx g) -> (e : (g, x:tm |- tm)) -> (s : tp) -> (t : tp)
-          -> oft' (g, tp) (Cons g G s) e t -> oft' g G (lam (\x.e)) (arr s t)
-(*) | t-var : (G : ixctx g) -> 
