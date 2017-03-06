@@ -148,9 +148,6 @@ and check (sign , cG : signature * ctx) (e : exp) (t : exp) : unit =
 
   | _, Ctx when is_syntax e -> check_ctx (sign, cG) e
 
-  | App(h, sp), Box (g, alpha) ->
-    check_app (sign, cG) h sp g alpha
-    
   | _ ->
      let t' =
        try infer (sign, cG) e
@@ -211,50 +208,6 @@ and check_pi (sign, cG) tel t =
      | _ -> raise (Error.Error ("Expression " ^ print_exp (Pi(tel,t)) ^ " cannot be checked to be a type."))
      end
 
-(* This function is used because we overload application *)
-and check_app (sign, cG) (h : exp) (sp : exp list) (g : exp) (t : exp) : unit =
-  let t' =
-    match h with
-    | Const n ->
-      begin match lookup_sign sign n with
-      | Pi (tel, t) -> check_spine (sign, cG) sp tel t
-      | SPi (tel, t) -> Box(g, check_spi_spine (sign, cG) (contextify (sign, cG) g) sp tel t)
-      | t -> raise (Error.Error ("Head of application " ^ print_exp h ^ " had type "
-                                 ^ print_exp t ^ " which is not of function type."))
-      end
-    | Var n ->
-      begin match lookup n cG with
-      | Pi (tel, t) -> check_spine (sign, cG) sp tel t
-      | SPi (tel, t) -> Box (g, check_spi_spine (sign, cG) (contextify (sign, cG) g) sp tel t)
-      | t -> raise (Error.Error ("Head of application " ^ print_exp h ^ " had type "
-                                 ^ print_exp t ^ " which is not of function type."))
-      end
-    | _ when is_syntax h ->
-      let cP = contextify (sign, cG) g in
-      begin match infer_syn (sign, cG) cP h with
-      | SPi (tel, t) -> Box (g, check_spi_spine (sign, cG) cP sp tel t)
-      | _ -> raise (Error.Error "Term in function position is not of function type")
-      end
-    | _ -> raise (Error.Error ("Term " ^ print_exp h ^ " cannot by the head of an application."))
-  in
-  try
-       let _, sigma =
-       Unify.unify (sign, cG) (Box (g, t)) t' in
-       Debug.print (fun () -> "Unification for " ^ print_exp (Box (g, t)) ^ " with " ^
-                                print_exp t' ^ " succeeded with substitution "
-                                ^ Unify.print_subst sigma ^ ".")
-     with
-     | Unify.Unification_failure prob ->
-       let string_e = print_exp (App (h, sp)) in
-       let string_t = print_exp (Box (g, t)) in
-       let string_t' = print_exp t' in
-       let message = "Expression: " ^ string_e
-                     ^ "\nwas inferred type: " ^ string_t'
-                     ^ "\nwhich is not equal to: " ^ string_t ^ " that was checked against."
-                     ^ "\nUnification failed with " ^ Unify.print_unification_problem prob
-       in
-       Debug.print_string message;
-       raise (Error.Error ("Term's inferred type is not equal to checked type.\n" ^ message))
 
 and check_syn_type (sign, cG) cP (e : exp) : unit =
   Debug.print (fun () -> "Checking syntactic type " ^ print_exp e ^ " in context " ^ print_ctx cG);
