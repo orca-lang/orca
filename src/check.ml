@@ -5,6 +5,7 @@ open Name
 let is_syntax = function
   | Lam _
   | AppL _
+  | App _
   | Const _
   | Var _
   | BVar _
@@ -93,6 +94,7 @@ let rec infer (sign, cG : signature * ctx) (e : exp) : exp =
     | Pi (tel, t) ->
        check_pi (sign, cG) tel t
 
+    | Ctx -> Set 0
     | Box (g, e) ->
       check (sign, cG) g Ctx;
       let cP = contextify (sign, cG) g in
@@ -187,7 +189,7 @@ and check_spine (sign, cG) sp tel t =
       | Pi (tel', t') -> check_spine (sign, cG) sp tel' t'
       | Box (g, SPi (tel', t')) ->
         let cP = contextify (sign, cG) g in
-        check_syn_spine (sign, cG) cP sp tel' t'
+        check_spi_spine (sign, cG) cP sp tel' t'
       | _ -> raise (Error.Error ("Unconsumed application cannot check against type " ^ print_exp t))
     end
   | [], _ -> Pi (tel, t)
@@ -211,21 +213,21 @@ and check_app (sign, cG) (h : exp) (sp : exp list) (g : exp) (t : exp) : unit =
     | Const n ->
       begin match lookup_sign sign n with
       | Pi (tel, t) -> check_spine (sign, cG) sp tel t
-      | SPi (tel, t) -> Box(g, check_syn_spine (sign, cG) (contextify (sign, cG) g) sp tel t)
+      | SPi (tel, t) -> Box(g, check_spi_spine (sign, cG) (contextify (sign, cG) g) sp tel t)
       | t -> raise (Error.Error ("Head of application " ^ print_exp h ^ " had type "
                                  ^ print_exp t ^ " which is not of function type."))
       end
     | Var n ->
       begin match lookup n cG with
       | Pi (tel, t) -> check_spine (sign, cG) sp tel t
-      | SPi (tel, t) -> Box (g, check_syn_spine (sign, cG) (contextify (sign, cG) g) sp tel t)
+      | SPi (tel, t) -> Box (g, check_spi_spine (sign, cG) (contextify (sign, cG) g) sp tel t)
       | t -> raise (Error.Error ("Head of application " ^ print_exp h ^ " had type "
                                  ^ print_exp t ^ " which is not of function type."))
       end
     | _ when is_syntax h ->
       let cP = contextify (sign, cG) g in
       begin match infer_syn (sign, cG) cP h with
-      | SPi (tel, t) -> Box (g, check_syn_spine (sign, cG) cP sp tel t)
+      | SPi (tel, t) -> Box (g, check_spi_spine (sign, cG) cP sp tel t)
       | _ -> raise (Error.Error "Term in function position is not of function type")
       end
     | _ -> raise (Error.Error ("Term " ^ print_exp h ^ " cannot by the head of an application."))
@@ -250,7 +252,7 @@ and check_app (sign, cG) (h : exp) (sp : exp list) (g : exp) (t : exp) : unit =
        raise (Error.Error ("Term's inferred type is not equal to checked type.\n" ^ message))
 
 and check_syn_type (sign, cG) cP (e : exp) : unit =
-  Debug.print (fun () -> "Checking syntactic type " ^ print_exp e);
+  Debug.print (fun () -> "Checking syntactic type " ^ print_exp e ^ " in context " ^ print_ctx cG);
   Debug.indent ();
   begin
     match Whnf.whnf sign e with
@@ -264,6 +266,16 @@ and check_syn_type (sign, cG) cP (e : exp) : unit =
       in
       let cP' = check_tel_type cP tel in
       check_syn_type (sign, cG) cP' e'
+    | Pi (tel, e') ->
+      let rec check_tel_type cG = function
+        | [] -> ()
+        | (_, x, s) :: tel ->
+          check_syn_type (sign, cG) cP s;
+          check_tel_type ((x, s) :: cG) tel
+      in
+      check_tel_type cG tel;
+      check_syn_type (sign, cG) cP e'
+  
     | Const n -> if lookup_syn_def n sign = [] then ()
       else raise (Error.Error ("Type " ^ n ^ " is not fully applied."))
     | App (Const n, es) ->
@@ -292,7 +304,7 @@ and check_ctx (sign, cG) g =
 
 and check_syn (sign, cG) cP (e : exp) (t : exp) =
   Debug.print (fun () -> "Checking syntactic expression " ^ print_exp e ^ " against type "
-    ^ print_exp t ^ " in bound context " ^ print_bctx cP);
+    ^ print_exp t ^ " in bound context " ^ print_bctx cP ^ " and context " ^ print_ctx cG);
   Debug.indent ();
   begin
     match e, Whnf.whnf sign t with
@@ -320,17 +332,25 @@ and check_syn (sign, cG) cP (e : exp) (t : exp) =
 
 and infer_syn (sign, cG) cP (e : exp) =
   Debug.print (fun () -> "Inferring type of syntactic expression " ^ print_exp e
-    ^ " in bound context " ^ print_bctx cP);
+    ^ " in bound context " ^ print_bctx cP ^ " and context " ^ print_ctx cG);
   Debug.indent ();
   let res =
     match e with
     | SPi (tel, t) -> check_spi (sign, cG) cP tel t
-    | AppL (e, es) ->
+    | App (e, es) ->
       begin match infer_syn (sign, cG) cP e with
-      | SPi (tel, t) -> check_syn_spine (sign, cG) cP es tel t
+      | Pi (tel, t) -> check_syn_spine (sign, cG) cP es tel t
       | _ -> raise (Error.Error "Term in function position is not of function type")
       end
-    | Var x -> check_box (sign, cG) cP e (lookup x cG)
+
+    | AppL (e, es) ->
+      begin match infer_syn (sign, cG) cP e with
+      | SPi (tel, t) -> check_spi_spine (sign, cG) cP es tel t
+      | _ -> raise (Error.Error "Term in function position is not of function type")
+      end
+    | Var x ->
+      Debug.print (fun () -> "Variable " ^ print_name x ^ " is being looked up in context " ^ print_ctx cG);
+      check_box (sign, cG) cP e (lookup x cG)
     | Const n -> check_box (sign, cG) cP e (lookup_sign sign n)
     | BVar i ->
       let t = lookup_bound i cP in
@@ -368,17 +388,33 @@ and infer_syn (sign, cG) cP (e : exp) =
 and check_syn_spine (sign, cG) cP sp tel t =
   match sp, tel with
   | e::sp', (_, x, s)::tel ->
+     check_syn (sign, cG) cP e s ;
+     let tel', t' = subst_pi (x, e) tel t in
+     check_syn_spine (sign, cG) cP sp' tel' t'
+  | [], [] -> t
+  | _, [] ->
+    begin
+      match Whnf.whnf sign t with
+      | Pi (tel', t') -> check_syn_spine (sign, cG) cP sp tel' t'
+      | _ -> raise (Error.Error ("Unconsumed application cannot check against type " ^ print_exp t))
+    end
+  | [], _ -> Pi (tel, t)
+
+
+and check_spi_spine (sign, cG) cP sp tel t =
+  match sp, tel with
+  | e::sp', (_, x, s)::tel ->
     let wrap t = Clos (t, (Dot (Shift 1, e))) in
     check_syn (sign, cG) cP e s;
     let tel' = List.map (fun (i, n, e) -> i, n, wrap e) tel in
-    check_syn_spine (sign, cG) cP sp' tel' (wrap t)
+    check_spi_spine (sign, cG) cP sp' tel' (wrap t)
   | [], [] -> t
   | _, [] ->
     begin
       match Whnf.whnf sign t with
       (* Not sure if Pi's are allowed inside boxes *)
       (* | Pi (tel', t') -> check_spine (sign, cG) sp tel' t' *)
-      | SPi (tel', t') -> check_syn_spine (sign, cG) cP sp tel' t
+      | SPi (tel', t') -> check_spi_spine (sign, cG) cP sp tel' t
       (* | Box (g, SPi (tel', t')) -> *)
       (*   let cD, sigma, cP' = unify_ctx (sign, cG) g cP in *)
       (*   check_syn_spine (sign, cD) cP' sp (simul_subst_on_stel sigma tel') (simul_subst sigma t') *)
@@ -407,6 +443,13 @@ let rec check_tel (sign, cG) u tel =
                            ^ " upgrading telescope's universe from "
                            ^ print_universe u ^ " to " ^ print_universe u');
        check_tel (sign, (x, s) :: cG) u' tel'
+
+let rec check_syn_tel (sign, cG) tel =
+  match tel with
+  | [] -> ()
+  | (_, x, s) :: tel' ->
+    check_syn_type (sign, cG) BNil s;
+    check_syn_tel (sign, (x, s) :: cG) tel'
 
 let rec check_stel (sign, cG) cP tel =
   match tel with

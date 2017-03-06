@@ -5,10 +5,10 @@ type signature_entry
   = Definition of def_name * tel * exp * exp (* the name, the type, and the definition *)
   (* name, parameters, constructed type *)
   | Constructor of def_name * tel * dsig
-  | SConstructor of def_name * stel * dsig
+  | SConstructor of def_name * tel * dsig
   (* name, parameters, indices, resulting universe *)
   | DataDef of def_name * tel * tel * universe
-  | SynDef of def_name * stel
+  | SynDef of def_name * tel
   | Program of def_name * tel * exp * pat_decls
 
 type signature = signature_entry list
@@ -29,7 +29,7 @@ let rec lookup_sign_entry (n : def_name) (sign : signature) : signature_entry =
     with Not_found ->
       raise (Error.Violation ("Unable to find " ^ n ^ " in the signature"))
 
-let lookup_syn_def (n : def_name) (sign : signature) : stel =
+let lookup_syn_def (n : def_name) (sign : signature) : tel =
   match lookup_sign_entry n sign with
   | SynDef (_, tel) -> tel
   | _ -> raise (Error.Error ("Constant " ^ n ^ " not a syntactic type"))
@@ -37,6 +37,7 @@ let lookup_syn_def (n : def_name) (sign : signature) : stel =
 let lookup_cons_entry (c : def_name) (sign : signature) : tel * dsig =
   match lookup_sign_entry c sign with
   | Constructor (_, tel, dsig) -> tel, dsig
+  | SConstructor (_, tel, dsig) -> tel, dsig
   | _ -> raise (Error.Error ("Constant " ^ c ^ " was expected to be a constructor."))
 
 let lookup_sign sign n =
@@ -55,7 +56,7 @@ let lookup_sign sign n =
   | SynDef (_, tel) ->
      if tel = []
      then Star
-     else (SPi (tel, Star))
+     else (Pi (tel, Star))
   | Constructor (_, is, (n', pes)) ->
      let t =
        if pes = [] then
@@ -76,7 +77,7 @@ let lookup_sign sign n =
          App (Const n', pes)
      in
      let t' =
-       if is = [] then t else SPi (is, t)
+       if is = [] then t else Pi (is, t)
      in
      Debug.print (fun () -> "Looked up constructor " ^ n ^ " which has type " ^ print_exp t');
      t'

@@ -188,7 +188,7 @@ module Int = struct
   type program =
     (* name, parameters, indices, universe *)
     | Data of def_name * tel * tel * universe * decls
-    | Syn of def_name * stel * sdecls
+    | Syn of def_name * tel * decls
     | DefPM of def_name * tel * exp * pat_decls
     | Def of def_name * exp * exp
 
@@ -573,7 +573,7 @@ module Int = struct
   let print_program = function
     | Data (n, ps, is, u, decls) ->
        "(data " ^ n ^ " (" ^ print_params ps ^ ") (" ^ print_params is ^ ") " ^ print_universe u  ^ "\n" ^ print_decls decls ^ ")"
-    | Syn (n, tel, decls) -> "(syn " ^ n ^ " " ^ print_stel tel ^ "\n" ^ print_sdecls decls ^ ")"
+    | Syn (n, tel, decls) -> "(syn " ^ n ^ " " ^ print_tel tel ^ "\n" ^ print_decls decls ^ ")"
     | DefPM (n, tel, e, decls) -> "(def " ^ n ^ " (" ^ print_tel tel ^ ") " ^ print_exp e ^ "\n" ^ print_def_decls decls ^ ")"
     | Def (n, e1, e2) -> "(def " ^ n ^ " " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
 

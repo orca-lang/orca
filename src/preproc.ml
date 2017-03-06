@@ -323,13 +323,13 @@ let pre_process s = function
      let s'', ds' = List.fold_left (fun (s, dos) d -> let ss, dd = pproc_decl s cG d false n in ss, (dd :: dos)) (s', []) ds in
      s'', I.Data (n, ps', is, u, ds')
   | E.Syn (n, e, ds) ->
-    let tel, e' = pproc_stel s [] [] e in
+    let tel, e' = pproc_tel s [] [] e in
     let _ = match e' with
       | I.Star -> ()
       | _ -> raise (Error.Error_loc (loc e, "Syntax definition for " ^ n ^ " should have kind * instead of " ^ I.print_exp e'))
     in
      let s' = add_name_sign s n in
-     let s'', ds' = List.fold_left (fun (s, dos) d -> let ss, dd = pproc_sdecl s [] d true n in ss, (dd :: dos)) (s', []) ds in
+     let s'', ds' = List.fold_left (fun (s, dos) d -> let ss, dd = pproc_decl s [] d true n in ss, (dd :: dos)) (s', []) ds in
      s'', I.Syn (n, tel, ds')
   | E.DefPM (n, e, ds) ->
      let s' = add_name_sign s n in

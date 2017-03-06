@@ -19,6 +19,7 @@ let tc_constructor (sign , cG : signature * ctx) (u : universe) (tel : tel)
         | _ -> raise (Error.Error ("Constructor " ^ n
              ^ " does not return a term of the fully applied type for " ^ n'))
       in
+      Debug.print (fun () -> "Checking indices applied to " ^ n' ^ " at the tail of signature of " ^ n);
       check_indices es tel;
       Constructor (n, tel', (n', es))
     end
@@ -27,12 +28,12 @@ let tc_constructor (sign , cG : signature * ctx) (u : universe) (tel : tel)
                         ^ " which does not fit in " ^ print_universe u
                         ^ ", the universe of the data type " ^ n'))
 
-let tc_syn_constructor (sign , cG : signature * ctx) (tel : stel)
-                       (n , tel', (n', es) : def_name * stel * dsig) : signature_entry =
+let tc_syn_constructor (sign , cG : signature * ctx) (tel : tel)
+                       (n , tel', (n', es) : def_name * tel * dsig) : signature_entry =
   Debug.print_string ("Typechecking syntax constructor: " ^ n) ;
-  check_stel (sign, cG) BNil tel';
-  let cP = bctx_of_stel tel' in
-  let check' = check_syn (sign, cG) cP in
+  check_syn_tel (sign, cG) tel';
+  (* let cP = bctx_of_stel tel' in *)
+  let check' = check_syn (sign, (ctx_of_tel tel') @ cG) BNil in
   let rec check_indices es tel = 
     match es, tel with
     | [], [] -> ()
@@ -42,6 +43,7 @@ let tc_syn_constructor (sign , cG : signature * ctx) (tel : stel)
     | _ -> raise (Error.Error ("Constructor " ^ n
              ^ " does not return a term of the fully applied type for " ^ n'))
   in
+  Debug.print (fun () -> "Checking indices applied to " ^ n' ^ " at the tail of signature of " ^ n);
   check_indices es tel;
   SConstructor (n, tel', (n', es))
 
@@ -57,7 +59,7 @@ let tc_program (sign : signature) : program -> signature = function
 
   | Syn (n, tel, ds) ->
     Debug.print_string ("Typechecking syn declaration: " ^ n);
-    let () = check_stel (sign, []) BNil tel in
+    check_syn_tel (sign, []) tel;
     let sign' = SynDef (n, tel) :: sign in
     (List.map (tc_syn_constructor (sign', []) tel) ds) @ sign'
 
