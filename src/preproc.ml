@@ -83,7 +83,7 @@ let find_pat_name (s : sign) (cG : ctx) (cP : bctx) (n : E.name) : ctx * I.pat =
     end
 
 let rec get_bound_var_ctx (e: E.exp) : bctx =
-  match Location.content e with
+  match content e with
   | E.Comma (g, P(_, E.Annot(P(_, E.Ident n), _))) -> n :: (get_bound_var_ctx g)
   | E.Annot(P(_, E.Ident n), _) -> [n]
   | E.Nil -> []
@@ -108,8 +108,9 @@ let rec get_bound_var_ctx_in_pat (p : E.pat) : bctx =
 
 let rec pproc_exp (s : sign) (cG : ctx) (cP : bctx) (is_syntax : bool) (e :E.exp) : I.exp =
   Debug.print (fun () -> "Preprocessing expression " ^ E.print_exp e ^ " with flag " ^ string_of_bool is_syntax);
+  Debug.indent ();
   let f e = pproc_exp s cG cP is_syntax e in
-  match content e with
+  let res = match content e with
   | E.Star -> I.Star
   | E.Set n -> I.Set n
   | E.Ctx -> I.Ctx
@@ -120,7 +121,7 @@ let rec pproc_exp (s : sign) (cG : ctx) (cP : bctx) (is_syntax : bool) (e :E.exp
     let tel, t' = pproc_stel s cG cP is_syntax e in
     I.SPi (tel, t')
   | E.Arr (t0, t1) ->
-     let tel, t' = pproc_tel s cG cP is_syntax e in
+    let tel, t' = pproc_tel s cG cP is_syntax e in
      I.Pi (tel, t')
   | E.Box (g, e) ->
     if isEmpty cP then
@@ -157,17 +158,44 @@ let rec pproc_exp (s : sign) (cG : ctx) (cP : bctx) (is_syntax : bool) (e :E.exp
   | E.Under -> I.Under
   | E.Hole (Some n) -> I.Hole (Name.gen_name n)
   | E.Hole None -> I.Hole (Name.gen_name "H")
+  in Debug.deindent ();
+  res
+
 
 and pproc_tel (s : sign) (cG : ctx) (cP : bctx) (is_syntax : bool) (e : E.exp) : I.tel * I.exp =
+  let rec g cG e t0 = match content e with
+    | E.App (P(_, E.Ident n), e') ->
+      let cG', n' = add_name_ctx cG n in
+      let cG'', tel = g cG' e' t0 in
+      cG'', (Syntax.Explicit, n', t0) :: tel
+    | E.Ident n ->
+      let cG'', n' = add_name_ctx cG n in
+      cG'', [Syntax.Explicit, n', t0]
+    | _ -> raise (Error.Error_loc (loc e, "Left hand side of arrow was not a series of identifiers annotated by a type."))
+  in
+  let rec f cG e = match content e with
+    | E.Annot (e, t0) ->
+      let t0' = pproc_exp s cG cP is_syntax t0 in
+      let cG', tel = g cG e t0' in
+      Debug.print(fun () -> "Calling f in pproc_tel\ntel = " ^ I.print_tel tel);
+      cG', tel
+    | E.App (P(_, E.Annot(e, t0)), t1) ->
+      let t0' = pproc_exp s cG cP is_syntax t0 in
+      let cG', tel = g cG e t0' in
+      let cG'', tel'  = f cG' t1 in
+      Debug.print(fun () -> "Calling f in pproc_tel\ntel = " ^ I.print_tel tel ^ "\ntel' = " ^ I.print_tel tel');
+      cG'', tel @ tel'
+    | _ -> let tel = [Syntax.Explicit, Name.gen_floating_name (), pproc_exp s cG cP is_syntax e] in
+           Debug.print(fun () -> "Calling f in pproc_tel. Fall through, resulting in = " ^ I.print_tel tel);
+      cG, tel
+  in
   match content e with
-  | E.Arr (P(_, E.Annot (P(_, E.Ident n), t0)), t1) ->
-     let cG', n' = add_name_ctx cG n in
-     let tel, t = pproc_tel s cG' cP is_syntax t1 in
-     (Syntax.Explicit, n', pproc_exp s cG cP is_syntax t0) :: tel, t
   | E.Arr (t0, t1) ->
-     let tel, t = pproc_tel s cG cP is_syntax t1 in
-     (Syntax.Explicit, Name.gen_floating_name (), pproc_exp s cG cP is_syntax t0) :: tel , t
-  | _ -> [], pproc_exp s cG cP is_syntax e
+    let cG', tel = f cG t0 in
+    let tel', t = pproc_tel s cG' cP is_syntax t1 in
+     tel @ tel' , t
+  | _ -> Debug.print(fun () -> "preproc tel matched against " ^ E.print_exp e);
+    [], pproc_exp s cG cP is_syntax e
 
 and pproc_stel (s : sign) (cG : ctx) (cP : bctx) (is_syntax : bool) (e : E.exp) : I.stel * I.exp =
   match content e with
@@ -194,12 +222,15 @@ and pproc_app (s : sign) (cG : ctx) (cP : bctx) (is_syntax : bool) (e : E.exp) :
   | _ -> pproc_exp s cG cP is_syntax e, []
 
 let pproc_decl s cG (n, e) (is_syntax : bool) (d : I.def_name) =
+  Debug.print (fun () -> "Preprocessing declaration " ^ n ^ "\nCreating telescope out of " ^ E.print_exp e);
+  Debug.indent ();
   let tel, e' = pproc_tel s cG [] is_syntax e in
   let (d', args) = match e' with
     | I.App (I.Const n', ds) -> n', ds
     | I.Const n' -> n', []
     | _ -> raise (Error.Error_loc (loc e, "Return type of constructor " ^ n ^ " should be " ^ d))
   in
+  Debug.deindent ();
   if d = d' then
     (add_name_sign s n, (n, tel, (d', args)))
   else
