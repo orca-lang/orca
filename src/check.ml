@@ -47,27 +47,21 @@ let rec decontextify cP =
   | CtxVar x -> Var x
   | BSnoc (cP', x, e) -> Snoc (decontextify cP', x, e)
 
-let unify_ctx (sign, cG) g cP =
-  let g' = decontextify cP in
-  Debug.print(fun () -> "Unifying contexts.\ng  = " ^ print_exp g ^ "\ng' = " ^ print_exp g' ^ "\n with ctx " ^ print_ctx cG);
-  let cD, sigma = try
-      Unify.unify (sign, cG) g g'
-    with
-      Unify.Unification_failure problem ->
-      raise (Error.Error ("Unification of context:\ng  = " ^ print_exp g
-                          ^ "\nand\ng' = " ^ print_exp g'
-                          ^ "\nfailed with the following problem:\n" ^ Unify.print_unification_problem problem))
-  in
-  let cP' = contextify (sign, cG) (simul_subst sigma g) in
-  cD, sigma, cP'
-
-let check_box (sign, cG) cP = function
+let check_box (sign, cG) cP e = function
   | Box (g, t) ->
-    let cD, sigma, cP' = unify_ctx (sign, cG) g cP in
+    let g' = decontextify cP in
+    Debug.print(fun () -> "Unifying contexts.\ng  = " ^ print_exp g ^ "\ng' = " ^ print_exp g' ^ "\n with ctx " ^ print_ctx cG);
+    let cD, sigma =
+      try
+        Unify.unify (sign, cG) g g'
+      with
+        Unify.Unification_failure problem ->
+          Debug.print (fun () -> Unify.print_unification_problem problem);
+          raise (Error.Error (print_exp e ^ " is defined in bound context " ^ print_exp g
+                              ^ " but it was expected to be in bound context " ^ print_exp g'))
+    in
     simul_subst sigma t
-    (* else raise (Error.Error "Wrong contexts. Tip: use a substitution?") *)
   | t -> t
-(* raise (Error.Error "Not a box. Don't think outside of the box.") *)
 
 let rec infer (sign, cG : signature * ctx) (e : exp) : exp =
   Debug.print (fun () -> "Infer called with: " ^ print_exp e ^ " in context: " ^ print_ctx cG);
@@ -83,6 +77,9 @@ let rec infer (sign, cG : signature * ctx) (e : exp) : exp =
       begin match infer (sign, cG) h with
        | Pi (tel, t) ->
          check_spine (sign, cG) sp tel t
+       | SPi _ as t ->
+         raise (Error.Error ("The left hand side (" ^ print_exp h ^ ") was expected to be of extensional "
+                             ^ "function type while it was found to be of intensional function type " ^ print_exp t))
        (* | SPi (tel, t) -> *)
        (*   check_syn_spine (sign, cG) cP sp tel t *)
        (* | Box (g, SPi (tel, t)) -> *)
@@ -251,12 +248,6 @@ and check_app (sign, cG) (h : exp) (sp : exp list) (g : exp) (t : exp) : unit =
        in
        Debug.print_string message;
        raise (Error.Error ("Term's inferred type is not equal to checked type.\n" ^ message))
-    
-    (*     try match infer (sign, cG) h with *)
-    (*    | Pi (tel, t) -> *)
-    (*      check_spine (sign, cG) sp tel t *)
-    (* with  *)
-
 
 and check_syn_type (sign, cG) cP (e : exp) : unit =
   Debug.print (fun () -> "Checking syntactic type " ^ print_exp e);
@@ -339,8 +330,8 @@ and infer_syn (sign, cG) cP (e : exp) =
       | SPi (tel, t) -> check_syn_spine (sign, cG) cP es tel t
       | _ -> raise (Error.Error "Term in function position is not of function type")
       end
-    | Var x -> check_box (sign, cG) cP (lookup x cG)
-    | Const n -> check_box (sign, cG) cP (lookup_sign sign n)
+    | Var x -> check_box (sign, cG) cP e (lookup x cG)
+    | Const n -> check_box (sign, cG) cP e (lookup_sign sign n)
     | BVar i ->
       let t = lookup_bound i cP in
       Debug.print (fun () -> "Looking bound variable " ^ string_of_int i ^ " resulted in type " ^ print_exp t

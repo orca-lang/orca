@@ -33,6 +33,15 @@ data oft' (g:ctx) : isctx g -> (g |- tm) -> (|- tp) -> set where
 | t-var : (G : isctx g) -> (e : (g |- tm)) -> (t : |- tp)
           -> lookup g G e t -> oft' g G e t
 
+data step' (g : ctx) : (g |- tm) -> (g |- tm) -> set where
+(*) | s-app1 : (m : tm) -> (m' : tm) -> (n : tm) -> step' g (app m n) (app m' n)
+| s-app1' : (m : (g |- tm)) -> (m' : (g |- tm)) -> (n : (g |- tm)) -> step' g m m' -> step' g (app m n) (app m' n)
+| s-app2' : (m : (g, x:tm |- tm)) -> (n : (g |- tm)) -> step' g (app (lam (\x. m)) n) (m [ ^0 ; n ]) 
+
+syn step : tm -> tm -> * where
+| s-app1 : (m : tm) -> (n : tm) -> (m' : tm) -> step (app m n) (app m' n)
+| s-app2 : (m : tm -> tm) -> (n : tm) -> step (app (lam (\x.m x)) n) (m n) 
+
 (*) def copy : (g : ctx) -> (g |- tm) -> (g |- tm) where
 (*) | g (app M N) => app (copy g M) (copy g N)
 (*) | g (lam (\x. M)) => lam (\x. copy (g, x) M)
