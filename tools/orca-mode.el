@@ -15,17 +15,41 @@
 ;;   (global-set-key (kbd "C-c C-l") 'orca-check-file)
 ;;   )
 
+(defconst orca-font-lock-symbols-alist
+  ;; Not sure about fn → λ, since we could also have \ → λ.
+  '(("\\" . ?λ)
+    ("|-" . ?⊢)
+    (":>" . ?▷)
+;;    ("->>"    . ?↠) ;; It is really difficult to distinguish from the other one
+    ("->"    . ?→)
+    ("=>"    . ?⇒)
+    ("\\0"   . ?∅)
+    )
+  "Alist mapping Orca symbols to chars.
+Each element has the form (STRING . CHAR) or (STRING CHAR PREDICATE).
+STRING is the symbol.
+CHAR is the character with which to represent this symbol.
+PREDICATE if present is a function of one argument (the start position
+of the symbol) which should return non-nil if this mapping should be disabled
+at that position.")
+
+(defun orca-chars ()
+  (progn
+    (setq prettify-symbols-alist (append prettify-symbols-alist orca-font-lock-symbols-alist))
+    (prettify-symbols-mode)))
+
 (define-generic-mode 'orca-mode
   '("(*)") ;; comments
   '("data" "syn" "lf" "def" "where" "|" "=>" "fn" "\\" ":>" "|-") ;; keywords
   '()
   '("\\.kw$") ;; file extension
-  nil ;; (list 'orca-bind-keys) ;; other functions to call
+  (list 'orca-chars) ;; other functions to call
   "A mode for Orca programs." ;; doc string
   )
 
 (defconst *orca* "*Orca*"
   "Buffer used by Orca")
+
 
 ;; (defun orca-check-file ()
 ;;   "Type check a file using Orca as an inferior mode."

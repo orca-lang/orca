@@ -13,9 +13,9 @@ syn oft : tm -> tp -> * where
          -> oft f (arr s t) -> oft e s -> oft (app f e) t
 | t-lam: (s:tp) -> (t:tp) -> (e:tm -> tm)
          -> ((x:tm) -> oft x s -> oft (e x) t) -> oft (lam (\x.e x)) (arr s t)
-         
+
 data isctx : (g:ctx) -> set where
-| Empty : isctx 0
+| Empty : isctx \0
 | Cons : (g:ctx) -> isctx g -> (t: |- tp) -> isctx (g, tm)
 
 data lookup : (g : ctx) -> isctx g -> (g |- tm) -> (|- tp) -> set where
@@ -23,7 +23,7 @@ data lookup : (g : ctx) -> isctx g -> (g |- tm) -> (|- tp) -> set where
           -> lookup (g, x:tm) (Cons g G t) (x:tm :> x) t
 | is-there : (g:ctx) -> (G : isctx g) -> (t : |- tp) -> (m : (g |- tm)) -> (t' : |- tp)
           -> lookup g G m t -> lookup (g,x:tm) (Cons g G t') (m [ ^1 ]) t
-   
+
 data oft' (g:ctx) : isctx g -> (g |- tm) -> (|- tp) -> set where
 | t-unit' : (G : isctx g) -> oft' g G one unit
 | t-app' : (G : isctx g) -> (f : (g |- tm)) -> (e : (g |- tm)) -> (s : |- tp) -> (t : |- tp)
