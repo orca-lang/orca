@@ -1,6 +1,6 @@
 syn tm where
 | app: tm -> tm -> tm
-| lam: (tm -> tm) -> tm
+| lam: (tm ->> tm) -> tm
 | one : tm
 
 lf tp where
@@ -11,8 +11,8 @@ syn oft : tm -> tp -> * where
 | t-unit: oft one unit
 | t-app: (f: tm) -> (e : tm) -> (s: tp) -> (t: tp)
          -> oft f (arr s t) -> oft e s -> oft (app f e) t
-| t-lam: (s:tp) -> (t:tp) -> (e:tm -> tm)
-         -> ((x:tm) -> oft x s -> oft (e x) t) -> oft (lam (\x.e x)) (arr s t)
+| t-lam: (s:tp) -> (t:tp) -> (e:tm ->> tm)
+         -> ((x:tm) ->> oft x s ->> oft (e ' x) t) -> oft (lam (\x.e ' x)) (arr s t)
 
 data isctx : (g:ctx) -> set where
 | Empty : isctx \0
@@ -40,9 +40,9 @@ data step' (g : ctx) : (g |- tm) -> (g |- tm) -> set where
 
 syn step : tm -> tm -> * where
 | s-app1 : (m : tm) -> (n : tm) -> (m' : tm) -> step (app m n) (app m' n)
-| s-app2 : (m : tm -> tm) -> (n : tm) -> step (app (lam (\x.m x)) n) (m n) 
+| s-app2 : (m : tm ->> tm) -> (n : tm) -> step (app (lam (\x.m ' x)) n) (m ' n) 
 
 (*) def copy : (g : ctx) -> (g |- tm) -> (g |- tm) where
 (*) | g (app M N) => app (copy g M) (copy g N)
-(*) | g (lam (\x. M)) => lam (\x. copy (g, x) M)
-(*) | g x => x
+(*) (*) | g (lam (\x. M)) => lam (\x. copy (g, x) M)
+(*) (*) | g x => x
