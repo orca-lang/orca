@@ -57,6 +57,9 @@ let rec main_scanner pos = lexer
   | "=>" -> add_word pos (Ulexing.lexeme_length lexbuf), RARR
   | "->" -> add_word pos (Ulexing.lexeme_length lexbuf), ARR
   | "->>" -> add_word pos (Ulexing.lexeme_length lexbuf), SARR
+  | "⇒" -> add_word pos (Ulexing.lexeme_length lexbuf), RARR
+  | "→" -> add_word pos (Ulexing.lexeme_length lexbuf), ARR
+  | "↠" -> add_word pos (Ulexing.lexeme_length lexbuf), SARR
   | ":" -> add_word pos (Ulexing.lexeme_length lexbuf), COLON
   | "," -> add_word pos (Ulexing.lexeme_length lexbuf), COMMA
   | ";" -> add_word pos (Ulexing.lexeme_length lexbuf), SEMICOLON
@@ -65,14 +68,18 @@ let rec main_scanner pos = lexer
   | "^" -> add_word pos (Ulexing.lexeme_length lexbuf), EMPTYS
   | ".." -> add_word pos (Ulexing.lexeme_length lexbuf), SHIFT 0
   | "0" ->  add_word pos (Ulexing.lexeme_length lexbuf), NIL
+  | "∅" ->  add_word pos (Ulexing.lexeme_length lexbuf), NIL
   | "[" -> add_word pos (Ulexing.lexeme_length lexbuf), LSQUARE
   | "]" -> add_word pos (Ulexing.lexeme_length lexbuf), RSQUARE
   | "fn" -> add_word pos (Ulexing.lexeme_length lexbuf), FN
   | '\\' -> add_word pos (Ulexing.lexeme_length lexbuf), LAM
+  | 'λ' -> add_word pos (Ulexing.lexeme_length lexbuf), LAM
   | "." -> add_word pos (Ulexing.lexeme_length lexbuf), DOT
   | "'" -> add_word pos (Ulexing.lexeme_length lexbuf), APPL
+  | "·" -> add_word pos (Ulexing.lexeme_length lexbuf), APPL
   | "*" -> add_word pos (Ulexing.lexeme_length lexbuf), STAR
   | "|-" -> add_word pos (Ulexing.lexeme_length lexbuf), TURNSTILE
+  | "⊢" -> add_word pos (Ulexing.lexeme_length lexbuf), TURNSTILE
   | ":>" -> add_word pos (Ulexing.lexeme_length lexbuf), TTS
   | "(" -> add_word pos (Ulexing.lexeme_length lexbuf), LPAREN
   | ")" -> add_word pos (Ulexing.lexeme_length lexbuf), RPAREN
