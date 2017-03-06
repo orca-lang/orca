@@ -48,19 +48,24 @@ let rec decontextify cP =
   | CtxVar x -> Var x
   | BSnoc (cP', x, e) -> Snoc (decontextify cP', x, e)
 
+let unify_ctx (sign, cG) e g cP =
+  let g' = decontextify cP in
+  Debug.print(fun () -> "Unifying contexts.\ng  = " ^ print_exp g ^ "\ng' = " ^ print_exp g' ^ "\n with ctx " ^ print_ctx cG);
+  let cD, sigma =
+    try
+      Unify.unify (sign, cG) g g'
+    with
+      Unify.Unification_failure problem ->
+        Debug.print (fun () -> Unify.print_unification_problem problem);
+        raise (Error.Error (print_exp e ^ " is defined in bound context " ^ print_exp g
+                            ^ " but it was expected to be in bound context " ^ print_exp g'))
+  in
+  cD, sigma
+
+
 let check_box (sign, cG) cP e = function
   | Box (g, t) ->
-    let g' = decontextify cP in
-    Debug.print(fun () -> "Unifying contexts.\ng  = " ^ print_exp g ^ "\ng' = " ^ print_exp g' ^ "\n with ctx " ^ print_ctx cG);
-    let cD, sigma =
-      try
-        Unify.unify (sign, cG) g g'
-      with
-        Unify.Unification_failure problem ->
-          Debug.print (fun () -> Unify.print_unification_problem problem);
-          raise (Error.Error (print_exp e ^ " is defined in bound context " ^ print_exp g
-                              ^ " but it was expected to be in bound context " ^ print_exp g'))
-    in
+    let cD, sigma = unify_ctx (sign, cG) e g cP in
     simul_subst sigma t
   | t -> t
 
@@ -316,12 +321,19 @@ and check_syn (sign, cG) cP (e : exp) (t : exp) =
       end
     | e, t when is_syntax e ->
       Debug.print(fun ()-> "Expression " ^ print_exp e ^ " is syntactic and thus being inferred");
-      let t' = infer_syn (sign, cG) cP e in
+      let t' = match infer_syn (sign, cG) cP e with
+        | Box (g, t) ->
+          Debug.print (fun () -> "Hello I was in a box");
+          let cD, sigma = unify_ctx (sign, cG) t g cP in
+          simul_subst sigma t
+        | t -> Debug.print (fun () -> "I am not a box: " ^ print_exp t); t
+      in
       let _ = try
+          Debug.print (fun () -> "Who am I \"t\"?: " ^ print_exp t);
           Unify.unify (sign, cG) t t'
       with
         Unify.Unification_failure prob ->
-        raise (Error.Error ("Checking syntactic term " ^ print_exp e ^ " against type " ^ print_exp t
+        raise (Error.Error ("XXXXXChecking syntactic term " ^ print_exp e ^ " against type " ^ print_exp t
                             ^ "\nFailed with unification problem:\n" ^ Unify.print_unification_problem prob))
       in
       ()
@@ -386,11 +398,20 @@ and infer_syn (sign, cG) cP (e : exp) =
   in Debug.deindent (); res
 
 and check_syn_spine (sign, cG) cP sp tel t =
-  match sp, tel with
-  | e::sp', (_, x, s)::tel ->
-     check_syn (sign, cG) cP e s ;
-     let tel', t' = subst_pi (x, e) tel t in
-     check_syn_spine (sign, cG) cP sp' tel' t'
+  Debug.print (fun () -> "Checking syn spine:\nsp = " ^ print_exps sp ^ "\ntel = " ^ print_tel tel);
+  Debug.indent ();
+  let res = match sp, tel with
+    | e::sp', (_, x, s)::tel ->
+      let s = match Whnf.whnf sign s with
+        | Box(g, s) ->
+          let cD, sigma = unify_ctx (sign, cG) s g cP in
+          simul_subst sigma s
+        | s -> s
+      in
+      Debug.print (fun () -> "Checking syn spine:\ne = " ^ print_exp e ^ "\ns = " ^ print_exp s);
+      check_syn (sign, cG) cP e s ;
+      let tel', t' = subst_pi (x, e) tel t in
+      check_syn_spine (sign, cG) cP sp' tel' t'
   | [], [] -> t
   | _, [] ->
     begin
@@ -399,7 +420,9 @@ and check_syn_spine (sign, cG) cP sp tel t =
       | _ -> raise (Error.Error ("Unconsumed application cannot check against type " ^ print_exp t))
     end
   | [], _ -> Pi (tel, t)
-
+  in
+  Debug.deindent ();
+  res
 
 and check_spi_spine (sign, cG) cP sp tel t =
   match sp, tel with

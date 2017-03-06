@@ -57,7 +57,7 @@ let split (sign : signature) (p1 : pats) (c, ps : def_name * pats) (cD2 : ctx) (
     Debug.print (fun () -> "For " ^ n ^ " the split of " ^ print_exps sp
       ^ " resulted in parameters " ^ print_exps us
       ^ " and indices " ^ print_exps vs);
-    let thetatel, (n', sp) = lookup_cons_entry c sign in
+    let thetatel, (n', sp) = lookup_cons_entry c sign maybe_g in
     Debug.print (fun () -> "thetatel = " ^ print_tel thetatel);
     if n = n'
     then
@@ -138,7 +138,7 @@ let split_set sign (x : name) (cG : ctx) : ctx_map =
        begin match constrs with
        | [] -> []
        | c :: constrs' ->
-          let thetatel, (n', sp) = lookup_cons_entry c sign in
+          let thetatel, (n', sp) = lookup_cons_entry c sign None in
           let ps = (innac_ctx cG2) @ [PConst (c, innac_ctx (ctx_of_tel thetatel))] @ (innac_ctx cG1) in
           let sigma =
             try
@@ -238,6 +238,7 @@ and check_innac (sign, cD : signature * ctx) (p : pat) (q : pat) (t : exp) : uni
   | PConst (n, sp), PConst (n', sq) when n = n' ->
      begin match lookup_sign_entry n sign with
      | Constructor (_, tel, _) -> check_innacs (sign, cD) sp sq (ctx_of_tel tel)
+     | SConstructor (_, tel, _) -> check_innacs (sign, cD) sp sq (ctx_of_tel tel)
      | _ -> raise (Error.Violation ("It should have been a constructor."))
      end
   (* In the syntax cases, we might need to grow cP *)

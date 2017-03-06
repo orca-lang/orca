@@ -34,10 +34,10 @@ let lookup_syn_def (n : def_name) (sign : signature) : tel =
   | SynDef (_, tel) -> tel
   | _ -> raise (Error.Error ("Constant " ^ n ^ " not a syntactic type"))
 
-let lookup_cons_entry (c : def_name) (sign : signature) : tel * dsig =
-  match lookup_sign_entry c sign with
-  | Constructor (_, tel, dsig) -> tel, dsig
-  | SConstructor (_, tel, dsig) -> tel, dsig
+let lookup_cons_entry (c : def_name) (sign : signature) (mg : exp option) : tel * dsig =
+  match lookup_sign_entry c sign, mg with
+  | Constructor (_, tel, dsig), None -> tel, dsig
+  | SConstructor (_, tel, dsig), Some g -> List.map (fun (i, x, s) -> i, x, Box (g, s)) tel, dsig
   | _ -> raise (Error.Error ("Constant " ^ c ^ " was expected to be a constructor."))
 
 let lookup_sign sign n =
