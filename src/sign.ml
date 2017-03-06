@@ -120,6 +120,8 @@ let split_idx_param (sign : signature) (n : def_name) (es : exp list) : exp list
        | _ -> raise (Error.Violation "Ran out of parameters.")
      in
      split (es, ps)
+  | SynDef _ ->
+    [], es
   | _ -> raise (Error.Error ("split_idx_param expected a datatype."))
 
 let rec print_signature sign = "[" ^ String.concat "; " (List.map signature_entry_name sign) ^ "]"

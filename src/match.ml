@@ -45,59 +45,61 @@ let rec flexible (p : pats)(cG : ctx) : name list =
 let split (sign : signature) (p1 : pats) (c, ps : def_name * pats) (cD2 : ctx) (x, t : name * exp) (cD1 : ctx) : ctx * ctx_map =
   Debug.indent ();
   Debug.print (fun () -> "Split type " ^ print_exp t) ;
-  let n, sp =
+  let maybe_g, n, sp =
     match Whnf.whnf sign t with
-    | App(Const n, sp) -> n, sp
-    | Const n -> n, []
+    | App(Const n, sp) -> None, n, sp
+    | Const n -> None, n, []
+    | Box(g, Const n) -> Some g, n, []
+    | Box(g, App (Const n, sp)) -> Some g, n, sp
     | e -> raise (Error.Error ("Expected constructor application. Got " ^ print_exp e))
   in
   let us, vs = split_idx_param sign n sp in
-  Debug.print (fun () -> "For " ^ n ^ " the split of " ^ print_exps sp
-                         ^ " resulted in parameters " ^ print_exps us
-                         ^ " and indices " ^ print_exps vs);
-  let thetatel, (n', sp) = lookup_cons_entry c sign in
-  Debug.print (fun () -> "thetatel = " ^ print_tel thetatel);
-  if n = n'
-  then
-    let us', ws = split_idx_param sign n sp in
-    let cT = rename_ctx_using_pats (ctx_of_tel thetatel) ps in
-    let flex = flexible (p1 @ ps) (cD1 @ cT) in
-    Debug.print (fun () -> "Flexibles variables are " ^ print_names flex);
-    let cD', delta =
-      Debug.print (fun () -> "Split unifies vs = " ^ print_exps vs ^ ", ws = " ^ print_exps ws);
-      try
-        Unify.unify_flex_many (sign, cT @ cD1) flex vs ws
-      with
-        Unify.Unification_failure prob ->
-        raise (Error.Error ("Split failed with unification problem " ^ Unify.print_unification_problem prob))
-    in
-    let cT' = simul_subst_on_ctx delta (rename_ctx_using_subst cT delta) in
-    Debug.print (fun () -> "delta = " ^ print_subst delta ^ ", cT = " ^ print_ctx cT ^ ", cT' = " ^ print_ctx cT');
-    Debug.print (fun () -> "cD1 = " ^ print_ctx cD1);
+    Debug.print (fun () -> "For " ^ n ^ " the split of " ^ print_exps sp
+      ^ " resulted in parameters " ^ print_exps us
+      ^ " and indices " ^ print_exps vs);
+    let thetatel, (n', sp) = lookup_cons_entry c sign in
+    Debug.print (fun () -> "thetatel = " ^ print_tel thetatel);
+    if n = n'
+    then
+      let us', ws = split_idx_param sign n sp in
+      let cT = rename_ctx_using_pats (ctx_of_tel thetatel) ps in
+      let flex = flexible (p1 @ ps) (cD1 @ cT) in
+      Debug.print (fun () -> "Flexibles variables are " ^ print_names flex);
+      let cD', delta =
+        Debug.print (fun () -> "Split unifies vs = " ^ print_exps vs ^ ", ws = " ^ print_exps ws);
+        try
+          Unify.unify_flex_many (sign, cT @ cD1) flex vs ws
+        with
+          Unify.Unification_failure prob ->
+            raise (Error.Error ("Split failed with unification problem " ^ Unify.print_unification_problem prob))
+      in
+      let cT' = simul_subst_on_ctx delta (rename_ctx_using_subst cT delta) in
+      Debug.print (fun () -> "delta = " ^ print_subst delta ^ ", cT = " ^ print_ctx cT ^ ", cT' = " ^ print_ctx cT');
+      Debug.print (fun () -> "cD1 = " ^ print_ctx cD1);
     (* let delta = compose_subst delta id_cD' in (\* to get the eta-long subst *\) *)
     (* Debug.print (fun () -> "In the middle of split, we have : delta = " ^ print_subst delta  ^ " cT = " ^ print_ctx cT *)
     (*                        ^ " Composition of delta and cT results in " ^ print_ctx cT' ^ ". Also, cD' = " ^ print_ctx cD'); *)
-    Debug.print (fun () -> "cT = " ^ print_ctx cT ^ "\ncT' = " ^ print_ctx cT');
-    let ss = x, App (Const c, var_list_of_ctx cT') in
-    let delta' = compose_single_with_subst ss (delta @ [x, Var x]) in
-    Debug.print (fun () -> "delta' = " ^ print_subst delta');
-    let id_cD' = psubst_of_ctx cD1 in
-    let pdelta = List.map (fun (x, e) -> x, Innac e) delta in
-    Debug.print (fun () -> "pdelta = " ^ print_psubst pdelta);
-    let pss = x, PConst (c, simul_psubst_on_list pdelta (pvar_list_of_ctx cT)) in
-    Debug.print (fun () -> "pss = " ^ print_psubst [pss]);
-    let pdelta = compose_psubst pdelta id_cD' in
-    Debug.print (fun () -> "pdelta = " ^ print_psubst pdelta);
-    let pdelta_shift = pdelta @ [x, PVar x] in
-    let pdelta' = compose_single_with_psubst pss pdelta_shift in
-    Debug.print (fun () -> "pdelta' = " ^ print_psubst pdelta');
-    let cD'', delta'' = cD' @ (simul_subst_on_ctx delta' cD2), (pats_of_psubst (shift_psubst_by_ctx pdelta' cD2)) in
-    Debug.print (fun () -> "Split! \ncD2 = " ^ print_ctx cD2 ^ "\ndelta' = " ^ print_psubst pdelta'
-                           ^ "\n delta'' = " ^ print_pats delta'' ^ "\n cD'' = " ^ print_ctx cD'');
-    Debug.deindent ();
-    cD'', delta''
-  else
-    raise (Error.Error ("Get a grip!, wrong constructor. n = \"" ^ n ^ "\"; n' = \"" ^ n' ^ "\""))
+      Debug.print (fun () -> "cT = " ^ print_ctx cT ^ "\ncT' = " ^ print_ctx cT');
+      let ss = x, App (Const c, var_list_of_ctx cT') in
+      let delta' = compose_single_with_subst ss (delta @ [x, Var x]) in
+      Debug.print (fun () -> "delta' = " ^ print_subst delta');
+      let id_cD' = psubst_of_ctx cD1 in
+      let pdelta = List.map (fun (x, e) -> x, Innac e) delta in
+      Debug.print (fun () -> "pdelta = " ^ print_psubst pdelta);
+      let pss = x, PConst (c, simul_psubst_on_list pdelta (pvar_list_of_ctx cT)) in
+      Debug.print (fun () -> "pss = " ^ print_psubst [pss]);
+      let pdelta = compose_psubst pdelta id_cD' in
+      Debug.print (fun () -> "pdelta = " ^ print_psubst pdelta);
+      let pdelta_shift = pdelta @ [x, PVar x] in
+      let pdelta' = compose_single_with_psubst pss pdelta_shift in
+      Debug.print (fun () -> "pdelta' = " ^ print_psubst pdelta');
+      let cD'', delta'' = cD' @ (simul_subst_on_ctx delta' cD2), (pats_of_psubst (shift_psubst_by_ctx pdelta' cD2)) in
+      Debug.print (fun () -> "Split! \ncD2 = " ^ print_ctx cD2 ^ "\ndelta' = " ^ print_psubst pdelta'
+        ^ "\n delta'' = " ^ print_pats delta'' ^ "\n cD'' = " ^ print_ctx cD'');
+      Debug.deindent ();
+      cD'', delta''
+    else
+      raise (Error.Error ("Get a grip!, wrong constructor. n = \"" ^ n ^ "\"; n' = \"" ^ n' ^ "\""))
 
 let split_rec (sign : signature) (ps : pats) (cD : ctx) : ctx * ctx_map =
   let rec search p1 p2 cD1 cD2 =

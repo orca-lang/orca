@@ -44,6 +44,6 @@ syn step : tm -> tm -> * where
 | s-app2 : (m : tm ->> tm) -> (n : tm) -> step (app (lam (\x.m ' x)) n) (m ' n) 
 
 def copy : (g : ctx) -> (g |- tm) -> (g |- tm) where
-(*) | g (app M N) => app (copy g M) (copy g N)
+| g (app M N) => app (copy g M) (copy g N)
 (*) | g (lam (\x. M)) => lam (\x. copy (g, x) M)
 | g x => x
