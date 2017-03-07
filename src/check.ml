@@ -233,7 +233,7 @@ and check_syn_type (sign, cG) cP (e : exp) : unit =
       in
       check_tel_type cG tel;
       check_syn_type (sign, cG) cP e'
-  
+
     | Const n -> if lookup_syn_def n sign = [] then ()
       else raise (Error.Error ("Type " ^ n ^ " is not fully applied."))
     | App (Const n, es) ->
@@ -244,7 +244,7 @@ and check_syn_type (sign, cG) cP (e : exp) : unit =
       end
     | _ -> raise (Error.Error (print_exp e ^ " is not a syntactic type."))
   end; Debug.deindent ()
-    
+
 and check_ctx (sign, cG) g =
   match g with
   | Snoc (g, _, e) ->
@@ -272,6 +272,7 @@ and check_syn (sign, cG) cP (e : exp) (t : exp) =
       | [] -> check_syn (sign, cG) (append_bctx cP' cP) e t
       | _ -> check_syn (sign, cG) (append_bctx cP' cP) e (SPi (tel', t))
       end
+    | _, Ctx -> check_ctx (sign, cG) e
     | e, t when is_syntax e ->
       Debug.print(fun ()-> "Expression " ^ print_exp e ^ " is syntactic and thus being inferred");
       let t' = match infer_syn (sign, cG) cP e with

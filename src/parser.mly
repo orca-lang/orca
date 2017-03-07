@@ -8,7 +8,7 @@ open Syntax.Ext
 %token DATA SYN DEF MID RARR COLON SEMICOLON WHERE EQ UNDERSCORE PATTERNWILD CTX
 %token LPAREN RPAREN LCURLY RCURLY LSQUARE RSQUARE
 %token FN LAM APPL
-%token STAR ARR SARR TURNSTILE TTS (* term turnstile *)
+%token STAR ARR SARR TURNSTILE TTS (* term turnstile *) STT
 %token <int>SET
 %token <string>IDENT
 %token <string option>HOLE
@@ -16,7 +16,7 @@ open Syntax.Ext
 %token COMMA EMPTYS DOT NIL
 %token <int>SHIFT
 
-%nonassoc TURNSTILE TTS
+%nonassoc TURNSTILE TTS STT
 %nonassoc DOT RARR
 %left COMMA SEMICOLON
 %nonassoc COLON
@@ -121,7 +121,8 @@ pattern:
 | c = IDENT ps = simple_pattern+ {PConst (c, ps)}
 | p = pattern COLON t = exp {PAnnot (p, t)}
 | x = IDENT LSQUARE p = pattern RSQUARE {PClos (x, p)}
-| p1 = pattern SEMICOLON p2 = pattern {PSubst (p1, p2)}
+| p1 = pattern SEMICOLON p2 = pattern {PDot (p1, p2)}
 | s = pattern COMMA e = pattern {PComma (s, e)}
 | p1 = pattern TTS p2 = pattern {PBox (p1, p2)}
+| STT x = IDENT {PPar x}
 | p = simple_pattern {p}

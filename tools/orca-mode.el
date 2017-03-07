@@ -20,7 +20,8 @@
   '(("\\" . ?λ)
     ("|-" . ?⊢)
     (":>" . ?▷)
-;;    ("->>"    . ?↠) ;; It is really difficult to distinguish from the other one
+    ("<:" . ?◁)
+    ("->>"   . ?➾) ;; It is really difficult to distinguish from the other one
     ("->"    . ?→)
     ("=>"    . ?⇒)
     ("\\0"   . ?∅)

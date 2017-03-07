@@ -88,6 +88,8 @@ and whnf (sign : signature) (e : exp) : exp =
        whnf sign (App(h, sp @ sp'))
     | App(h, []) ->
        whnf sign h
+    | Pi (tel, Pi (tel', t)) -> whnf sign (Pi (tel @ tel', t))
+    | SPi (tel, SPi (tel', t)) -> whnf sign (SPi (tel @ tel', t))
 
     | Const n ->
        begin match lookup_sign_def n sign with
@@ -113,6 +115,7 @@ and whnf (sign : signature) (e : exp) : exp =
        | h -> App(h, sp)
        end
     | Annot(e, _) -> whnf sign e
+
 
     | e -> rewrite sign e
   in

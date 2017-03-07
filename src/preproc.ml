@@ -283,7 +283,7 @@ let rec pproc_pat (s : sign) cG cP p =
     end
   | E.PEmptyS -> cG, I.PEmptyS
   | E.PShift i -> cG, I.PShift i
-  | E.PSubst (p1, p2) ->
+  | E.PDot (p1, p2) ->
     let cG', p1' = f p1 in
     let cG'', p2' = pproc_pat s cG' cP p2 in
     cG'', I.PDot (p1', p2')
@@ -295,6 +295,9 @@ let rec pproc_pat (s : sign) cG cP p =
       pproc_pat s cG cP' p
     else
       raise (Error.Error "Bound variables bindings (:>) cannot be nested")
+  | E.PPar n ->
+     let cG', n' = add_name_ctx cG n in
+     cG', I.PPar n'
   | E.PUnder -> cG, I.PUnder
   | E.PWildcard -> cG, I.PWildcard
 

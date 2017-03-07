@@ -93,7 +93,7 @@ let rec unify_flex (sign, cG) flex e1 e2 =
          else
            raise (Unification_failure (Different_constuctors (n, n')))
 
-      | Var n, Var n' when n = n' -> cG, [n, Var n]
+      | Var n, Var n' when n = n' -> cG, []
 
       | Var n, _ when is_flex n ->
          if not (occur_check n e2) then

@@ -32,12 +32,13 @@ module Ext = struct
     | PIdent of name
     | Innac of exp
     | PLam of name list * pat
+    | PPar of name
     | PConst of name * pat list
     | PAnnot of pat * exp
     | PClos of name * pat
     | PEmptyS
     | PShift of int
-    | PSubst of pat * pat
+    | PDot of pat * pat
     | PNil
     | PComma of pat *  pat
     | PBox of pat * pat
@@ -93,9 +94,10 @@ module Ext = struct
     | PBox (p1, p2) -> "(:> " ^ print_pat p1 ^ " " ^ print_pat p2 ^ ")"
     | PEmptyS -> "^"
     | PShift i -> "(^ " ^ string_of_int i ^ ")"
-    | PSubst (p1, p2) -> "(; " ^ print_pat p1 ^ " " ^ print_pat p2 ^ ")"
+    | PDot (p1, p2) -> "(; " ^ print_pat p1 ^ " " ^ print_pat p2 ^ ")"
     | PNil -> "0"
     | PComma (p1, p2) -> "(, " ^ print_pat p1 ^ " " ^ print_pat p2 ^ ")"
+    | PPar x -> "(<:" ^ x ^ ")"
     | PUnder -> "_"
     | PWildcard -> "._"
 
@@ -172,6 +174,7 @@ module Int = struct
     | PDot of pat * pat
     | PNil
     | PSnoc of pat * string * pat
+    | PPar of name
     | PUnder
     | PWildcard
 
@@ -239,6 +242,7 @@ module Int = struct
   let rec fv_pat =
     function
     | PVar n -> [n]
+    | PPar _ -> []
     | PBVar i -> []
     | Innac e -> []
     | PLam (f, p) -> fv_pat p
@@ -447,6 +451,8 @@ module Int = struct
     match p with
     | PVar n when n = x -> p'
     | PVar n -> PVar n
+    | PPar n when n = x -> p'   (* MMMMM *)
+    | PPar n -> PPar n
     | PBVar i -> PBVar i
     | Innac e -> Innac e        (* MMMMM *)
     | PLam (f, p) -> PLam(f, psubst s p)
@@ -519,6 +525,7 @@ module Int = struct
 
   let rec print_pat (p : pat) : string = match p with
     | PVar n -> print_name n
+    | PPar n -> "(<: " ^ print_name n ^ ")"
     | PBVar i -> "(i " ^ string_of_int i ^ ")"
     | Innac e -> "." ^ print_exp e
     | PLam (f, p) -> "(\ " ^ String.concat " " f ^ " " ^ print_pat p ^ ")"
@@ -579,6 +586,7 @@ module Int = struct
 
   let rec exp_of_pat : pat -> exp = function
     | PVar n -> Var n
+    | PPar n -> Var n           (* MMMMM *)
     | PBVar i -> BVar i
     | Innac e -> e
     | PLam (f, p) -> Lam (f, exp_of_pat p)

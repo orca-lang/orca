@@ -81,6 +81,7 @@ let rec main_scanner pos = lexer
   | "|-" -> add_word pos (Ulexing.lexeme_length lexbuf), TURNSTILE
   | "⊢" -> add_word pos (Ulexing.lexeme_length lexbuf), TURNSTILE
   | ":>" -> add_word pos (Ulexing.lexeme_length lexbuf), TTS
+  | "<:" -> add_word pos (Ulexing.lexeme_length lexbuf), STT
   | "(" -> add_word pos (Ulexing.lexeme_length lexbuf), LPAREN
   | ")" -> add_word pos (Ulexing.lexeme_length lexbuf), RPAREN
   | "{" -> add_word pos (Ulexing.lexeme_length lexbuf), LCURLY
