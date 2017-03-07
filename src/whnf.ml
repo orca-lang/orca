@@ -16,6 +16,10 @@ let rec match_pat sign p e =
   match p, e with
   | Innac _, _ -> []
   | PVar n, e -> [n, e]
+  | PPar n, BVar i -> [n, BVar i]
+  | PBVar i, BVar i' when i = i' -> []
+  | PLam (_, p), Lam (_, e) -> match_pat sign p e
+
   | PConst (n, []), Const n' when n = n' -> []
   | PConst (n, ps), App(Const n', sp) when n = n' ->
      match_pats sign ps sp
@@ -23,8 +27,7 @@ let rec match_pat sign p e =
      raise (Matching_failure (p, e))
   | _ -> raise (Matching_failure (p, e))
 
-(* | PBVar i -> *)
-(* | PLam (f, p) -> *)
+
 (* | PAnnot (p, e) -> *)
 (* | PClos (n, p) -> *)
 (* | PEmptyS -> *)
