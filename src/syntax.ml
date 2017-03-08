@@ -3,6 +3,7 @@ type icit = Explicit | Implicit
 module Ext = struct
 
   type name = string
+  module N = Name
 
   type exp = raw_exp Location.t
    and raw_exp
@@ -32,6 +33,10 @@ module Ext = struct
     | Innac of exp
     | PLam of name list * pat
     | PPar of name
+    | PBVar of int     (* This is used only during preprocessing *)
+    | PVar of N.name   (* This is used only during preprocessing *)
+    | PPar' of N.name  (* This is used only during preprocessing *)
+    | PClos' of N.name * exp (* This is used only during preprocessing *)
     | PConst of name * pat list
     | PClos of name * exp
     | PEmptyS
@@ -82,11 +87,15 @@ module Ext = struct
     | Ctx -> "ctx"
 
   let rec print_pat (p : pat) : string = match p with
+    | PBVar i -> "i " ^ string_of_int i
+    | PVar n -> N.print_name n
+    | PPar' n -> N.print_name n
     | PIdent n -> n
     | Innac e -> "(. " ^ print_exp e ^ ")"
     | PLam (f, p) -> "(\ " ^ String.concat " " f ^ " " ^ print_pat p ^ ")"
     | PConst (n, ps) -> "(" ^ n ^ " " ^ (String.concat " " (List.map (fun p -> "(" ^ print_pat p ^ ")") ps)) ^ ")"
     | PClos (n, e) -> "([] " ^ n ^ " " ^ print_exp e ^ ")"
+    | PClos' (n, e) -> "([] " ^ N.print_name n ^ " " ^ print_exp e ^ ")"
     | PBox (p1, p2) -> "(:> " ^ print_pat p1 ^ " " ^ print_pat p2 ^ ")"
     | PEmptyS -> "^"
     | PShift i -> "(^ " ^ string_of_int i ^ ")"

@@ -18,14 +18,17 @@ syn step : tm -> tm -> * where
 | s-app1 : (m : tm) -> (n : tm) -> (m' : tm) -> step m m' -> step (app m n) (app m' n)
 | s-app2 : (a : tm ->> tm) -> (b : tm) -> step (app (lam (\x.a ' x)) b) (a ' b)
 
-def copy : (g : ctx) -> (g |- tm) -> (g |- tm) where
-| g one => one
-| g (app M N) => app (copy g M) (copy g N)
-| g (lam (\x. M)) => lam (\x. copy (g, tm) M)
-| g (<:x) => x
+def tps : (m n : (|- tm)) (t : (|- tp)) -> (|- oft m t) -> (|- step m n) -> (|- oft n t) where
+| (app m n) (app m' .n) t (t-app .m .n s .t d1 d2) (s-app1 .m .n .m' e) =>
+  t-app m' n s t (tps m m' (arr s t) d1 e) d2
+(*) | (app .(lam (\x.m[^1] ' x)) n) .(m ' n) t
+(*)   (t-app (lam .(\x.m[^1] ' x)) .n s .t (t-lam .s .t .(\x.m[^1] ' x) (\x.(\u.d1))) d2) (s-app2 m .n) =>
+(*)   d1[^0 ; ? ; d2]
 
-def copy-oft : (g : ctx) -> (m : (g |- tm)) -> (t : (|- tp)) -> (g |- oft m (t[^])) ->  (g |- oft m (t[^])) where
-| g one unit t-unit => t-unit
-| g (app f e) t (t-app .f .e (s[^]) .(t[^]) d1 d2) =>
-  t-app f e s[^] t[^] (copy-oft g f (arr s t) d1) (copy-oft g e s d2)
-| g m t d => d
+
+
+(*) Negative test case
+
+
+(*) def test1 : nat -> nat where
+(*) | (<: x) => x

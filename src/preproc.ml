@@ -65,20 +65,20 @@ let add_name_bvars c n : bctx = n @ c
 
 let isEmpty = (=) []
 
-let find_pat_name (s : sign) (cG : ctx) (cP : bctx) (n : E.name) : ctx * I.pat =
+let find_pat_name (s : sign) (cG : ctx) (cP : bctx) (n : E.name) : ctx * E.pat =
     begin
       match index n cP with
-      | Some i -> cG, I.PBVar i
+      | Some i -> cG, E.PBVar i
       | None ->
         if List.mem n s then
-          cG, I.PConst (n, [])
+          cG, E.PConst (n, [])
         else
           begin
             match lookup n cG with
             | Some _ -> raise (Error.Error ("Repeated variable " ^ n ^ " in pattern spine"))
             | None ->
               let cG', n' = add_name_ctx cG n in
-              cG', I.PVar n'
+              cG', E.PVar n'
           end
     end
 
@@ -250,39 +250,78 @@ let pproc_param s cG (is_syntax : bool) (icit, n, e) =
   let cG', n' = add_name_ctx cG n in
   cG', (icit, n', pproc_exp s cG [] e)
 
+let rec collect_pat_vars (s : sign) cG cP p =
+  match p with
+  | E.PIdent n -> find_pat_name s cG cP n
+  | E.Innac e -> cG, E.Innac e
+  | E.PLam (x, p) ->
+    let cG', p' = collect_pat_vars s cG (add_name_bvars cP x) p in
+    cG', E.PLam (x,  p')
+  | E.PConst (c, ps) ->
+    let g (cG, ps) p =
+      let cG', p' = collect_pat_vars s cG cP p in
+      cG', p' :: ps
+    in
+    let cG', ps' = List.fold_left g (cG, []) ps in
+    cG', E.PConst (c, List.rev ps')
+  | E.PClos (x, e) ->
+    begin match find_pat_name s cG cP x with
+    | cG', E.PVar n -> 
+      cG', E.PClos' (n, e)
+    | cG', _ -> raise (Error.Error "Substitution can only be applied to pattern variables")
+    end
+  | E.PEmptyS -> cG, E.PEmptyS
+  | E.PShift i -> cG, E.PShift i
+  | E.PDot (p1, p2) ->
+    let cG', p1' = collect_pat_vars s cG cP p1 in
+    let cG'', p2' = collect_pat_vars s cG' cP p2 in
+    cG'', E.PDot (p1', p2')
+  | E.PNil -> cG, E.PNil
+  | E.PComma (p1, p2) -> assert false
+  | E.PBox (g, p) ->
+    if isEmpty cP then
+      let cP' = get_bound_var_ctx_in_pat g in
+      collect_pat_vars s cG cP' p
+    else
+      raise (Error.Error "Bound variables bindings (:>) cannot be nested")
+  | E.PPar n ->
+    begin match find_pat_name s cG cP n with
+    | cG', E.PVar n' -> cG', E.PPar' n'
+    | _ -> raise (Error.Error (n ^ " was marked as parameter variable but was identified to be something else"))
+    end
+    | E.PUnder -> cG, E.PUnder
+  | E.PWildcard -> cG, E.PWildcard
+  | _ -> raise (Error.Violation ("Found temporary constructors that can only be created by this function"))
+
+
 let rec pproc_pat (s : sign) cG cP p =
   let print_ctx cG = "[" ^ String.concat ", " (List.map (fun (e, i) -> e ^ ", " ^ Name.print_name i) cG) ^ "]" in
   let f pat = pproc_pat s cG cP pat in
   Debug.print (fun () -> "Procesing pattern : " ^ E.print_pat p ^ " with current context " ^ print_ctx cG);
   match p with
-  | E.PIdent n -> find_pat_name s cG cP n
+  | E.PIdent _ -> raise (Error.Violation "Found PIdent on second pass")
+  | E.PPar _ -> raise (Error.Violation "Found PPar on second pass")
+  | E.PClos _ ->  raise (Error.Violation "Found PClos on second pass")
+  | E.PPar' n -> I.PPar n
+  | E.PVar n -> I.PVar n
+  | E.PBVar i -> I.PBVar i
   | E.Innac e ->
      Debug.print (fun () -> "Preprocessing inaccessible pattern " ^ E.print_exp e ^ " in context " ^ print_ctx cG);
-     cG, I.Innac (pproc_exp s cG [] e)
+     I.Innac (pproc_exp s cG [] e)
   | E.PLam (x, p) ->
-    let cG', p' = pproc_pat s cG (add_name_bvars cP x) p in
-    cG', I.PLam (x,  p')
+    I.PLam (x, pproc_pat s cG (add_name_bvars cP x) p)
   | E.PConst (c, ps) ->
-    let g (cG, ps) p =
-      let cG', p' = pproc_pat s cG cP p in
-      cG', p' :: ps
-    in
-    let cG', ps' = List.fold_left g (cG, []) ps in
-    cG', I.PConst (c, List.rev ps')
-  | E.PClos (x, e) ->
-    begin match find_pat_name s cG cP x with
-    | cG', I.PVar n ->
-      let e' = pproc_exp s cG' cP e in
-      cG', I.PClos (n, e')
-    | cG', _ -> raise (Error.Error "Substitution can only be applied to pattern variables")
-    end
-  | E.PEmptyS -> cG, I.PEmptyS
-  | E.PShift i -> cG, I.PShift i
+    let ps' = List.map (pproc_pat s cG cP) ps in
+    I.PConst (c, ps')
+  | E.PClos' (x, e) ->
+    let e' = pproc_exp s cG cP e in
+    I.PClos (x, e')
+      
+  | E.PEmptyS -> I.PEmptyS
+  | E.PShift i -> I.PShift i
   | E.PDot (p1, p2) ->
-    let cG', p1' = f p1 in
-    let cG'', p2' = pproc_pat s cG' cP p2 in
-    cG'', I.PDot (p1', p2')
-  | E.PNil -> cG, I.PNil
+    I.PDot (f p1, f p2)
+  | E.PNil -> I.PNil
   | E.PComma (p1, p2) -> assert false
   | E.PBox (g, p) ->
     if isEmpty cP then
@@ -290,22 +329,25 @@ let rec pproc_pat (s : sign) cG cP p =
       pproc_pat s cG cP' p
     else
       raise (Error.Error "Bound variables bindings (:>) cannot be nested")
-  | E.PPar n ->
-     let cG', n' = add_name_ctx cG n in
-     cG', I.PPar n'
-  | E.PUnder -> cG, I.PUnder
-  | E.PWildcard -> cG, I.PWildcard
+  | E.PUnder -> I.PUnder
+  | E.PWildcard -> I.PWildcard
 
 let rec pproc_pats s cG = function
+  | [] -> []
+  | p :: ps ->
+    pproc_pat s cG [] p :: pproc_pats s cG ps
+
+let rec collect_pats_vars s cG = function
   | [] -> cG, []
   | p :: ps ->
-     let cG', p' = pproc_pat s cG [] p in
-     let cG'', ps' = pproc_pats s cG' ps in
+     let cG', p' = collect_pat_vars s cG [] p in
+     let cG'', ps' = collect_pats_vars s cG' ps in
      cG'', p' :: ps'
-
+       
 let pproc_def_decl s (pats, e) =
-  let cG', pats' = pproc_pats s [] pats in
-  (pats', I.Just (pproc_exp s cG' [] e))
+  let cG, pats' = collect_pats_vars s [] pats in
+  let pats'' = pproc_pats s cG pats' in
+  (pats'', I.Just (pproc_exp s cG [] e))
 
 let params_to_ctx = List.map2 (fun (_, n, _) (_, n', _) -> n, n')
 

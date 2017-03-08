@@ -23,13 +23,16 @@ let initial_pos file_name = { Lexing.pos_fname = file_name
 			    ; Lexing.pos_bol = 0
 			    ; Lexing.pos_cnum = 0
 			    }
-let add_line pos = { pos with
-		     Lexing.pos_lnum = pos.Lexing.pos_lnum +1
-		   ; Lexing.pos_bol = pos.Lexing.pos_bol + pos.Lexing.pos_cnum
-		   ; Lexing.pos_cnum = 0
-		   }
+
 let add_word pos length = { pos with Lexing.pos_cnum = pos.Lexing.pos_cnum + length }
 
+let add_line pos length =
+  let pos' = add_word pos length in
+  { pos' with
+    Lexing.pos_lnum = pos.Lexing.pos_lnum + 1
+    ; Lexing.pos_bol = pos.Lexing.pos_cnum
+}
+  
 let remove_set_ s = String.sub s 4 (String.length s - 4)
 let remove_set s = String.sub s 3 (String.length s - 3)
 
@@ -44,7 +47,7 @@ let remove_leading_char ch s =
 
 let rec main_scanner pos = lexer
   | wsp | tab -> main_scanner (add_word pos 1) lexbuf (* ignore whitespace *)
-  | nl -> main_scanner (add_line pos) lexbuf   (* ignores new lines *)
+  | nl -> main_scanner (add_line pos (Ulexing.lexeme_length lexbuf)) lexbuf   (* ignores new lines *)
   | "(*)" -> linecomment (add_word pos (Ulexing.lexeme_length lexbuf)) lexbuf
   | "(*" -> comment pos 0 lexbuf
   | eof -> add_word pos (Ulexing.lexeme_length lexbuf), EOF
@@ -106,11 +109,11 @@ and comment pos level = lexer
   | "(*)" -> comment (add_word pos 2) level lexbuf
   | "*)" -> if level = 0 then main_scanner (add_word pos 2) lexbuf else comment (add_word pos 2) (level-1) lexbuf
   | "(*" -> comment (add_word pos 2) (level+1) lexbuf
-  | "\n" -> comment (add_line pos) level lexbuf
+  | "\n" -> comment (add_line pos (Ulexing.lexeme_length lexbuf)) level lexbuf
   | eof -> raise (Error "Found end of file inside of a block comment.\n\nPlease close comment block.")
   | _ -> comment (add_word pos (Ulexing.lexeme_length lexbuf)) level lexbuf
 
 and linecomment pos = lexer
-    | nl -> main_scanner (add_line pos) lexbuf
+    | nl -> main_scanner (add_line pos (Ulexing.lexeme_length lexbuf)) lexbuf
     | _  -> linecomment (add_word pos (Ulexing.lexeme_length lexbuf)) lexbuf
     | eof -> add_word pos (Ulexing.lexeme_length lexbuf), EOF
