@@ -175,7 +175,7 @@ let split_clos (sign : signature) (p1 : pats) (n, s : name * exp) (cD1 : ctx)
   in
   let g' = infer_syn (sign, cD1) (contextify (sign, cD1) g) s in
   check_ctx (sign, cD1) g';
-  compute_split_map (x, Var n) (x, PClos(n, s)) cD1 x cD2 [] [] (cD1 @ [x, Box (g', t)])
+  compute_split_map (x, Var n) (x, PClos(n, s)) cD1 x cD2 [] [] (cD1 @ [n, Box (g', t)])
     
 let split_rec (sign : signature) (ps : pats) (cD : ctx) : ctx * ctx_map =
   let rec search p1 p2 cD1 cD2 =
@@ -269,7 +269,7 @@ let check_pats (sign : signature) (p : pats) (cG : ctx) : ctx * ctx_map =
     | _ -> raise (Error.Violation "Length error in unify names")
   in
   let cG' = unify_names p cG in
-  Debug.print (fun () -> "Tremendous unification of names: cG = " ^ print_ctx cG ^ ", cG' = "
+  Debug.print (fun () -> "Unifying of names: cG = " ^ print_ctx cG ^ ", cG' = "
                          ^ print_ctx cG' ^ ", using patterns p = " ^ print_pats p);
   let cG = cG' in
   let rec check_pats (p : pats) (sigma : ctx_map) (cD : ctx) : ctx * ctx_map =

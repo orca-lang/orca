@@ -355,14 +355,14 @@ and check_syn_spine (sign, cG) cP sp tel t =
   Debug.indent ();
   let res = match sp, tel with
     | e::sp', (_, x, s)::tel ->
-      let s = match Whnf.whnf sign s with
+      begin match Whnf.whnf sign s with
         | Box(g, s) ->
-          let cD, sigma = unify_ctx (sign, cG) s g cP in
-          simul_subst sigma s
-        | s -> s
-      in
+          check_syn (sign, cG) (contextify (sign, cG) g) e s
+          (* let cD, sigma = unify_ctx (sign, cG) s g cP in *)
+          (* simul_subst sigma s *)
+        | s -> check_syn (sign, cG) cP e s
+      end;
       Debug.print (fun () -> "Checking syn spine:\ne = " ^ print_exp e ^ "\ns = " ^ print_exp s);
-      check_syn (sign, cG) cP e s ;
       let tel', t' = subst_pi (x, e) tel t in
       check_syn_spine (sign, cG) cP sp' tel' t'
   | [], [] -> t

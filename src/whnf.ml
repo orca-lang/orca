@@ -2,7 +2,8 @@ open Syntax.Int
 open Sign
 
 exception Matching_failure of pat * exp
-
+exception Stuck
+    
 let rec cong_stel tel s =
   match tel with
   | [] -> [], s
@@ -25,8 +26,8 @@ let rec match_pat sign p e =
      match_pats sign ps sp
   | PConst (n, _), App(Const n', _) ->
      raise (Matching_failure (p, e))
+  | _, Var _ -> raise Stuck
   | _ -> raise (Matching_failure (p, e))
-
 
 (* | PAnnot (p, e) -> *)
 (* | PClos (n, p) -> *)
@@ -77,9 +78,11 @@ and reduce_with_clauses sign sp cls =
     None
   else
     let sp1, sp2 = split cl_l sp in
-    match reduce sp1 cls with
-    | None -> raise (Error.Error ("Coverage error"))
-    | Some e -> Some (e, sp2)
+    try
+      match reduce sp1 cls with
+      | None -> raise (Error.Error ("Coverage error"))
+      | Some e -> Some (e, sp2)
+    with Stuck -> None
 
 
 and whnf (sign : signature) (e : exp) : exp =
@@ -195,6 +198,9 @@ and rewrite (sign : signature) (e : exp) : exp =
 
   (* Id *)
   | Clos (e, Shift 0) -> w e
+
+  (* Empty Subst *)
+  | Clos (e, EmptyS) -> w e
 
   (* Congruence rules *)
   | Clos (Const n, _) -> w (Const n)
