@@ -100,7 +100,6 @@ let rec get_bound_var_ctx_no_annot (e : E.exp) : bctx =
 
 let rec get_bound_var_ctx_in_pat (p : E.pat) : bctx =
   match p with
-  | E.PComma (g, E.PAnnot(E.PIdent n, _)) -> n :: (get_bound_var_ctx_in_pat g)
   | E.PComma (g, E.PIdent n) -> n :: (get_bound_var_ctx_in_pat g)
   | E.PNil -> []
   | E.PIdent _ -> []
@@ -271,14 +270,11 @@ let rec pproc_pat (s : sign) cG cP p =
     in
     let cG', ps' = List.fold_left g (cG, []) ps in
     cG', I.PConst (c, List.rev ps')
-  | E.PAnnot (p, t) ->
-    let cG', p' = f p in
-    cG', I.PAnnot (p', pproc_exp s [] [] t)
-  | E.PClos (x, p) ->
+  | E.PClos (x, e) ->
     begin match find_pat_name s cG cP x with
     | cG', I.PVar n ->
-      let cG'', p2' = pproc_pat s cG' cP p in
-      cG'', I.PClos (n, p2')
+      let e' = pproc_exp s cG' cP e in
+      cG', I.PClos (n, e')
     | cG', _ -> raise (Error.Error "Substitution can only be applied to pattern variables")
     end
   | E.PEmptyS -> cG, I.PEmptyS

@@ -208,7 +208,6 @@ and check_pi (sign, cG) tel t =
      | _ -> raise (Error.Error ("Expression " ^ print_exp (Pi(tel,t)) ^ " cannot be checked to be a type."))
      end
 
-
 and check_syn_type (sign, cG) cP (e : exp) : unit =
   Debug.print (fun () -> "Checking syntactic type " ^ print_exp e ^ " in context " ^ print_ctx cG);
   Debug.indent ();

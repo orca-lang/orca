@@ -119,8 +119,7 @@ simple_pattern:
 pattern:
 | LAM x = IDENT+ DOT p = pattern {PLam (x, p)}
 | c = IDENT ps = simple_pattern+ {PConst (c, ps)}
-| p = pattern COLON t = exp {PAnnot (p, t)}
-| x = IDENT LSQUARE p = pattern RSQUARE {PClos (x, p)}
+| x = IDENT LSQUARE e = exp RSQUARE {PClos (x, e)}
 | p1 = pattern SEMICOLON p2 = pattern {PDot (p1, p2)}
 | s = pattern COMMA e = pattern {PComma (s, e)}
 | p1 = pattern TTS p2 = pattern {PBox (p1, p2)}

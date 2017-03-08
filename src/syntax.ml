@@ -34,8 +34,7 @@ module Ext = struct
     | PLam of name list * pat
     | PPar of name
     | PConst of name * pat list
-    | PAnnot of pat * exp
-    | PClos of name * pat
+    | PClos of name * exp
     | PEmptyS
     | PShift of int
     | PDot of pat * pat
@@ -89,8 +88,7 @@ module Ext = struct
     | Innac e -> "(. " ^ print_exp e ^ ")"
     | PLam (f, p) -> "(\ " ^ String.concat " " f ^ " " ^ print_pat p ^ ")"
     | PConst (n, ps) -> "(" ^ n ^ " " ^ (String.concat " " (List.map (fun p -> "(" ^ print_pat p ^ ")") ps)) ^ ")"
-    | PAnnot (p, e) -> "(: " ^ print_pat p ^ " " ^ print_exp e ^ ")"
-    | PClos (n, p) -> "([] " ^ n ^ " " ^ print_pat p ^ ")"
+    | PClos (n, e) -> "([] " ^ n ^ " " ^ print_exp e ^ ")"
     | PBox (p1, p2) -> "(:> " ^ print_pat p1 ^ " " ^ print_pat p2 ^ ")"
     | PEmptyS -> "^"
     | PShift i -> "(^ " ^ string_of_int i ^ ")"
@@ -167,8 +165,7 @@ module Int = struct
     | Innac of exp
     | PLam of string list * pat
     | PConst of def_name * pat list
-    | PAnnot of pat * exp
-    | PClos of name * pat
+    | PClos of name * exp
     | PEmptyS
     | PShift of int
     | PDot of pat * pat
@@ -247,8 +244,7 @@ module Int = struct
     | Innac e -> []
     | PLam (f, p) -> fv_pat p
     | PConst (n, ps) -> fv_pats ps
-    | PAnnot (p, e) -> fv_pat p
-    | PClos (n, p) ->  fv_pat p
+    | PClos (n, p) ->  [n] 
     | PEmptyS -> []
     | PShift i -> []
     | PDot (p1, p2) -> fv_pat p1 @ fv_pat p2
@@ -447,6 +443,22 @@ module Int = struct
 
   let compose_subst sigma delta = List.map (fun (x, t) -> x, simul_subst sigma t) delta
 
+let rec exp_of_pat : pat -> exp = function
+    | PVar n -> Var n
+    | PPar n -> Var n           (* MMMMM *)
+    | PBVar i -> BVar i
+    | Innac e -> e
+    | PLam (f, p) -> Lam (f, exp_of_pat p)
+    | PConst (n, ps) -> App (Const n, List.map exp_of_pat ps)
+    | PClos (n, e) -> Clos (Var n, e)
+    | PEmptyS -> EmptyS
+    | PShift i -> Shift i
+    | PDot (p1, p2) -> Dot (exp_of_pat p1, exp_of_pat p2)
+    | PNil -> Nil
+    | PSnoc (p1, x, p2) -> Snoc (exp_of_pat p1, x, exp_of_pat p2)
+    | PUnder -> Under
+    | PWildcard -> raise (Error.Violation "We'd also be very surprised if this were to happen.")
+    
   let rec psubst ((x, p') as s) (p : pat) :  pat =
     match p with
     | PVar n when n = x -> p'
@@ -454,12 +466,15 @@ module Int = struct
     | PPar n when n = x -> p'   (* MMMMM *)
     | PPar n -> PPar n
     | PBVar i -> PBVar i
-    | Innac e -> Innac e        (* MMMMM *)
+    | Innac e -> Innac (subst (x, exp_of_pat p') e)
     | PLam (f, p) -> PLam(f, psubst s p)
     | PConst (n, ps) -> PConst(n, List.map (psubst s) ps)
-    | PAnnot (p, e) -> PAnnot(psubst s p, e) (* MMMM should we remove PAnnot? Yaasss *)
-    | PClos (n, p) when n = x -> assert false (* MMMMMMM *)
-    | PClos (n, p) -> PClos (n, psubst s p)
+    | PClos (n, s) when n = x ->
+      begin match p' with
+      | PVar n' -> PClos (n', subst (x, exp_of_pat p') s)
+      | _ -> assert false (* MMMMMMM *)
+      end  
+    | PClos (n, s) -> PClos (n, subst (x, exp_of_pat p') s)
     | PEmptyS -> PEmptyS
     | PShift i -> PShift i
     | PDot (p1, p2) -> PDot (psubst s p1, psubst s p2)
@@ -530,8 +545,7 @@ module Int = struct
     | Innac e -> "." ^ print_exp e
     | PLam (f, p) -> "(\ " ^ String.concat " " f ^ " " ^ print_pat p ^ ")"
     | PConst (n, ps) -> "(" ^ n ^ " " ^ (String.concat " " (List.map (fun p -> "(" ^ print_pat p ^ ")") ps)) ^ ")"
-    | PAnnot (p, e) -> "(: " ^ print_pat p ^ " " ^ print_exp e ^ ")"
-    | PClos (n, p) -> "([] " ^ print_name n ^ " " ^ print_pat p ^ ")"
+    | PClos (n, e) -> "([] " ^ print_name n ^ " " ^ print_exp e ^ ")"
     | PEmptyS -> "^"
     | PShift i -> "(^ " ^ string_of_int i ^ ")"
     | PDot (p1, p2) -> "(; " ^ print_pat p1 ^ " " ^ print_pat p2 ^ ")"
@@ -583,21 +597,4 @@ module Int = struct
     | Syn (n, tel, decls) -> "(syn " ^ n ^ " " ^ print_tel tel ^ "\n" ^ print_decls decls ^ ")"
     | DefPM (n, tel, e, decls) -> "(def " ^ n ^ " (" ^ print_tel tel ^ ") " ^ print_exp e ^ "\n" ^ print_def_decls decls ^ ")"
     | Def (n, e1, e2) -> "(def " ^ n ^ " " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
-
-  let rec exp_of_pat : pat -> exp = function
-    | PVar n -> Var n
-    | PPar n -> Var n           (* MMMMM *)
-    | PBVar i -> BVar i
-    | Innac e -> e
-    | PLam (f, p) -> Lam (f, exp_of_pat p)
-    | PConst (n, ps) -> App (Const n, List.map exp_of_pat ps)
-    | PAnnot (p, e) -> Annot (exp_of_pat p, e)
-    | PClos (n, p) -> Clos (Var n, exp_of_pat p)
-    | PEmptyS -> EmptyS
-    | PShift i -> Shift i
-    | PDot (p1, p2) -> Dot (exp_of_pat p1, exp_of_pat p2)
-    | PNil -> Nil
-    | PSnoc (p1, x, p2) -> Snoc (exp_of_pat p1, x, exp_of_pat p2)
-    | PUnder -> Under
-    | PWildcard -> raise (Error.Violation "We'd also be very surprised if this were to happen.")
 end

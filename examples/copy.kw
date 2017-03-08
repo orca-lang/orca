@@ -44,7 +44,25 @@ syn step : tm -> tm -> * where
 | s-app2 : (m : tm ->> tm) -> (n : tm) -> step (app (lam (\x.m ' x)) n) (m ' n)
 
 def copy : (g : ctx) -> (g |- tm) -> (g |- tm) where
+| g one => one
 | g (app M N) => app (copy g M) (copy g N)
 | g (lam (\x. M)) => lam (\x. copy (g, tm) M)
-| g one => one
 | g (<:x) => x
+
+data nat where
+| zero : nat
+| suc : nat -> nat
+
+def sasafgq : nat -> nat = fn s => s
+
+def copy-oft : (g : ctx) -> (m : (g |- tm)) -> (t : (|- tp)) -> (g |- oft m (t[^])) ->  (g |- oft m (t[^])) where
+| g one unit t-unit => t-unit
+| g (app f e) t (t-app .f .e (s[^]) .(t[^]) d1 d2) =>
+   t-app (copy g f) (copy g e) s (t[^]) (copy-oft g f (arr t[^] s[^]) d1) (copy-oft g e s d2)
+| g m t d => d
+
+(*) Negative test case
+
+
+(*) def test1 : nat -> nat where
+(*) | (<: x) => x

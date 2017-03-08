@@ -13,16 +13,20 @@ let rec subst_of_ctx_map (sigma : ctx_map) (tel : tel) : subst =
 
 let compose_maps (sigma : ctx_map) (cD : ctx) (delta : ctx_map) : ctx_map =
   let delta_names = List.map2 (fun (x, _) p -> x, p) cD delta in
+  Debug.print(fun () -> "Composing maps\nsigma = " ^ print_pats sigma 
+      ^ "\ndelta = " ^ print_pats delta ^ "\ndelta_names" ^ print_psubst delta_names);
   List.map (simul_psubst delta_names) sigma
 
 let rec matching (p : pat) (q : pat) : pats =
   match p, q with
   | PVar n, _ -> [q]
-  | PPar n, _ -> [q]
+  | PPar n, PPar n' -> [PVar n']
   | Innac e, _ ->  []
   | PConst (n, ps) , PConst (n', qs) when n = n' -> matchings ps qs
   | PConst (n, ps) , PConst (n', qs) -> raise(Error.Error "Pattern matching does not match.")
   | PLam (xs, p), PLam (ys, q) -> matching p q
+  | PClos (n, _), PClos (n', _) -> [PVar n']
+  | PNil, PNil -> []
   | _ -> raise (Error.Error ("what is love? p = " ^ print_pat p ^ " q = " ^ print_pat q))
 
 and matchings (sigma : ctx_map) (p : pats) : pats =
@@ -68,7 +72,6 @@ let split_flex_unify (sign : signature) (p1 : pats) (thetatel : tel) (ps : pats)
   Debug.print (fun () -> "pdelta = " ^ print_psubst pdelta);
   cD', cT, delta, pdelta, cT'
 
-
 let compute_split_map (ss:single_subst) (pss:single_psubst) (cD1:ctx) (x:name)
                       (cD2:ctx) (delta : subst) (pdelta : psubst) (cD':ctx) =
   Debug.print (fun () -> "ss = " ^ print_subst [ss]);
@@ -81,7 +84,8 @@ let compute_split_map (ss:single_subst) (pss:single_psubst) (cD1:ctx) (x:name)
   let pdelta_shift = pdelta @ [x, PVar x] in
   let pdelta' = compose_single_with_psubst pss pdelta_shift in
   Debug.print (fun () -> "pdelta' = " ^ print_psubst pdelta');
-  let cD'', delta'' = cD' @ (simul_subst_on_ctx delta' cD2), (pats_of_psubst (shift_psubst_by_ctx pdelta' cD2)) in
+  let cD'', delta'' = cD' @ (simul_subst_on_ctx delta' cD2),
+    (pats_of_psubst (shift_psubst_by_ctx pdelta' cD2)) in
   Debug.print (fun () -> "Split! \ncD2 = " ^ print_ctx cD2 ^ "\ndelta' = " ^ print_psubst pdelta'
                          ^ "\n delta'' = " ^ print_pats delta'' ^ "\n cD'' = " ^ print_ctx cD'');
   Debug.deindent ();
@@ -96,12 +100,18 @@ let rec theta_of_lam g xs tel =
   | _ -> raise (Error.Error ("Somethng went wrong as always"))
 
 let split_lam (sign : signature) (p1 : pats) (xs, p : string list * pat) (cD1 : ctx)
-              (x, g, tel, t : name * exp * stel * exp) (cD2 : ctx) : ctx * ctx_map =
+              (x, t : name * exp) (cD2 : ctx) : ctx * ctx_map =
   Debug.indent ();
+  let g, tel, t = match Whnf.whnf sign t with
+    | Box(g, SPi (tel, t)) -> g, tel, t
+    | t -> raise (Error.Error ("Syntactic abstraction was define in a pattern against"
+        ^ " type which was not syntactic function type in a box. Found " ^ print_exp t))
+  in
   Debug.print (fun () -> "Split SPi(" ^ print_stel tel ^ ", " ^ print_exp t ^ ")");
   let g', tel0, tel' = theta_of_lam g xs tel in
   let vs = [Box(g, SPi (tel, t))] in
-  let thetatel = [Syntax.Explicit, gen_floating_name (), Box(g', if tel' = [] then t else SPi (tel', t))] in
+  let thetatel = [Syntax.Explicit, gen_floating_name (),
+                  Box(g', if tel' = [] then t else SPi (tel', t))] in
   let ws = [Box(g, SPi (tel0, SPi(tel', t)))] in
   let cD', cT, delta, pdelta, td = split_flex_unify sign p1 thetatel [p] cD1 vs ws in
   let e = match var_list_of_ctx td with
@@ -116,8 +126,8 @@ let split_lam (sign : signature) (p1 : pats) (xs, p : string list * pat) (cD1 : 
   let pss = x, PLam (xs, p') in
   compute_split_map ss pss cD1 x cD2 delta pdelta cD'
 
-
-let split_const (sign : signature) (p1 : pats) (c, ps : def_name * pats) (cD1 : ctx) (x, t : name * exp) (cD2 : ctx) : ctx * ctx_map =
+let split_const (sign : signature) (p1 : pats) (c, ps : def_name * pats)
+                (cD1 : ctx) (x, t : name * exp) (cD2 : ctx) : ctx * ctx_map =
   Debug.indent ();
   Debug.print (fun () -> "Split type " ^ print_exp t) ;
   let maybe_g, n, sp =
@@ -144,6 +154,29 @@ let split_const (sign : signature) (p1 : pats) (c, ps : def_name * pats) (cD1 : 
     else
       raise (Error.Error ("Get a grip!, wrong constructor. n = \"" ^ n ^ "\"; n' = \"" ^ n' ^ "\""))
 
+let check_ppar (sign : signature) (p1 : pats) (n : name) (cD1 : ctx)
+    (x, t : name * exp) (cD2 : ctx) : ctx * ctx_map =
+  let g, t = match Whnf.whnf sign t with
+    | Box (Nil, t) -> raise (Error.Error "Matched on a parameter variable when context was expected to be empty")
+    | Box (g, t) -> g, t
+    | t -> raise (Error.Error ("Parameter variables can only be used against a boxed type. Found " ^ print_exp t))
+  in
+  compute_split_map (x, Var n) (x, PPar n) cD1 x cD2 [] [] (cD1 @ [x, Box (g, t)])
+  (* (\* let cD' = cD1 @ [n, Box (g, t)] @ (simul_subst_on_ctx [x, Var n] cD2) in *\) *)
+  (* let delta =  *)
+
+let split_clos (sign : signature) (p1 : pats) (n, s : name * exp) (cD1 : ctx)
+    (x, t : name * exp) (cD2 : ctx) : ctx * ctx_map =
+  let g, t = match Whnf.whnf sign t with
+    | Box(g, t) -> g, t
+    | t -> raise (Error.Error ("Substitution on a pattern variable can "
+                               ^ "only be used against a boxed type. Found "
+                               ^ print_exp t))
+  in
+  let g' = infer_syn (sign, cD1) (contextify (sign, cD1) g) s in
+  check_ctx (sign, cD1) g';
+  compute_split_map (x, Var n) (x, PClos(n, s)) cD1 x cD2 [] [] (cD1 @ [x, Box (g', t)])
+    
 let split_rec (sign : signature) (ps : pats) (cD : ctx) : ctx * ctx_map =
   let rec search p1 p2 cD1 cD2 =
     Debug.print(fun () -> "Split search with\np1 = " ^ print_pats p1
@@ -157,15 +190,17 @@ let split_rec (sign : signature) (ps : pats) (cD : ctx) : ctx * ctx_map =
        split_const sign p1 (c, sp) cD1 (x, t) cD2
     | PVar y :: ps', (x, t) :: cD2 ->
        search (p1 @ [PVar y]) ps' (cD1 @ [x, t]) cD2
-    | PPar y :: ps', (x, t) :: cD2 ->
-       search (p1 @ [PPar y]) ps' (cD1 @ [x, t]) cD2
     | Innac e :: ps', (x, t) :: cD2 ->
        search (p1 @ [Innac e]) ps' (cD1 @ [x, t]) cD2
-    | PLam (xs, p) :: ps', (x, Box (g, SPi(tel, t))) :: cD2 ->
-       split_lam sign p1 (xs, p) cD1 (x, g, tel, t) cD2
+    | PPar y :: ps', (x, t) :: cD2 ->
+      check_ppar sign p1 y cD1 (x, t) cD2
+    | PClos (y, s) :: ps', (x, t) :: cD2 ->
+      split_clos sign p1 (y, s) cD1 (x, t) cD2
+    | PLam (xs, p) :: ps', (x, t) :: cD2 ->
+       split_lam sign p1 (xs, p) cD1 (x, t) cD2
     | _ -> raise (Error.Error ("Search: Syntax not implemented\np2 = " ^ print_pats p2 ^ "\ncD2 = " ^ print_ctx cD2))
     in
-    Debug.print (fun () -> "Search had\ncD1 = " ^ print_ctx cD1 ^ "\ncD2 = " ^ print_ctx cD2 ^ "\nreturned cD' = " ^ print_ctx cD');
+    Debug.print (fun () -> "Search had\ncD1 = " ^ print_ctx cD1 ^ "\ncD2 = " ^ print_ctx cD2 ^ "\nreturned cD' = " ^ print_ctx cD' ^ "\nand sigma = "^ print_pats sigma);
     cD', sigma
   in
   Debug.deindent();
@@ -222,7 +257,6 @@ let check_pats (sign : signature) (p : pats) (cG : ctx) : ctx * ctx_map =
   Debug.indent ();
   let is_Pvar = function
     | PVar _ -> true
-    | PPar _ -> true
     | _ -> false
   in
   let rec unify_names p cG =
@@ -230,6 +264,7 @@ let check_pats (sign : signature) (p : pats) (cG : ctx) : ctx * ctx_map =
     | [], [] -> []
     | PVar x :: p', (y, t) :: cG' when x <> y -> (x, t) :: (compose_single_with_subst (y, Var x) (unify_names p' cG'))
     | PPar x :: p', (y, t) :: cG' when x <> y -> (x, t) :: (compose_single_with_subst (y, Var x) (unify_names p' cG'))
+    | PClos (x,_) :: p', (y, t) :: cG' when x <> y -> (x, t) :: (compose_single_with_subst (y, Var x) (unify_names p' cG'))
     | _ :: p', s :: cG' -> s :: (unify_names p' cG')
     | _ -> raise (Error.Violation "Length error in unify names")
   in
@@ -285,7 +320,7 @@ and check_innac (sign, cD : signature * ctx) (p : pat) (q : pat) (t : exp) : uni
      Debug.deindent ();
      ()
   | PVar x, PVar y when x = y -> ()
-  | PPar x, PVar y when x = y -> ()
+  | PPar x, PPar y when x = y -> ()
   | PConst (n, sp), PConst (n', sq) when n = n' ->
      begin match lookup_sign_entry n sign with
      | Constructor (_, tel, _) -> check_innacs (sign, cD) sp sq (ctx_of_tel tel)
@@ -309,7 +344,8 @@ and check_innac (sign, cD : signature * ctx) (p : pat) (q : pat) (t : exp) : uni
        let g', _, tel' = theta_of_lam g xs tel in
        check_innac (sign, cD) p q (Box(g', if tel' = [] then t else SPi (tel', t)))
      else
-       raise (Error.Violation "Match - Check_innac - PLam binding sizes differ. Who knows why?");
+       raise (Error.Violation "Match - Check_innac - PLam binding sizes differ. Who knows why?")
+  | PClos (n, _), PClos (n', _) when n = n' -> ()
 
   (* In the syntax cases, we might need to grow cP *)
   | p, q -> raise (Error.Error ("Pattern matching on syntax is not yet supported.\np = " ^ print_pat p ^ "\nq = " ^ print_pat q))
