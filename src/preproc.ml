@@ -219,7 +219,7 @@ and pproc_app (s : sign) (cG : ctx) (cP : bctx) (e : E.exp) : I.exp * I.exp list
      h, sp @[pproc_exp s cG cP e2]
   | _ -> pproc_exp s cG cP e, []
 
-let pproc_decl s cG (n, e) (is_syntax : bool) (d : I.def_name) =
+let pproc_decl s cG (n, e) (d : I.def_name) =
   Debug.print (fun () -> "Preprocessing declaration " ^ n ^ "\nCreating telescope out of " ^ E.print_exp e);
   Debug.indent ();
   let tel, e' = pproc_tel s cG [] e in
@@ -246,7 +246,7 @@ let pproc_sdecl s cG (n, e) (is_syntax : bool) (d : I.def_name) =
   else
     raise (Error.Error_loc (loc e, "Return type of constructor " ^ n ^ " should be " ^ d))
 
-let pproc_param s cG (is_syntax : bool) (icit, n, e) =
+let pproc_param s cG (icit, n, e) =
   let cG', n' = add_name_ctx cG n in
   cG', (icit, n', pproc_exp s cG [] e)
 
@@ -353,14 +353,24 @@ let params_to_ctx = List.map2 (fun (_, n, _) (_, n', _) -> n, n')
 
 let pre_process s = function
   | E.Data (n, ps, e, ds) ->
-     let _, ps' = List.fold_left (fun (cG, ps) p -> let cG', p' = pproc_param s cG false p in cG', (p'::ps)) ([], []) ps in
+    Debug.print (fun () -> "Preprocessing datatype : " ^ n ^ "\nps = " ^ E.print_params ps);
+    let rec fold_param cG ps =
+      match ps with
+      | p :: ps ->
+        let cG', p' = pproc_param s cG p in
+        let cG'', ps' = fold_param cG' ps in
+        cG'', p' :: ps'
+      | [] -> cG, []
+    in
+    let cGa, ps' = fold_param [] ps in
+    Debug.print (fun () -> "ps' = " ^ I.print_tel ps');
      let cG = params_to_ctx ps ps' in
      let is, u = match pproc_tel s cG [] e with
        | tel, I.Set u -> tel, u
        | _, t -> raise (Error.Error_loc (loc e, "Expected universe but instead got expression " ^ I.print_exp t))
      in
      let s' = add_name_sign s n in
-     let s'', ds' = List.fold_left (fun (s, dos) d -> let ss, dd = pproc_decl s cG d false n in ss, (dd :: dos)) (s', []) ds in
+     let s'', ds' = List.fold_left (fun (s, dos) d -> let ss, dd = pproc_decl s cG d n in ss, (dd :: dos)) (s', []) ds in
      s'', I.Data (n, ps', is, u, ds')
   | E.Syn (n, e, ds) ->
     let tel, e' = pproc_tel s [] [] e in
@@ -369,7 +379,7 @@ let pre_process s = function
       | _ -> raise (Error.Error_loc (loc e, "Syntax definition for " ^ n ^ " should have kind * instead of " ^ I.print_exp e'))
     in
      let s' = add_name_sign s n in
-     let s'', ds' = List.fold_left (fun (s, dos) d -> let ss, dd = pproc_decl s [] d true n in ss, (dd :: dos)) (s', []) ds in
+     let s'', ds' = List.fold_left (fun (s, dos) d -> let ss, dd = pproc_decl s [] d n in ss, (dd :: dos)) (s', []) ds in
      s'', I.Syn (n, tel, ds')
   | E.DefPM (n, e, ds) ->
      let s' = add_name_sign s n in

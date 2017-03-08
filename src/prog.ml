@@ -19,7 +19,8 @@ let tc_constructor (sign , cG : signature * ctx) (u : universe) (tel : tel)
         | _ -> raise (Error.Error ("Constructor " ^ n
              ^ " does not return a term of the fully applied type for " ^ n'))
       in
-      Debug.print (fun () -> "Checking indices applied to " ^ n' ^ " at the tail of signature of " ^ n);
+      Debug.print (fun () -> "Checking indices applied to " ^ n' ^ " at the tail of signature of " ^ n
+        ^ "\nes = (" ^ String.concat ", " (List.map print_exp es) ^ ")\ntel = " ^ print_tel tel);
       check_indices es tel;
       Constructor (n, tel', (n', es))
     end
@@ -49,7 +50,8 @@ let tc_syn_constructor (sign , cG : signature * ctx) (tel : tel)
 
 let tc_program (sign : signature) : program -> signature = function
   | Data (n, ps, is, u, ds) ->
-     Debug.print_string ("Typechecking data declaration: " ^ n ^ "\n");
+    Debug.print_string ("Typechecking data declaration: " ^ n ^ "\nps = "
+                        ^ print_tel ps ^ "\nis = " ^ print_tel is);    
      let u' = check_tel (sign, []) u ps in
      let cG = ctx_of_tel ps in
      let u'' = check_tel (sign, cG) u' is in

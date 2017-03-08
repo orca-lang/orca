@@ -1,0 +1,30 @@
+data nat where
+| zero : nat
+| suc : nat -> nat
+
+def plus : nat -> nat -> nat where
+| zero m => m
+| (suc n) m => suc (plus n m)
+
+data vect (A : set) : nat -> set where
+| nil : vect A zero
+| cons : (n : nat) (x : A) -> vect A n -> vect A (suc n)
+
+(*) define eq type
+(*) test by using this equality
+
+
+def head : (n : nat) (A : set) -> vect A (suc n) -> A where
+| .n A (cons n x xs) => x
+
+def tail : (n : nat) (A : set) -> vect A (suc n) -> vect A n where
+| n A (cons .n x xs) => xs
+
+def append : (n m : nat) (A : set) -> vect A n -> vect A m -> vect A (plus n m) where
+| .zero m A nil ys => ys
+| .(suc n) m A (cons n x xs) ys => cons (plus n m) x (append n m A xs ys)
+
+data eq (A : set) (x : A) : A -> set where
+| refl : eq A x x
+
+(*) def eq_app_nil : (A : set) -> (n : nat) -> (x : vect A n) -> eq (vect A n) x (append nil x) = fn A n x => refl
