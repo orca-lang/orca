@@ -16,7 +16,7 @@ let is_syntax = function
   | Comp _
   | Dot _
   | Snoc _
-  | Nil
+  | Nil -> true
   | _ -> false
 
 let lookup x cG =
