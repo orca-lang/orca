@@ -27,4 +27,11 @@ def append : (n m : nat) (A : set) -> vect A n -> vect A m -> vect A (plus n m) 
 data eq (A : set) (x : A) : A -> set where
 | refl : eq A x x
 
-(*) def eq_app_nil : (A : set) -> (n : nat) -> (x : vect A n) -> eq (vect A n) x (append nil x) = fn A n x => refl
+def eq_app_nil : (A : set) -> (n : nat) -> (x : vect A n) -> eq (vect A n) x (append zero n A nil x) = fn A n x => refl
+
+def l1 : vect nat (suc (suc zero)) = cons (suc zero) zero (cons zero (suc zero) nil)
+def l2 : vect nat (suc (suc zero)) = cons (suc zero) (suc (suc zero)) (cons zero (suc (suc (suc zero))) nil)
+def l3 : vect nat (suc (suc (suc (suc zero)))) =
+   cons (suc (suc (suc zero))) zero (cons (suc (suc zero)) (suc zero) (cons (suc zero) (suc (suc zero)) (cons zero (suc (suc (suc zero))) nil)))
+
+def eq_app : eq (vect nat (suc (suc (suc (suc zero))))) (append (suc (suc zero)) (suc (suc zero)) nat l1 l2) l3 = refl
