@@ -17,7 +17,6 @@ let is_syntax = function
   | Dot _
   | Snoc _
   | Nil
-  | Under -> true
   | _ -> false
 
 let lookup x cG =

@@ -154,7 +154,6 @@ let rec pproc_exp (s : sign) (cG : ctx) (cP : bctx) (e :E.exp) : I.exp =
   | E.Comma (e1, e2) -> I.Snoc (f e1, "_", f e2)
   | E.Nil -> I.Nil
   | E.Annot (e1, e2) -> I.Annot(f e1, f e2)
-  | E.Under -> I.Under
   | E.Hole (Some n) -> I.Hole (Name.gen_name n)
   | E.Hole None -> I.Hole (Name.gen_name "H")
   in Debug.deindent ();

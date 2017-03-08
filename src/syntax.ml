@@ -25,7 +25,6 @@ module Ext = struct
      | Semicolon of exp * exp
      | Nil
      | Annot of exp * exp
-     | Under
      | Ctx
 
   type pat =
@@ -78,7 +77,6 @@ module Ext = struct
     | Semicolon (e1, e2) -> "(; " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
     | Nil -> "0"
     | Annot (e1, e2) -> "(: " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
-    | Under -> "_"
     | Hole (Some s) -> "?" ^ s
     | Hole None -> "?"
     | Ctx -> "ctx"
@@ -150,7 +148,6 @@ module Int = struct
     | Snoc of exp * string * exp
     | Nil
     | Annot of exp * exp
-    | Under
     | Hole of name
 
    and tel_entry = icit * name * exp
@@ -224,7 +221,6 @@ module Int = struct
     | Snoc (g, _, e) -> fv g @ fv e
     | Nil -> []
     | Annot (e1, e2) -> fv e1 @ fv e2
-    | Under -> []
     | Hole _ -> []
 
   and fv_pi cG (tel : tel) (t : exp) = match tel with
@@ -292,7 +288,6 @@ module Int = struct
       | Snoc (e1, x, e2) -> Snoc (f e1, x, f e2)
       | Nil -> Nil
       | Annot (e1, e2) -> Annot(f e1, f e2)
-      | Under -> Under
       | Hole s -> Hole s
 
     and refresh_tel (rep : (name * name) list) (tel : tel) (t : exp) : tel * exp =
@@ -344,7 +339,6 @@ module Int = struct
     | Snoc (g, x, e2) -> Snoc(f g, x, f e2)
     | Nil -> Nil
     | Annot (e1, e2) -> Annot(f e1, f e2)
-    | Under -> Under
     | Hole s -> Hole s
   and refresh_free_var_tel (x, y) tel t =
     match tel with
@@ -409,7 +403,6 @@ module Int = struct
     | Snoc (e1, x, e2) -> Snoc (f e1, x, f e2)
     | Nil -> Nil
     | Annot (e1, e2) -> Annot(f e1, f e2)
-    | Under -> Under
     | Hole s -> Hole s
   and subst_pi (x, es) tel t =
     match tel with
@@ -456,7 +449,7 @@ let rec exp_of_pat : pat -> exp = function
     | PDot (p1, p2) -> Dot (exp_of_pat p1, exp_of_pat p2)
     | PNil -> Nil
     | PSnoc (p1, x, p2) -> Snoc (exp_of_pat p1, x, exp_of_pat p2)
-    | PUnder -> Under
+    | PUnder -> raise (Error.Violation "We'd also be very surprised if this were to happen.")
     | PWildcard -> raise (Error.Violation "We'd also be very surprised if this were to happen.")
     
   let rec psubst ((x, p') as s) (p : pat) :  pat =
@@ -525,7 +518,6 @@ let rec exp_of_pat : pat -> exp = function
     | Snoc (e1, x, e2) -> "(, " ^ print_exp e1 ^ ", " ^ x ^ " : " ^ print_exp e2 ^ ")"
     | Nil -> "0"
     | Annot (e1, e2) -> "(: " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
-    | Under -> "_"
     | Hole s -> "?" ^ print_name s
   and print_pi tel t = match tel with
     | [] -> print_exp t

@@ -103,7 +103,6 @@ raw_simple_exp:
 | EMPTYS {EmptyS}
 | n = SHIFT {Shift n}
 | NIL {Nil}
-| UNDERSCORE {Under}
 | CTX {Ctx}
 
 simple_pattern:

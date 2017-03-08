@@ -113,8 +113,6 @@ let rec unify_flex (sign, cG) flex e1 e2 =
       | Snoc(e1, _, e2), Snoc(e1', _, e2') -> unify_many cG [e1;e2] [e1';e2']
       | Nil, Nil -> cG, []
       | Annot(e1, e2), Annot(e1', e2') -> unify_many cG [e1;e2] [e1';e2']
-      | Under, _ -> cG, []
-      | _, Under -> cG, []
       | Ctx, Ctx -> cG, []
       | _, _ ->
          raise (Unification_failure(Expressions_dont_unify (e1, e2)))
