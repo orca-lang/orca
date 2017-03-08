@@ -173,9 +173,13 @@ let simul_psubst_on_ctx sigma =
 let rec rename_ctx_using_pats (cG : ctx) (ps : pats) =
   Debug.print (fun () -> "Calling rename_ctx_using_pats \ncG = " ^ print_ctx cG ^ "\nps = " ^ print_pats ps);
   match cG, ps with
-  | [], [] -> []
-  | (x, t) :: cG', PVar y :: ps' -> (y, t) :: (rename_ctx_using_pats cG' ps')
-  | s :: cG', _ :: ps' -> s :: (rename_ctx_using_pats cG' ps')
+  | [], [] -> [], []
+  | (x, t) :: cG', PVar y :: ps' ->
+    let sigma, cD = rename_ctx_using_pats (ctx_subst (x, Var y) cG') ps' in
+    (x, Var y) :: sigma, (y, t) :: cD
+  | s :: cG', _ :: ps' ->
+    let sigma, cD = rename_ctx_using_pats cG' ps' in
+    sigma, s :: cD
   | _ -> raise (Error.Violation "rename_ctx_using_pats. Both arguments should have same length")
 
 let lookup_ctx cG n =

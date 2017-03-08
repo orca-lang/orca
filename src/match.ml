@@ -52,9 +52,13 @@ let innac_ctx = List.map (fun (_, t) -> Innac t)
 let innac_subst = List.map (fun (x, e) -> x, Innac e)
 
 let split_flex_unify (sign : signature) (p1 : pats) (thetatel : tel) (ps : pats) (cD1 : ctx) (vs : exp list) (ws : exp list) =
-  let cT = rename_ctx_using_pats (ctx_of_tel thetatel) ps in
+  let sigma, cT = rename_ctx_using_pats (ctx_of_tel thetatel) ps in
+  Debug.print (fun () -> "Creating set of flexible variables\np1 = " ^ print_pats p1
+    ^ "\nps = " ^ print_pats ps ^ "\ncD1 = " ^ print_ctx cD1 ^ "\ncT = " ^ print_ctx cT);
   let flex = flexible (p1 @ ps) (cD1 @ cT) in
   Debug.print (fun () -> "Flexibles variables are " ^ print_names flex);
+  let vs = List.map (simul_subst sigma) vs in
+  let ws = List.map (simul_subst sigma) ws in
   let cD', delta =
     Debug.print (fun () -> "Split unifies vs = " ^ print_exps vs ^ ", ws = " ^ print_exps ws);
     try
@@ -76,6 +80,7 @@ let compute_split_map (ss:single_subst) (pss:single_psubst) (cD1:ctx) (x:name)
                       (cD2:ctx) (delta : subst) (pdelta : psubst) (cD':ctx) =
   Debug.print (fun () -> "ss = " ^ print_subst [ss]);
   Debug.print (fun () -> "pss = " ^ print_psubst [pss]);
+  Debug.print (fun () -> "cD' = " ^ print_ctx cD');
   let id_cD' = psubst_of_ctx cD1 in
   let delta' = compose_single_with_subst ss (delta @ [x, Var x]) in
   Debug.print (fun () -> "delta' = " ^ print_subst delta');
@@ -161,7 +166,8 @@ let check_ppar (sign : signature) (p1 : pats) (n : name) (cD1 : ctx)
     | Box (g, t) -> g, t
     | t -> raise (Error.Error ("Parameter variables can only be used against a boxed type. Found " ^ print_exp t))
   in
-  compute_split_map (x, Var n) (x, PPar n) cD1 x cD2 [] [] (cD1 @ [x, Box (g, t)])
+  
+  compute_split_map (x, Var n) (x, PPar n) cD1 x cD2 [] [] (cD1 @ [n, Box (g, t)])
   (* (\* let cD' = cD1 @ [n, Box (g, t)] @ (simul_subst_on_ctx [x, Var n] cD2) in *\) *)
   (* let delta =  *)
 
@@ -189,7 +195,7 @@ let split_rec (sign : signature) (ps : pats) (cD : ctx) : ctx * ctx_map =
     | PConst (c, sp) :: ps', (x, t) :: cD2 ->
        split_const sign p1 (c, sp) cD1 (x, t) cD2
     | PVar y :: ps', (x, t) :: cD2 ->
-       search (p1 @ [PVar y]) ps' (cD1 @ [x, t]) cD2
+       search (p1 @ [PVar y]) ps' (cD1 @ [y, t]) (ctx_subst (x, Var y) cD2)
     | Innac e :: ps', (x, t) :: cD2 ->
        search (p1 @ [Innac e]) ps' (cD1 @ [x, t]) cD2
     | PPar y :: ps', (x, t) :: cD2 ->
@@ -263,14 +269,12 @@ let check_pats (sign : signature) (p : pats) (cG : ctx) : ctx * ctx_map =
     match p, cG with
     | [], [] -> []
     | PVar x :: p', (y, t) :: cG' when x <> y -> (x, t) :: (compose_single_with_subst (y, Var x) (unify_names p' cG'))
-    | PPar x :: p', (y, t) :: cG' when x <> y -> (x, t) :: (compose_single_with_subst (y, Var x) (unify_names p' cG'))
-    | PClos (x,_) :: p', (y, t) :: cG' when x <> y -> (x, t) :: (compose_single_with_subst (y, Var x) (unify_names p' cG'))
     | _ :: p', s :: cG' -> s :: (unify_names p' cG')
     | _ -> raise (Error.Violation "Length error in unify names")
   in
   let cG' = unify_names p cG in
-  Debug.print (fun () -> "Unifying of names: cG = " ^ print_ctx cG ^ ", cG' = "
-                         ^ print_ctx cG' ^ ", using patterns p = " ^ print_pats p);
+  (* Debug.print (fun () -> "Unifying of names: cG = " ^ print_ctx cG ^ ", cG' = " *)
+  (*                        ^ print_ctx cG' ^ ", using patterns p = " ^ print_pats p); *)
   let cG = cG' in
   let rec check_pats (p : pats) (sigma : ctx_map) (cD : ctx) : ctx * ctx_map =
     if List.for_all is_Pvar p then

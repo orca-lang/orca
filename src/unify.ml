@@ -67,7 +67,8 @@ and occur_check_stel n tel =
 let print_subst sigma = "[" ^ String.concat ", " (List.map (fun (x, e) -> print_exp e ^ "/" ^ print_name x) sigma) ^ "]"
 
 let rec unify_flex (sign, cG) flex e1 e2 =
-  let rem n cG = List.filter (fun (x, _) -> x <> n) cG in
+  let rem n cG = let cG' = List.filter (fun (x, _) -> x <> n) cG in
+                 Debug.print (fun () -> "Removing " ^ print_name n ^ " from context " ^ print_ctx cG ^ " yielding " ^ print_ctx cG'); cG' in
   let unify_flex = unify_flex (sign, cG) flex in
   let unify_many cG e1 e2 = unify_flex_many (sign, cG) flex e1 e2 in
   let unify_pi = unify_flex_pi (sign, cG) flex in
