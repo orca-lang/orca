@@ -18,7 +18,7 @@ let is_syntax = function
   | Snoc _
   | Nil -> true
   | _ -> false
-
+    
 let lookup x cG =
   begin
     try List.assoc x cG
@@ -27,6 +27,12 @@ let lookup x cG =
                ("Unbound var after preprocessing, this cannot happen. (Var: " ^ print_name x ^ ")"))
   end
 
+let is_ctx (sign, cG) = function
+  | Nil
+  | Snoc _ -> true
+  | Var g when lookup g cG = Ctx -> true
+  | _ -> false
+    
 let rec contextify (sign, cG) (g : exp) =
   match Whnf.whnf sign g with
   | Nil -> BNil
@@ -100,7 +106,7 @@ let rec infer (sign, cG : signature * ctx) (e : exp) : exp =
 
     | Ctx -> Set 0
     | Box (g, e) ->
-      check (sign, cG) g Ctx;
+      check_ctx (sign, cG) g;
       let cP = contextify (sign, cG) g in
       check_syn_type (sign, cG) cP e;
       Set 0
@@ -211,7 +217,7 @@ and check_syn_type (sign, cG) cP (e : exp) : unit =
   Debug.print (fun () -> "Checking syntactic type " ^ print_exp e ^ " in context " ^ print_ctx cG);
   Debug.indent ();
   begin
-    match Whnf.whnf sign e with
+    match e with
     | Star -> ()
     | SPi (tel, e') ->
       let rec check_tel_type cP = function
@@ -271,6 +277,22 @@ and check_syn (sign, cG) cP (e : exp) (t : exp) =
       | _ -> check_syn (sign, cG) (append_bctx cP' cP) e (SPi (tel', t))
       end
     | _, Ctx -> check_ctx (sign, cG) e
+    | EmptyS, Nil -> ()
+    | Shift n, g when is_ctx (sign, cG) g ->
+      let g' = decontextify (drop_suffix cP n) in
+      let _ = try Unify.unify (sign, cG) g g'
+        with Unify.Unification_failure prob ->
+          raise (Error.Error ("Expected context: " ^ print_exp g ^ " shifted by " ^ string_of_int n
+                              ^ "positions.\nFound context: " ^ print_exp g' ^ "\nUnification failed with : "
+                              ^ Unify.print_unification_problem prob))
+      in ()
+    | Dot (s, e), Snoc (g, _, t) ->
+      check_syn (sign, cG) cP s g;
+      check_syn (sign, cG) cP e (Clos(t, s))
+    | Comp (s1, s2), g ->
+      raise (Error.Violation "Compositions only appear as the result of whnf which assumes well typed terms")
+    | ShiftS s, g ->
+      raise (Error.Violation "Substitution shiftings only appear as the result of whnf which assumes well typed terms")
     | e, t when is_syntax e ->
       Debug.print(fun ()-> "Expression " ^ print_exp e ^ " is syntactic and thus being inferred");
       let t' = match infer_syn (sign, cG) cP e with
@@ -322,39 +344,43 @@ and infer_syn (sign, cG) cP (e : exp) =
         ^ "\n Context is " ^ print_bctx cP);
       t
     (* | Clos (Var x, s) -> *)
+    (*   Debug.print(fun () -> "Hello I am a clos on a var"); *)
     (*   begin match lookup x cG with *)
     (*   | Box (g, t) -> *)
     (*     let g' = infer_syn (sign, cG) cP s in *)
+    (*     Debug.print (fun () -> "Infer_syn: Clos-var -- infered " ^ print_exp g' ^ " for substitution "^ print_exp s); *)
     (*     check_ctx (sign, cG) g'; *)
-    (*     let rec unify_ctx g g' s = match g, g', s with *)
-    (*       | Nil, Nil, _ -> t *)
-    (*       | Var x, Var y, _ when x = y -> t *)
-    (*       | Snoc(g, e *)
+    (*     let cP1 = contextify (sign, cG) g in *)
+    (*     let cP2 = contextify (sign, cG) g' in *)
+    (*     let rec unify_ctx cP1 cP2 s = match cP1, cP2, s with *)
+    (*       | BNil, BNil, _ -> [], Shift 0 *)
+    (*       | CtxVar x, CtxVar y, _ when x = y -> [], Shift 0 *)
+    (*       | BSnoc(cP1', _, t1), BSnoc(cP2', _, t2), Dot(s', e) -> *)
+    (*         let sigma, s0 = unify_ctx cP1' cP2' s' in *)
+    (*         let _, sigma' = Unify.unify (sign, cG) (Clos (simul_subst sigma t1, s0)) (Clos (simul_subst sigma t2, s0)) in *)
+    (*         sigma @ sigma', simul_subst sigma (Dot (s0, e)) *)
+    (*       | _, _, _ -> *)
+    (*         let g1 = decontextify cP1 in *)
+    (*         let g2 = decontextify cP2 in *)
+    (*         let _, sigma = Unify.unify (sign, cG) g1 g2 in *)
+    (*         sigma, Shift 0  *)
+    (*     in *)
+    (*     let sigma, _ = unify_ctx cP1 cP2 s in *)
+    (*     simul_subst sigma t *)
     (*   | t -> t *)
     (*   end *)
     | Clos (e, s) ->
-      let cP' = contextify (sign, cG) (infer_syn (sign, cG) cP s) in
-      infer_syn (sign, cG) cP' e
-    | EmptyS -> Nil
-    | Shift n -> let cP' = drop_suffix cP n in
-                 Debug.print(fun () -> "Shift " ^ string_of_int n
-                   ^ " bring context " ^ print_bctx cP ^ " to context " ^ print_bctx cP');
-                 decontextify cP'
-    | Dot (s, e) ->
-      let g = infer_syn (sign, cG) cP s in
-      let t = infer_syn (sign, cG) cP e in
-      Snoc (g, "_", t)
-    | Comp (s1, s2) ->
-      let g1 = infer_syn (sign, cG) cP s1 in
-      let cP' = contextify (sign, cG) g1 in
-      infer_syn (sign, cG) cP' s2
-    | ShiftS s ->
-      begin match cP with
-      | BNil -> raise (Error.Error ("Shifting a substitution in an empty context"))
-      | BSnoc (cP', x, t) ->
-        let g = infer_syn (sign, cG) cP' s in
-        Snoc (g, x, t)
-      | CtxVar x -> raise (Error.Violation ("We're not too sure what to do here"))
+      begin
+        let t = try infer (sign, cG) e
+          with Error.Error msg ->
+            Debug.print (fun () -> "Inferring " ^ print_exp e ^ " returned message:\n" ^ msg);
+            raise (Error.Error ("The left hand side of the closure " ^ print_exp (Clos (e, s)) ^ " was not inferrable."))
+        in
+        match t with
+        | Box(g, t) ->
+          check_syn (sign, cG) cP s g;
+          Clos(t, s)
+        | _ -> raise (Error.Error ("Expected " ^ print_exp e ^ " to be of boxed type. Instead inferred type " ^ print_exp t))
       end
     | _ -> raise (Error.Error ("Cannot infer syntactic expression " ^ print_exp e))
   in Debug.deindent (); res

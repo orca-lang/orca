@@ -37,7 +37,32 @@ let lookup_syn_def (n : def_name) (sign : signature) : tel =
 let lookup_cons_entry (c : def_name) (sign : signature) (mg : exp option) : tel * dsig =
   match lookup_sign_entry c sign, mg with
   | Constructor (_, tel, dsig), None -> tel, dsig
-  | SConstructor (_, tel, dsig), Some g -> List.map (fun (i, x, s) -> i, x, Box (g, s)) tel, dsig
+  | SConstructor (_, tel, dsig), Some g ->
+    let rec box n = function
+      | Var x when n = 0 -> Var x
+      | Var x -> Clos (Var x, Shift n)
+      | SPi(tel, t) ->
+        let tel', t' = box_spi n tel t in
+        SPi(tel', t')
+      | Pi(tel, t) ->
+        Pi (List.map (fun (i, x, s) -> i, x,  box n s) tel, box n t)
+      | Const x -> Const x
+      | Fn (xs, e) -> Fn (xs, box n e)
+      | App (e, es) -> App (box n e, List.map (box n) es)
+      | AppL (e, es) -> AppL (box n e, List.map (box n) es)
+      | Lam (xs, e) -> Lam (xs, box (n+(List.length xs)) e)
+      | BVar i -> BVar i
+      | Hole x -> Hole x
+      | Annot (e1, e2) -> Annot (box n e1, box n e2)
+      | _ -> raise (Error.Violation ("Found reference to substitution or context in definition of syntactic constructor "
+                                     ^ c))
+    and box_spi n tel t = match tel with
+      | [] -> [], box n t
+      | (i, x, s) :: tel ->
+        let tel', t' = box_spi (n+1) tel t in
+        (i, x, box n s) :: tel', t'          
+    in
+    List.map (fun (i, x, s) -> i, x, Box (g, box 0 s)) tel, dsig
   | _ -> raise (Error.Error ("Constant " ^ c ^ " was expected to be a constructor."))
 
 let lookup_sign sign n =

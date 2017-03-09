@@ -23,8 +23,11 @@ def tps : (m n : (|- tm)) (t : (|- tp)) -> (|- oft m t) -> (|- step m n) -> (|- 
   t-app m' n s t (tps m m' (arr s t) d1 e) d2
 | (app .(lam m) n) .(m ' n) t
   (t-app (lam .m) .n s .t (t-lam .s .t .m (\x.(\u.d1))) d2) (s-app2 m .n) =>
-  d1[^0 ; n ; d2]
+  d1[^ ; n ; d2]
 
+(*) x:tm,u:oft n s  
+
+(*) tm |- oft n s
 
 (*) Negative test case
 

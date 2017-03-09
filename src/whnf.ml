@@ -3,7 +3,58 @@ open Sign
 
 exception Matching_failure of pat * exp
 exception Stuck
-    
+
+exception Inv_fail
+
+let apply_inv e s =
+  let rec add_id_cdot n s =
+    if n = 0 then s
+    else CDot(add_id_cdot (n-1) s, n-1)
+  in
+  let rec apply_inv e s =
+    let rec apply_inv' n s cnt =
+      match s with
+      | CDot (s, m) when n = m -> BVar cnt
+      | CDot (s, _) -> apply_inv' n s (cnt+1)
+      | CShift m when n < m -> raise Inv_fail
+      | CShift m -> BVar (n - m)
+      | CEmpty -> raise Inv_fail
+    in
+    match e, s with
+    | e, CShift 0 -> e
+    | BVar n, _ -> apply_inv' n s 0
+    | Set n, _ -> Set n
+    | Star, _ -> Star
+    | Pi(tel, t'), _ ->
+      Pi(List.map (fun (i,x,e) -> i, x, apply_inv e s) tel, apply_inv t' s)
+    | SPi(tel, t'),_ ->
+      SPi(List.map (fun (i,x,e) -> i, x, apply_inv e s) tel, apply_inv t' (add_id_cdot (List.length tel) s))
+    | Box (g, e), _ -> raise Inv_fail
+    | Ctx, _ -> Ctx
+    | Const c, _ -> Const c
+    | Var x, _ -> Var x                 (* MMMM *)
+    | Fn (xs, e),_ -> Fn (xs, apply_inv e s)
+    | App (e, es),_ -> App(apply_inv e s, List.map (fun e -> apply_inv e s) es)
+    | Lam (x, e), _ -> Lam(x, apply_inv e (CDot (s, 0)))
+    | AppL (e, es), _ -> AppL(apply_inv e s, List.map (fun e -> apply_inv e s) es)
+    | Hole n, _ -> Hole n
+    | Annot (e1, e2), _ -> Annot (apply_inv e1 s, apply_inv e2 s)
+    | Snoc _, _ -> e
+    | Nil, _ -> Nil
+      
+    | Clos (e, s'), _ -> Clos(e, apply_inv s' s)
+      
+    | EmptyS,_ -> EmptyS
+    | Shift _, _ 
+      
+    | Dot _, _
+    | Comp _, _
+    | ShiftS _, _-> assert false
+
+  in
+  try Some (apply_inv e s)
+  with Inv_fail -> None
+  
 let rec cong_stel tel s =
   match tel with
   | [] -> [], s
@@ -142,6 +193,21 @@ and rewrite (sign : signature) (e : exp) : exp =
         | e :: es -> Dot (f es, e)
       in
       w (Clos(e1, f es))
+      
+  (* IdL *)
+  | Comp(Shift 0, s) -> w s
+
+  (* IdR *)
+  | Comp(s, Shift 0) -> w s
+
+  (* LiftId *)
+  | ShiftS(Shift 0) -> Shift 0
+
+  (* Id *)
+  | Clos (e, Shift 0) -> w e
+
+  (* Empty Subst *)
+  | Clos (e, EmptyS) -> w e
          
   (* VarShift 1 *)
   | Clos(BVar n, Shift n') -> BVar (n + n')
@@ -150,13 +216,13 @@ and rewrite (sign : signature) (e : exp) : exp =
   | Clos(BVar n, Comp(s, Shift n')) -> w (Clos(BVar (n + n'), s))
 
   (* FVarsCons *)
-  | Clos(BVar 1, Dot (s, e)) -> w e
+  | Clos(BVar 0, Dot (s, e)) -> w e
 
   (* FVarLift 1 *)
-  | Clos(BVar 1, ShiftS s) -> BVar 1
+  | Clos(BVar 0, ShiftS s) -> BVar 0
 
   (* FVarLift 2 *)
-  | Clos(BVar 1, Comp(s2, ShiftS s1)) -> w (Clos(BVar 1, s2))
+  | Clos(BVar 0, Comp(s2, ShiftS s1)) -> w (Clos(BVar 0, s2))
 
   (* RVarCons *)
   | Clos (BVar n, Dot(s, _)) when n > 0 -> w (Clos(BVar (n-1), s))
@@ -174,7 +240,7 @@ and rewrite (sign : signature) (e : exp) : exp =
   | Comp(s2, Dot(s1, e)) -> w (Dot(Comp(s2, s1), Clos(e, s2)))
 
   (* ShiftCons *)
-  | Comp(Dot(s, e), Shift n) -> w (Clos(e, Shift (n-1)))
+  | Comp(Dot(s, e), Shift n) -> w (Comp(s, Shift (n-1)))
 
   (* ShiftLift 1 *)
   | Comp(ShiftS s, Shift n) -> w (Comp(Shift n, s)) (* MMMM *)
@@ -190,21 +256,6 @@ and rewrite (sign : signature) (e : exp) : exp =
 
   (* LiftEnv *)
   | Comp(Dot(s2,e), ShiftS s1) -> w (Dot(Comp(s2, s1), e))
-
-  (* IdL *)
-  | Comp(Shift 0, s) -> w s
-
-  (* IdR *)
-  | Comp(s, Shift 0) -> w s
-
-  (* LiftId *)
-  | ShiftS(Shift 0) -> Shift 0
-
-  (* Id *)
-  | Clos (e, Shift 0) -> w e
-
-  (* Empty Subst *)
-  | Clos (e, EmptyS) -> w e
 
   (* Congruence rules *)
   | Clos (Const n, _) -> w (Const n)
@@ -222,6 +273,9 @@ and rewrite (sign : signature) (e : exp) : exp =
      SPi (tel', Clos (t, s))
   | Clos (Fn (x, e), s) -> Fn (x, Clos(e, s))
   | Clos (Annot (e, t), s) -> Annot (Clos(e,s), Clos(t, s))
+  | Clos (e, s) -> let s' = w s in
+                   if s = s' then Clos (e, s)
+                   else w (Clos (e, s'))
   (* IDK what to do with these *)
   (* | Clos (Under, s) -> assert false *)
   (* | Clos (Snoc (g, x, t), s) -> assert false *)
@@ -262,3 +316,6 @@ and rewrite (sign : signature) (e : exp) : exp =
   Debug.print (fun () -> "Rewrite this " ^ print_exp e
                          ^ "\n===> " ^ print_exp res);
   res
+
+
+   

@@ -314,9 +314,17 @@ let rec pproc_pat (s : sign) cG cP p =
     let ps' = List.map (pproc_pat s cG cP) ps in
     I.PConst (c, ps')
   | E.PClos' (x, e) ->
-    let e' = pproc_exp s cG cP e in
-    I.PClos (x, e')
-      
+    let rec pat_subst_of_exp = function
+      | E.EmptyS -> I.CEmpty
+      | E.Shift n -> I.CShift n
+      | E.Semicolon (sigma, P(_,E.Ident n)) ->
+        let i = match find_pat_name s cG cP n with
+          | _, E.PBVar i -> i
+          | _ -> raise (Error.Error ("Substitution in pattern can only contain bound variables"))
+        in I.CDot (pat_subst_of_exp (content sigma), i)
+      | e -> raise (Error.Error ("Expected pattern substitution."))
+    in
+    I.PClos (x, pat_subst_of_exp (content e))
   | E.PEmptyS -> I.PEmptyS
   | E.PShift i -> I.PShift i
   | E.PDot (p1, p2) ->

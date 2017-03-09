@@ -165,13 +165,18 @@ module Int = struct
    and stel_entry = icit * string * exp
    and stel = stel_entry list
 
+  type pat_subst
+  = CShift of int
+    | CEmpty
+    | CDot of pat_subst * index
+    
   type pat =
     | PVar of name
     | PBVar of index
     | Innac of exp
     | PLam of string list * pat
     | PConst of def_name * pat list
-    | PClos of name * exp
+    | PClos of name * pat_subst
     | PEmptyS
     | PShift of int
     | PDot of pat * pat
@@ -445,6 +450,11 @@ module Int = struct
 
   let compose_subst sigma delta = List.map (fun (x, t) -> x, simul_subst sigma t) delta
 
+  let rec exp_of_pat_subst : pat_subst -> exp = function
+    | CShift n -> Shift n
+    | CEmpty -> EmptyS
+    | CDot (s, i) -> Dot(exp_of_pat_subst s, BVar i)
+    
 let rec exp_of_pat : pat -> exp = function
     | PVar n -> Var n
     | PPar n -> Var n           (* MMMMM *)
@@ -452,7 +462,7 @@ let rec exp_of_pat : pat -> exp = function
     | Innac e -> e
     | PLam (f, p) -> Lam (f, exp_of_pat p)
     | PConst (n, ps) -> App (Const n, List.map exp_of_pat ps)
-    | PClos (n, e) -> Clos (Var n, e)
+    | PClos (n, s) -> Clos (Var n, exp_of_pat_subst s)
     | PEmptyS -> EmptyS
     | PShift i -> Shift i
     | PDot (p1, p2) -> Dot (exp_of_pat p1, exp_of_pat p2)
@@ -473,10 +483,10 @@ let rec exp_of_pat : pat -> exp = function
     | PConst (n, ps) -> PConst(n, List.map (psubst s) ps)
     | PClos (n, s) when n = x ->
       begin match p' with
-      | PVar n' -> PClos (n', subst (x, exp_of_pat p') s)
+      | PVar n' -> PClos (n', s)
       | _ -> assert false (* MMMMMMM *)
       end  
-    | PClos (n, s) -> PClos (n, subst (x, exp_of_pat p') s)
+    | PClos (n, s) -> PClos (n, s)
     | PEmptyS -> PEmptyS
     | PShift i -> PShift i
     | PDot (p1, p2) -> PDot (psubst s p1, psubst s p2)
@@ -539,6 +549,12 @@ let rec exp_of_pat : pat -> exp = function
 
   let print_exps es = "(" ^ String.concat ", " (List.map print_exp es) ^ ")"
 
+  let rec print_pat_subst : pat_subst -> string =
+    function
+    | CShift n -> "^ " ^ string_of_int n
+    | CEmpty -> "^"
+    | CDot (s, i) -> "(, " ^ print_pat_subst s ^ ", (i " ^ string_of_int i ^ "))"
+    
   let rec print_pat (p : pat) : string = match p with
     | PVar n -> print_name n
     | PPar n -> "(<: " ^ print_name n ^ ")"
@@ -546,9 +562,9 @@ let rec exp_of_pat : pat -> exp = function
     | Innac e -> "." ^ print_exp e
     | PLam (f, p) -> "(\ " ^ String.concat " " f ^ " " ^ print_pat p ^ ")"
     | PConst (n, ps) -> "(" ^ n ^ " " ^ (String.concat " " (List.map (fun p -> "(" ^ print_pat p ^ ")") ps)) ^ ")"
-    | PClos (n, e) -> "([] " ^ print_name n ^ " " ^ print_exp e ^ ")"
+    | PClos (n, s) -> "([] " ^ print_name n ^ " " ^ print_pat_subst s ^ ")"
     | PEmptyS -> "^"
-    | PShift i -> "(^ " ^ string_of_int i ^ ")"
+    | PShift i -> "^ " ^ string_of_int i
     | PDot (p1, p2) -> "(; " ^ print_pat p1 ^ " " ^ print_pat p2 ^ ")"
     | PNil -> "0"
     | PSnoc (p1, x, p2) -> "(, " ^ print_pat p1 ^ ", " ^ x ^ ":" ^ print_pat p1 ^ ")"

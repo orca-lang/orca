@@ -73,10 +73,11 @@ let rec unify_flex (sign, cG) flex e1 e2 =
   let unify_many cG e1 e2 = unify_flex_many (sign, cG) flex e1 e2 in
   let unify_pi = unify_flex_pi (sign, cG) flex in
   let unify_spi = unify_flex_spi (sign, cG) flex in
-    let is_flex n = List.mem n flex in
-    Debug.print (fun () -> "Comparing: " ^ print_exp e1 ^ " and " ^ print_exp e2) ;
-    Debug.indent() ;
-    let cD, sigma = match Whnf.whnf sign e1, Whnf.whnf sign e2 with
+  let is_flex n = List.mem n flex in
+  let e1', e2' =  Whnf.whnf sign e1, Whnf.whnf sign e2 in
+  Debug.print(fun () -> "Unifying expressions\ne1 = " ^ print_exp e1
+    ^ "\ne2 = " ^ print_exp e2 ^ "\ne1' = " ^ print_exp e1' ^ "\ne2' = " ^ print_exp e2');
+    match e1', e2' with
       | Set n , Set n' when n = n' -> cG, []
       | Set n, Set n' -> raise (Unification_failure (Universes_dont_match (n, n')))
       | Pi (tel, t), Pi(tel', t') -> unify_pi tel t tel' t'
@@ -117,10 +118,6 @@ let rec unify_flex (sign, cG) flex e1 e2 =
       | Ctx, Ctx -> cG, []
       | _, _ ->
          raise (Unification_failure(Expressions_dont_unify (e1, e2)))
-    in
-    Debug.deindent();
-    Debug.print (fun () -> "Resulted in " ^ print_subst sigma ^ " and context " ^ print_ctx cD);
-    cD, sigma
 
   and unify_flex_many (sign, cG) flex es1 es2 =
     let unify_each (cD, sigma1) e1 e2 =

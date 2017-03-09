@@ -36,18 +36,12 @@ and matchings (sigma : ctx_map) (p : pats) : pats =
   | _ -> raise (Error.Violation ("Matching lists of different size. \nsigma = " ^ print_pats sigma ^ "\np = " ^ print_pats p))
 
 let rec flexible (p : pats)(cG : ctx) : name list =
-  Debug.indent ();
-  Debug.print (fun () -> "Computing flexible variables from p = " ^ print_pats p ^ " and cG = " ^ print_ctx cG);
-  let res = match p, cG with
+  match p, cG with
     | [], [] -> []
     | Innac e::ps, (x, t)::cG' -> x::(flexible ps cG')
     | p::ps, (x, t)::cG' -> flexible ps cG'
     | _ -> raise (Error.Violation ("Flexible: length violation."))
-  in
-  Debug.print (fun () -> "Result of flexible: [" ^ (String.concat ", " (List.map print_name res)) ^ "].");
-  Debug.deindent ();
-  res
-
+  
 let innac_ctx = List.map (fun (_, t) -> Innac t)
 let innac_subst = List.map (fun (x, e) -> x, Innac e)
 
@@ -129,7 +123,8 @@ let split_lam (sign : signature) (p1 : pats) (xs, p : string list * pat) (cD1 : 
     | _ -> raise (Error.Violation ("Split_lam obtained more than one parameter out of substituting in cT"))
   in
   let pss = x, PLam (xs, p') in
-  compute_split_map ss pss cD1 x cD2 delta pdelta cD'
+  let res = compute_split_map ss pss cD1 x cD2 delta pdelta cD' in
+  Debug.deindent (); res
 
 let split_const (sign : signature) (p1 : pats) (c, ps : def_name * pats)
                 (cD1 : ctx) (x, t : name * exp) (cD2 : ctx) : ctx * ctx_map =
@@ -155,7 +150,8 @@ let split_const (sign : signature) (p1 : pats) (c, ps : def_name * pats)
       let cD', cT, delta, pdelta, td = split_flex_unify sign p1 thetatel ps cD1 vs ws in
       let ss = x, App (Const c, var_list_of_ctx td) in
       let pss = x, PConst (c, simul_psubst_on_list pdelta (pvar_list_of_ctx cT)) in
-      compute_split_map ss pss cD1 x cD2 delta pdelta cD'
+      let res = compute_split_map ss pss cD1 x cD2 delta pdelta cD' in
+      Debug.deindent (); res
     else
       raise (Error.Error ("Get a grip!, wrong constructor. n = \"" ^ n ^ "\"; n' = \"" ^ n' ^ "\""))
 
@@ -171,7 +167,7 @@ let check_ppar (sign : signature) (p1 : pats) (n : name) (cD1 : ctx)
   (* (\* let cD' = cD1 @ [n, Box (g, t)] @ (simul_subst_on_ctx [x, Var n] cD2) in *\) *)
   (* let delta =  *)
 
-let split_clos (sign : signature) (p1 : pats) (n, s : name * exp) (cD1 : ctx)
+let split_clos (sign : signature) (p1 : pats) (n, s : name * pat_subst) (cD1 : ctx)
     (x, t : name * exp) (cD2 : ctx) : ctx * ctx_map =
   let g, t = match Whnf.whnf sign t with
     | Box(g, t) -> g, t
@@ -179,9 +175,20 @@ let split_clos (sign : signature) (p1 : pats) (n, s : name * exp) (cD1 : ctx)
                                ^ "only be used against a boxed type. Found "
                                ^ print_exp t))
   in
-  let g' = infer_syn (sign, cD1) (contextify (sign, cD1) g) s in
-  check_ctx (sign, cD1) g';
-  compute_split_map (x, Var n) (x, PClos(n, s)) cD1 x cD2 [] [] (cD1 @ [n, Box (g', t)])
+  let rec get_domain g s =
+    match g, s with
+    | _, CEmpty -> Nil
+    | _, CDot(s, y) ->
+      let cP = contextify (sign, cD1 @ cD2) g in
+      Snoc(get_domain g s, "_", lookup_bound y cP)
+    | _, CShift 0 -> g
+    | Snoc(g, _, _), CShift n -> get_domain g (CShift (n-1))
+    | _ -> raise (Error.Violation ("This should be a context"))
+  in
+  match Whnf.apply_inv t s with
+  | Some t -> compute_split_map (x, Var n) (x, PClos(n, s)) cD1 x cD2 [] [] (cD1 @ [n, Box (get_domain g s, t)])
+  | None -> raise (Error.Error ("Cannot check pattern matching clause " ^ print_pat (PClos (n, s))
+                               ^ " because it was not possible to compute an inverse substitution for " ^ print_pat_subst s))
     
 let split_rec (sign : signature) (ps : pats) (cD : ctx) : ctx * ctx_map =
   let rec search p1 p2 cD1 cD2 =
@@ -207,9 +214,9 @@ let split_rec (sign : signature) (ps : pats) (cD : ctx) : ctx * ctx_map =
     | _ -> raise (Error.Error ("Search: Syntax not implemented\np2 = " ^ print_pats p2 ^ "\ncD2 = " ^ print_ctx cD2))
     in
     Debug.print (fun () -> "Search had\ncD1 = " ^ print_ctx cD1 ^ "\ncD2 = " ^ print_ctx cD2 ^ "\nreturned cD' = " ^ print_ctx cD' ^ "\nand sigma = "^ print_pats sigma);
+    Debug.deindent();
     cD', sigma
   in
-  Debug.deindent();
   Debug.print (fun () -> "Split rec list ordering figuring out, ps = [" ^  print_pats ps ^ "], cD = " ^ print_ctx cD);
   search [] ps [] cD
 
