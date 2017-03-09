@@ -98,12 +98,12 @@ let rec unify_flex (sign, cG) flex e1 e2 =
 
       | Var n, _ when is_flex n ->
          if not (occur_check n e2) then
-           rem n cG, [n, e2]
+           ctx_subst (n, e2) (rem n cG), [n, e2]
          else
            raise (Unification_failure (Occur_check (n, e2)))
       | _, Var n when is_flex n ->
          if not (occur_check n e1) then
-           rem n cG, [n, e1]
+           ctx_subst (n, e1) (rem n cG), [n, e1]
          else
            raise (Unification_failure (Occur_check (n, e1)))
       | BVar i, BVar i' when i = i' -> cG, []

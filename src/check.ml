@@ -321,6 +321,17 @@ and infer_syn (sign, cG) cP (e : exp) =
       Debug.print (fun () -> "Looking bound variable " ^ string_of_int i ^ " resulted in type " ^ print_exp t
         ^ "\n Context is " ^ print_bctx cP);
       t
+    (* | Clos (Var x, s) -> *)
+    (*   begin match lookup x cG with *)
+    (*   | Box (g, t) -> *)
+    (*     let g' = infer_syn (sign, cG) cP s in *)
+    (*     check_ctx (sign, cG) g'; *)
+    (*     let rec unify_ctx g g' s = match g, g', s with *)
+    (*       | Nil, Nil, _ -> t *)
+    (*       | Var x, Var y, _ when x = y -> t *)
+    (*       | Snoc(g, e *)
+    (*   | t -> t *)
+    (*   end *)
     | Clos (e, s) ->
       let cP' = contextify (sign, cG) (infer_syn (sign, cG) cP s) in
       infer_syn (sign, cG) cP' e
@@ -331,8 +342,7 @@ and infer_syn (sign, cG) cP (e : exp) =
                  decontextify cP'
     | Dot (s, e) ->
       let g = infer_syn (sign, cG) cP s in
-      let cP' = contextify (sign, cG) g in
-      let t = infer_syn (sign, cG) cP' e in
+      let t = infer_syn (sign, cG) cP e in
       Snoc (g, "_", t)
     | Comp (s1, s2) ->
       let g1 = infer_syn (sign, cG) cP s1 in

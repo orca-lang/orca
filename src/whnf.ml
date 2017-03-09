@@ -136,9 +136,13 @@ and rewrite (sign : signature) (e : exp) : exp =
   (* Syntactic rewriting rules *)
 
   (* Beta reduction *)
-  | App(Lam (_, e1), e2::es) -> w (App((Clos(e1, Dot(Shift 0, e2))), es))
-  | AppL(Lam (_, e1), e2::es) -> w (AppL((Clos(e1, Dot(Shift 0, e2))), es))
-
+    | AppL(Lam (_, e1), es) ->
+      let rec f es = match es with
+        | [] -> Shift 0
+        | e :: es -> Dot (f es, e)
+      in
+      w (Clos(e1, f es))
+         
   (* VarShift 1 *)
   | Clos(BVar n, Shift n') -> BVar (n + n')
 
