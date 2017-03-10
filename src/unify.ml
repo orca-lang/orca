@@ -112,6 +112,7 @@ let rec unify_flex (sign, cG) flex e1 e2 =
       | EmptyS, EmptyS -> cG, []
       | Shift n, Shift n' -> cG, []
       | Dot(e1, e2), Dot(e1', e2') -> unify_many cG [e1;e2] [e1';e2']
+      | Comp (e1, e2), Comp(e1', e2') -> unify_many cG [e1;e2] [e1';e2']
       | Snoc(e1, _, e2), Snoc(e1', _, e2') -> unify_many cG [e1;e2] [e1';e2']
       | Nil, Nil -> cG, []
       | Annot(e1, e2), Annot(e1', e2') -> unify_many cG [e1;e2] [e1';e2']

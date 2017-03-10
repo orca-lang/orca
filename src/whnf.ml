@@ -257,6 +257,9 @@ and rewrite (sign : signature) (e : exp) : exp =
   (* LiftEnv *)
   | Comp(Dot(s2,e), ShiftS s1) -> w (Dot(Comp(s2, s1), e))
 
+  (* Added rules for confluence *)
+  | Clos (e, Comp (s, EmptyS)) -> w e
+
   (* Congruence rules *)
   | Clos (Const n, _) -> w (Const n)
   | Clos (Clos (e, s1), s2) -> w (Clos (e, Comp(s2, s1)))

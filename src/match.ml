@@ -71,7 +71,8 @@ let split_flex_unify (sign : signature) (p1 : pats) (thetatel : tel) (ps : pats)
   cD', cT, delta, pdelta, cT'
 
 let compute_split_map (ss:single_subst) (pss:single_psubst) (cD1:ctx) (x:name)
-                      (cD2:ctx) (delta : subst) (pdelta : psubst) (cD':ctx) =
+    (cD2:ctx) (delta : subst) (pdelta : psubst) (cD':ctx) =
+  Debug.indent ();
   Debug.print (fun () -> "ss = " ^ print_subst [ss]);
   Debug.print (fun () -> "pss = " ^ print_psubst [pss]);
   Debug.print (fun () -> "cD' = " ^ print_ctx cD');
@@ -185,19 +186,20 @@ let split_clos (sign : signature) (p1 : pats) (n, s : name * pat_subst) (cD1 : c
     | Snoc(g, _, _), CShift n -> get_domain g (CShift (n-1))
     | _ -> raise (Error.Violation ("This should be a context"))
   in
+  let rec subst_of_pat_subst = function
+    | CShift n -> Shift n
+    | CEmpty -> EmptyS
+    | CDot(s, i) -> Dot(subst_of_pat_subst s, BVar i)
+  in
   match Whnf.apply_inv t s with
-  | Some t -> compute_split_map (x, Var n) (x, PClos(n, s)) cD1 x cD2 [] [] (cD1 @ [n, Box (get_domain g s, t)])
+  | Some t -> compute_split_map (x, Clos(Var n, subst_of_pat_subst s)) (x, PClos(n, s))
+                                cD1 x cD2 [] [] (cD1 @ [n, Box (get_domain g s, t)])
   | None -> raise (Error.Error ("Cannot check pattern matching clause " ^ print_pat (PClos (n, s))
                                ^ " because it was not possible to compute an inverse substitution for " ^ print_pat_subst s))
     
 let split_rec (sign : signature) (ps : pats) (cD : ctx) : ctx * ctx_map =
-  let rec search p1 p2 cD1 cD2 =
-    Debug.print(fun () -> "Split search with\np1 = " ^ print_pats p1
-                          ^ "\nand p2 = " ^ print_pats p2
-                          ^ "\nin CD1 = " ^ print_ctx cD1
-                          ^ "\nin CD2 = " ^ print_ctx cD2);
-    Debug.indent();
-    let cD', sigma = match p2, cD2 with
+  let rec search p1 p2 cD1 cD2 =    
+    match p2, cD2 with
     | [], [] -> [], []
     | PConst (c, sp) :: ps', (x, t) :: cD2 ->
        split_const sign p1 (c, sp) cD1 (x, t) cD2
@@ -212,12 +214,7 @@ let split_rec (sign : signature) (ps : pats) (cD : ctx) : ctx * ctx_map =
     | PLam (xs, p) :: ps', (x, t) :: cD2 ->
        split_lam sign p1 (xs, p) cD1 (x, t) cD2
     | _ -> raise (Error.Error ("Search: Syntax not implemented\np2 = " ^ print_pats p2 ^ "\ncD2 = " ^ print_ctx cD2))
-    in
-    Debug.print (fun () -> "Search had\ncD1 = " ^ print_ctx cD1 ^ "\ncD2 = " ^ print_ctx cD2 ^ "\nreturned cD' = " ^ print_ctx cD' ^ "\nand sigma = "^ print_pats sigma);
-    Debug.deindent();
-    cD', sigma
   in
-  Debug.print (fun () -> "Split rec list ordering figuring out, ps = [" ^  print_pats ps ^ "], cD = " ^ print_ctx cD);
   search [] ps [] cD
 
 let split_set sign (x : name) (cG : ctx) : ctx_map =
@@ -280,8 +277,6 @@ let check_pats (sign : signature) (p : pats) (cG : ctx) : ctx * ctx_map =
     | _ -> raise (Error.Violation "Length error in unify names")
   in
   let cG' = unify_names p cG in
-  (* Debug.print (fun () -> "Unifying of names: cG = " ^ print_ctx cG ^ ", cG' = " *)
-  (*                        ^ print_ctx cG' ^ ", using patterns p = " ^ print_pats p); *)
   let cG = cG' in
   let rec check_pats (p : pats) (sigma : ctx_map) (cD : ctx) : ctx * ctx_map =
     if List.for_all is_Pvar p then
@@ -297,9 +292,7 @@ let check_pats (sign : signature) (p : pats) (cG : ctx) : ctx * ctx_map =
                              ^ "\nsigma' = " ^ print_pats sigma'
                              ^ "\ncD' = " ^ print_ctx cD');
 
-      let res = check_pats p' sigma' cD' in
-      Debug.print (fun () -> "Check pats returned result ctx " ^ print_ctx (fst res) ^ "\nand pattern " ^ print_pats (snd res));
-      res
+      check_pats p' sigma' cD'
   in
   let res = check_pats p (List.map (fun (x, _) -> PVar x) cG) cG in
   Debug.deindent ();
@@ -317,8 +310,6 @@ let rec check_innacs (sign, cD : signature * ctx) (p : pats) (sigma : ctx_map) (
   | _ -> raise (Error.Error "Size mismatch.")
 
 and check_innac (sign, cD : signature * ctx) (p : pat) (q : pat) (t : exp) : unit =
-  Debug.print (fun () -> "Checking inaccessible patterns.\np = "
-    ^ print_pat p ^ "\nq = " ^ print_pat q);
   match p, q with
   | Innac ep, Innac eq ->
      Debug.indent ();
@@ -363,8 +354,8 @@ and check_innac (sign, cD : signature * ctx) (p : pat) (q : pat) (t : exp) : uni
 
 let check_lhs (sign : signature) (p : pats) (cG : ctx) : ctx * ctx_map =
   let cD, sigma = check_pats sign p cG in
-  Debug.print (fun () -> "Checking LHS returned\ncD = " ^ print_ctx cD ^ "\nsigma = " ^ print_pats sigma);
-  Debug.print (fun () -> "Checking inaccessible with \ncG = " ^ print_ctx cG ^ "\np = " ^ print_pats p);
+  Debug.print (fun () -> "Checking inaccessible patterns.\ncG = " ^ print_ctx cG
+    ^ "\np = " ^ print_pats p ^ "\nsigma = " ^ print_pats sigma);
   check_innacs (sign, cD) p sigma cG ;
   cD, sigma
 
@@ -380,7 +371,10 @@ let check_clause (sign : signature) (f : def_name) (p : pats) (telG : tel) (t : 
     let cD, sigma = check_lhs sign p (ctx_of_tel telG) in
     Debug.print (fun () -> "LHS was checked:\n cD = " ^ print_ctx cD ^ "\n sigma = "^ print_pats sigma ^ "\n telG = " ^ print_tel telG);
     match rhs with
-    | Just e -> check (sign, cD) e (simul_subst (subst_of_ctx_map sigma telG) t)
+    | Just e ->
+      let t' = simul_subst (subst_of_ctx_map sigma telG) t in
+      Debug.print (fun () -> "Checking RHS " ^ print_exp e ^ " against type " ^ print_exp t' ^ "\nin context " ^ print_ctx cD);
+      check (sign, cD) e t'
     | Impossible x -> caseless sign cD x t
   with
     Unify.Unification_failure prob ->

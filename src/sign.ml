@@ -196,7 +196,6 @@ let simul_psubst_on_ctx sigma =
     List.map (fun (x, e) -> x, simul_psubst sigma e)
 
 let rec rename_ctx_using_pats (cG : ctx) (ps : pats) =
-  Debug.print (fun () -> "Calling rename_ctx_using_pats \ncG = " ^ print_ctx cG ^ "\nps = " ^ print_pats ps);
   match cG, ps with
   | [], [] -> [], []
   | (x, t) :: cG', PVar y :: ps' ->
