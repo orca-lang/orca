@@ -78,6 +78,7 @@ let rec match_pat sign p e =
   | PConst (n, _), App(Const n', _) ->
      raise (Matching_failure (p, e))
   | _, Var _ -> raise Stuck
+  | _, Clos(Var _, _) -> raise Stuck
   | _ -> raise (Matching_failure (p, e))
 
 (* | PAnnot (p, e) -> *)
@@ -130,14 +131,14 @@ and reduce_with_clauses sign sp cls =
   else
     let sp1, sp2 = split cl_l sp in
     try
-      match reduce sp1 cls with
+      match reduce (List.map (whnf sign) sp1) cls with
       | None -> raise (Error.Error ("Coverage error"))
       | Some e -> Some (e, sp2)
     with Stuck -> None
 
 
 and whnf (sign : signature) (e : exp) : exp =
-  (* Debug.print (fun () -> "Computing the whnf of " ^ print_exp e ^ ".") ; *)
+  Debug.print (fun () -> "Computing the whnf of " ^ print_exp e) ;
   Debug.indent();
   let res = match e with
     (* this removes degenerate applications should they occur *)
@@ -153,23 +154,23 @@ and whnf (sign : signature) (e : exp) : exp =
        | D e -> whnf sign e
        | _ -> Const n
        end
-    | App(Const n, sp) ->
-       begin match lookup_sign_def n sign with
-       | D e -> whnf sign (App (e, sp))
-       | P cls ->
+    | App(h, sp) ->
+      begin match whnf sign h with
+      | Fn(xs, e) ->
+        let sigma = List.map2 (fun x e -> x, e) xs sp in
+        whnf sign (simul_subst sigma e) (* Beta reduction *)
+      | Const n ->
+        begin match lookup_sign_def n sign with
+        | D e -> whnf sign (App (e, sp))
+        | P cls ->
           begin match reduce_with_clauses sign sp cls with
           | None -> App (Const n, sp)
           | Some (e, []) -> whnf sign e
           | Some (e, sp) -> whnf sign (App (e, sp))
           end
-       | _ -> App(Const n, sp)
-       end
-    | App(h, sp) ->
-       begin match whnf sign h with
-       | Fn(xs, e) ->
-          let sigma = List.map2 (fun x e -> x, e) xs sp in
-          whnf sign (simul_subst sigma e) (* Beta reduction *)
-       | h -> App(h, sp)
+        | _ -> App(Const n, sp)
+        end
+      | h -> App(h, sp)
        end
     | Annot(e, _) -> whnf sign e
 
@@ -177,11 +178,13 @@ and whnf (sign : signature) (e : exp) : exp =
     | e -> rewrite sign e
   in
   Debug.deindent();
-  (* Debug.print (fun () -> "Whnf of " ^ print_exp e ^ " is " ^ print_exp res ^ "."); *)
+  Debug.print (fun () -> "====> " ^ print_exp res);
   res
 
 and rewrite (sign : signature) (e : exp) : exp =
   let w = whnf sign in
+  Debug.print (fun () -> "Rewriting " ^ print_exp e);
+  Debug.indent ();
   let res = match e with
 
   (* Syntactic rewriting rules *)
@@ -277,8 +280,10 @@ and rewrite (sign : signature) (e : exp) : exp =
   | Clos (Fn (x, e), s) -> Fn (x, Clos(e, s))
   | Clos (Annot (e, t), s) -> Annot (Clos(e,s), Clos(t, s))
   | Clos (e, s) -> let s' = w s in
-                   if s = s' then Clos (e, s)
-                   else w (Clos (e, s'))
+                   let e' = w e in
+                   if s = s' && e' = e then
+                     Clos (e, s)
+                   else w (Clos (e', s'))
   (* IDK what to do with these *)
   (* | Clos (Under, s) -> assert false *)
   (* | Clos (Snoc (g, x, t), s) -> assert false *)
@@ -316,8 +321,8 @@ and rewrite (sign : signature) (e : exp) : exp =
   | e -> e (* No reduction necessary *)
 
   in
-  Debug.print (fun () -> "Rewrite this " ^ print_exp e
-                         ^ "\n===> " ^ print_exp res);
+  Debug.deindent ();
+  Debug.print (fun () -> "===> " ^ print_exp res);
   res
 
 

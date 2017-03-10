@@ -11,7 +11,7 @@ syn oft : tm -> tp -> * where
 | t-unit: oft one unit
 | t-app: (f: tm) -> (e : tm) -> (s: tp) -> (t: tp)
          -> oft f (arr s t) -> oft e s -> oft (app f e) t
-| t-lam: (s:tp) -> (t:tp) -> (e:tm ->> tm)
+| t-lam: (e:tm ->> tm) -> (s:tp) -> (t:tp)
          -> ((x:tm) ->> oft x s ->> oft (e ' x) t) -> oft (lam (\x.e ' x)) (arr s t)
 
 syn step : tm -> tm -> * where
@@ -29,3 +29,14 @@ def copy-oft : (g : ctx) -> (m : (g |- tm)) -> (t : (|- tp)) -> (g |- oft m (t[^
 | g (app f e) t (t-app .f .e (s[^]) .(t[^]) d1 d2) =>
   t-app f e s[^] t[^] (copy-oft g f (arr s t) d1) (copy-oft g e s d2)
 | g m t d => d
+
+def oft-copy : (g : ctx) -> (m : (g |- tm)) -> (t : |- tp) -> (g |- oft m t[^]) -> (g |- oft (copy g m) t[^]) where
+| g one unit t-unit => t-unit
+| g (app m n) t (t-app .m .n (s[^]) .(t[^]) d1 d2) =>
+  t-app (copy g m) (copy g n) s[^] t[^] (oft-copy g m (arr s[^] t[^]) d1) (oft-copy g n s[^] d2)
+| g (lam m) (arr s t) (t-lam .m .(s[^]) .(t[^]) d) => ?
+
+def oft-copy-wkn : (g : ctx) -> (m : (g |- tm)) -> (t : |- tp) -> (g |- oft m t[^]) -> (g,x:tm |- oft ((copy g m)[^1]) t[^]) where
+| g one unit t-unit => t-unit
+| g (app m n) t (t-app .m .n (s[^]) .(t[^]) d1 d2) =>
+  t-app (copy g m)[^1] (copy g n)[^1] s[^] t[^] (oft-copy-wkn g m (arr s[^] t[^]) d1) (oft-copy-wkn g n s[^] d2) 
