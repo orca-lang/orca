@@ -3,7 +3,7 @@ syn tm where
 | lam: (tm ->> tm) -> tm
 | one : tm
 
-lf tp where
+syn tp where
 | unit : tp
 | arr : tp -> tp -> tp
 
@@ -39,4 +39,4 @@ def oft-copy : (g : ctx) -> (m : (g |- tm)) -> (t : |- tp) -> (g |- oft m t[^]) 
 def oft-copy-wkn : (g : ctx) -> (m : (g |- tm)) -> (t : |- tp) -> (g |- oft m t[^]) -> (g,x:tm |- oft ((copy g m)[^1]) t[^]) where
 | g one unit t-unit => t-unit
 | g (app m n) t (t-app .m .n (s[^]) .(t[^]) d1 d2) =>
-  t-app (copy g m)[^1] (copy g n)[^1] s[^] t[^] (oft-copy-wkn g m (arr s[^] t[^]) d1) (oft-copy-wkn g n s[^] d2) 
+  t-app (copy g m)[^1] (copy g n)[^1] s[^] t[^] (oft-copy-wkn g m (arr s[^] t[^]) d1) (oft-copy-wkn g n s[^] d2)

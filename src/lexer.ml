@@ -32,7 +32,7 @@ let add_line pos length =
     Lexing.pos_lnum = pos.Lexing.pos_lnum + 1
     ; Lexing.pos_bol = pos.Lexing.pos_cnum
 }
-  
+
 let remove_set_ s = String.sub s 4 (String.length s - 4)
 let remove_set s = String.sub s 3 (String.length s - 3)
 
@@ -54,7 +54,6 @@ let rec main_scanner pos = lexer
 
   | "data" -> add_word pos (Ulexing.lexeme_length lexbuf), DATA
   | "syn" -> add_word pos (Ulexing.lexeme_length lexbuf), SYN
-  | "lf" -> add_word pos (Ulexing.lexeme_length lexbuf), SYN
   | "def" | "thm" | "lem" -> add_word pos (Ulexing.lexeme_length lexbuf), DEF
   | "|" -> add_word pos (Ulexing.lexeme_length lexbuf), MID
   | "=>" -> add_word pos (Ulexing.lexeme_length lexbuf), RARR
