@@ -17,7 +17,9 @@
 *)
 
 module E = Syntax.Ext
+module EP = Print.Ext
 module I = Syntax.Int
+module IP = Print.Int
 
 open Location
 
@@ -96,17 +98,17 @@ let rec get_bound_var_ctx_no_annot (e : E.exp) : bctx =
   | E.Annot(P(_, E.Ident n), _) -> [n]
   | E.Nil -> []
   | E.Ident _ -> []
-  | _ -> raise (Error.Error_loc (loc e, E.print_exp e ^ " is a forbidden expression on the left hand side of :>"))
+  | _ -> raise (Error.Error_loc (loc e, EP.print_exp e ^ " is a forbidden expression on the left hand side of :>"))
 
 let rec get_bound_var_ctx_in_pat (p : E.pat) : bctx =
   match p with
   | E.PComma (g, E.PIdent n) -> n :: (get_bound_var_ctx_in_pat g)
   | E.PNil -> []
   | E.PIdent _ -> []
-  | p -> raise (Error.Error (E.print_pat p ^ " is a forbidden pattern on the left hand side of :>"))
+  | p -> raise (Error.Error (EP.print_pat p ^ " is a forbidden pattern on the left hand side of :>"))
 
 let rec pproc_exp (s : sign) (cG : ctx) (cP : bctx) (e :E.exp) : I.exp =
-  Debug.print (fun () -> "Preprocessing expression " ^ E.print_exp e);
+  Debug.print (fun () -> "Preprocessing expression " ^ EP.print_exp e);
   Debug.indent ();
   let f e = pproc_exp s cG cP e in
   let res = match content e with
@@ -175,16 +177,16 @@ and pproc_tel (s : sign) (cG : ctx) (cP : bctx) (e : E.exp) : I.tel * I.exp =
     | E.Annot (e, t0) ->
       let t0' = pproc_exp s cG cP t0 in
       let cG', tel = g cG e t0' in
-      Debug.print(fun () -> "Calling f in pproc_tel\ntel = " ^ I.print_tel tel);
+      Debug.print(fun () -> "Calling f in pproc_tel\ntel = " ^ IP.print_tel tel);
       cG', tel
     | E.App (P(_, E.Annot(e, t0)), t1) ->
       let t0' = pproc_exp s cG cP t0 in
       let cG', tel = g cG e t0' in
       let cG'', tel'  = f cG' t1 in
-      Debug.print(fun () -> "Calling f in pproc_tel\ntel = " ^ I.print_tel tel ^ "\ntel' = " ^ I.print_tel tel');
+      Debug.print(fun () -> "Calling f in pproc_tel\ntel = " ^ IP.print_tel tel ^ "\ntel' = " ^ IP.print_tel tel');
       cG'', tel @ tel'
     | _ -> let tel = [Syntax.Explicit, Name.gen_floating_name (), pproc_exp s cG cP e] in
-           Debug.print(fun () -> "Calling f in pproc_tel. Fall through, resulting in = " ^ I.print_tel tel);
+           Debug.print(fun () -> "Calling f in pproc_tel. Fall through, resulting in = " ^ IP.print_tel tel);
       cG, tel
   in
   match content e with
@@ -192,7 +194,7 @@ and pproc_tel (s : sign) (cG : ctx) (cP : bctx) (e : E.exp) : I.tel * I.exp =
     let cG', tel = f cG t0 in
     let tel', t = pproc_tel s cG' cP t1 in
      tel @ tel' , t
-  | _ -> Debug.print(fun () -> "preproc tel matched against " ^ E.print_exp e);
+  | _ -> Debug.print(fun () -> "preproc tel matched against " ^ EP.print_exp e);
     [], pproc_exp s cG cP e
 
 and pproc_stel (s : sign) (cG : ctx) (cP : bctx) (e : E.exp) : I.stel * I.exp =
@@ -220,7 +222,7 @@ and pproc_app (s : sign) (cG : ctx) (cP : bctx) (e : E.exp) : I.exp * I.exp list
   | _ -> pproc_exp s cG cP e, []
 
 let pproc_decl s cG (n, e) (d : I.def_name) =
-  Debug.print (fun () -> "Preprocessing declaration " ^ n ^ "\nCreating telescope out of " ^ E.print_exp e);
+  Debug.print (fun () -> "Preprocessing declaration " ^ n ^ "\nCreating telescope out of " ^ EP.print_exp e);
   Debug.indent ();
   let tel, e' = pproc_tel s cG [] e in
   let (d', args) = match e' with
@@ -266,7 +268,7 @@ let rec collect_pat_vars (s : sign) cG cP p =
     cG', E.PConst (c, List.rev ps')
   | E.PClos (x, e) ->
     begin match find_pat_name s cG cP x with
-    | cG', E.PVar n -> 
+    | cG', E.PVar n ->
       cG', E.PClos' (n, e)
     | cG', _ -> raise (Error.Error "Substitution can only be applied to pattern variables")
     end
@@ -297,7 +299,7 @@ let rec collect_pat_vars (s : sign) cG cP p =
 let rec pproc_pat (s : sign) cG cP p =
   let print_ctx cG = "[" ^ String.concat ", " (List.map (fun (e, i) -> e ^ ", " ^ Name.print_name i) cG) ^ "]" in
   let f pat = pproc_pat s cG cP pat in
-  Debug.print (fun () -> "Procesing pattern : " ^ E.print_pat p ^ " with current context " ^ print_ctx cG);
+  Debug.print (fun () -> "Procesing pattern : " ^ EP.print_pat p ^ " with current context " ^ print_ctx cG);
   match p with
   | E.PIdent _ -> raise (Error.Violation "Found PIdent on second pass")
   | E.PPar _ -> raise (Error.Violation "Found PPar on second pass")
@@ -306,7 +308,7 @@ let rec pproc_pat (s : sign) cG cP p =
   | E.PVar n -> I.PVar n
   | E.PBVar i -> I.PBVar i
   | E.Innac e ->
-     Debug.print (fun () -> "Preprocessing inaccessible pattern " ^ E.print_exp e ^ " in context " ^ print_ctx cG);
+     Debug.print (fun () -> "Preprocessing inaccessible pattern " ^ EP.print_exp e ^ " in context " ^ print_ctx cG);
      I.Innac (pproc_exp s cG [] e)
   | E.PLam (x, p) ->
     I.PLam (x, pproc_pat s cG (add_name_bvars cP x) p)
@@ -351,7 +353,7 @@ let rec collect_pats_vars s cG = function
      let cG', p' = collect_pat_vars s cG [] p in
      let cG'', ps' = collect_pats_vars s cG' ps in
      cG'', p' :: ps'
-       
+
 let pproc_def_decl s (pats, e) =
   let cG, pats' = collect_pats_vars s [] pats in
   let pats'' = pproc_pats s cG pats' in
@@ -361,7 +363,7 @@ let params_to_ctx = List.map2 (fun (_, n, _) (_, n', _) -> n, n')
 
 let pre_process s = function
   | E.Data (n, ps, e, ds) ->
-    Debug.print (fun () -> "Preprocessing datatype : " ^ n ^ "\nps = " ^ E.print_params ps);
+    Debug.print (fun () -> "Preprocessing datatype : " ^ n ^ "\nps = " ^ EP.print_params ps);
     let rec fold_param cG ps =
       match ps with
       | p :: ps ->
@@ -371,11 +373,11 @@ let pre_process s = function
       | [] -> cG, []
     in
     let cGa, ps' = fold_param [] ps in
-    Debug.print (fun () -> "ps' = " ^ I.print_tel ps');
+    Debug.print (fun () -> "ps' = " ^ IP.print_tel ps');
      let cG = params_to_ctx ps ps' in
      let is, u = match pproc_tel s cG [] e with
        | tel, I.Set u -> tel, u
-       | _, t -> raise (Error.Error_loc (loc e, "Expected universe but instead got expression " ^ I.print_exp t))
+       | _, t -> raise (Error.Error_loc (loc e, "Expected universe but instead got expression " ^ IP.print_exp t))
      in
      let s' = add_name_sign s n in
      let s'', ds' = List.fold_left (fun (s, dos) d -> let ss, dd = pproc_decl s cG d n in ss, (dd :: dos)) (s', []) ds in
@@ -384,7 +386,7 @@ let pre_process s = function
     let tel, e' = pproc_tel s [] [] e in
     let _ = match e' with
       | I.Star -> ()
-      | _ -> raise (Error.Error_loc (loc e, "Syntax definition for " ^ n ^ " should have kind * instead of " ^ I.print_exp e'))
+      | _ -> raise (Error.Error_loc (loc e, "Syntax definition for " ^ n ^ " should have kind * instead of " ^ IP.print_exp e'))
     in
      let s' = add_name_sign s n in
      let s'', ds' = List.fold_left (fun (s, dos) d -> let ss, dd = pproc_decl s [] d n in ss, (dd :: dos)) (s', []) ds in

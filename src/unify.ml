@@ -1,4 +1,5 @@
 open Syntax.Int
+open Print.Int
 open Sign
 open Name
 

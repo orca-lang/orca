@@ -1,5 +1,6 @@
 open Sign
 open Syntax.Int
+open Print.Int
 open Match
 open Check
 
@@ -10,7 +11,7 @@ let tc_constructor (sign , cG : signature * ctx) (u : universe) (tel : tel)
   if uc <= u then
     begin
       let check' = check (sign, (ctx_of_tel tel') @ cG) in
-      let rec check_indices es tel = 
+      let rec check_indices es tel =
         match es, tel with
         | [], [] -> ()
         | e::es', (_, x, t)::tel' ->
@@ -35,7 +36,7 @@ let tc_syn_constructor (sign , cG : signature * ctx) (tel : tel)
   check_syn_tel (sign, cG) tel';
   (* let cP = bctx_of_stel tel' in *)
   let check' = check_syn (sign, (ctx_of_tel tel') @ cG) BNil in
-  let rec check_indices es tel = 
+  let rec check_indices es tel =
     match es, tel with
     | [], [] -> ()
     | e::es', (_, _, t)::tel' ->
@@ -51,7 +52,7 @@ let tc_syn_constructor (sign , cG : signature * ctx) (tel : tel)
 let tc_program (sign : signature) : program -> signature = function
   | Data (n, ps, is, u, ds) ->
     Debug.print_string ("Typechecking data declaration: " ^ n ^ "\nps = "
-                        ^ print_tel ps ^ "\nis = " ^ print_tel is);    
+                        ^ print_tel ps ^ "\nis = " ^ print_tel is);
      let u' = check_tel (sign, []) u ps in
      let cG = ctx_of_tel ps in
      let u'' = check_tel (sign, cG) u' is in

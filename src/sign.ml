@@ -1,4 +1,5 @@
 open Syntax.Int
+open Print.Int
 open Name
 
 type signature_entry
@@ -60,7 +61,7 @@ let lookup_cons_entry (c : def_name) (sign : signature) (mg : exp option) : tel 
       | [] -> [], box n t
       | (i, x, s) :: tel ->
         let tel', t' = box_spi (n+1) tel t in
-        (i, x, box n s) :: tel', t'          
+        (i, x, box n s) :: tel', t'
     in
     List.map (fun (i, x, s) -> i, x, Box (g, box 0 s)) tel, dsig
   | _ -> raise (Error.Error ("Constant " ^ c ^ " was expected to be a constructor."))

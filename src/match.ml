@@ -1,4 +1,5 @@
 open Syntax.Int
+open Print.Int
 open Sign
 open Check
 open Name
@@ -13,7 +14,7 @@ let rec subst_of_ctx_map (sigma : ctx_map) (tel : tel) : subst =
 
 let compose_maps (sigma : ctx_map) (cD : ctx) (delta : ctx_map) : ctx_map =
   let delta_names = List.map2 (fun (x, _) p -> x, p) cD delta in
-  Debug.print(fun () -> "Composing maps\nsigma = " ^ print_pats sigma 
+  Debug.print(fun () -> "Composing maps\nsigma = " ^ print_pats sigma
       ^ "\ndelta = " ^ print_pats delta ^ "\ndelta_names" ^ print_psubst delta_names);
   List.map (simul_psubst delta_names) sigma
 
@@ -41,7 +42,7 @@ let rec flexible (p : pats)(cG : ctx) : name list =
     | Innac e::ps, (x, t)::cG' -> x::(flexible ps cG')
     | p::ps, (x, t)::cG' -> flexible ps cG'
     | _ -> raise (Error.Violation ("Flexible: length violation."))
-  
+
 let innac_ctx = List.map (fun (_, t) -> Innac t)
 let innac_subst = List.map (fun (x, e) -> x, Innac e)
 
@@ -163,7 +164,7 @@ let check_ppar (sign : signature) (p1 : pats) (n : name) (cD1 : ctx)
     | Box (g, t) -> g, t
     | t -> raise (Error.Error ("Parameter variables can only be used against a boxed type. Found " ^ print_exp t))
   in
-  
+
   compute_split_map (x, Var n) (x, PPar n) cD1 x cD2 [] [] (cD1 @ [n, Box (g, t)])
   (* (\* let cD' = cD1 @ [n, Box (g, t)] @ (simul_subst_on_ctx [x, Var n] cD2) in *\) *)
   (* let delta =  *)
@@ -196,9 +197,9 @@ let split_clos (sign : signature) (p1 : pats) (n, s : name * pat_subst) (cD1 : c
                                 cD1 x cD2 [] [] (cD1 @ [n, Box (get_domain g s, t)])
   | None -> raise (Error.Error ("Cannot check pattern matching clause " ^ print_pat (PClos (n, s))
                                ^ " because it was not possible to compute an inverse substitution for " ^ print_pat_subst s))
-    
+
 let split_rec (sign : signature) (ps : pats) (cD : ctx) : ctx * ctx_map =
-  let rec search p1 p2 cD1 cD2 =    
+  let rec search p1 p2 cD1 cD2 =
     match p2, cD2 with
     | [], [] -> [], []
     | PConst (c, sp) :: ps', (x, t) :: cD2 ->

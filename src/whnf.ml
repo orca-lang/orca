@@ -1,4 +1,5 @@
 open Syntax.Int
+open Print.Int
 open Sign
 
 exception Matching_failure of pat * exp
@@ -41,12 +42,12 @@ let apply_inv e s =
     | Annot (e1, e2), _ -> Annot (apply_inv e1 s, apply_inv e2 s)
     | Snoc _, _ -> e
     | Nil, _ -> Nil
-      
+
     | Clos (e, s'), _ -> Clos(e, apply_inv s' s)
-      
+
     | EmptyS,_ -> EmptyS
-    | Shift _, _ 
-      
+    | Shift _, _
+
     | Dot _, _
     | Comp _, _
     | ShiftS _, _-> assert false
@@ -54,7 +55,7 @@ let apply_inv e s =
   in
   try Some (apply_inv e s)
   with Inv_fail -> None
-  
+
 let rec cong_stel tel s =
   match tel with
   | [] -> [], s
@@ -196,7 +197,7 @@ and rewrite (sign : signature) (e : exp) : exp =
         | e :: es -> Dot (f es, e)
       in
       w (Clos(e1, f es))
-      
+
   (* IdL *)
   | Comp(Shift 0, s) -> w s
 
@@ -211,7 +212,7 @@ and rewrite (sign : signature) (e : exp) : exp =
 
   (* Empty Subst *)
   | Clos (e, EmptyS) -> w e
-         
+
   (* VarShift 1 *)
   | Clos(BVar n, Shift n') -> BVar (n + n')
 
@@ -324,6 +325,3 @@ and rewrite (sign : signature) (e : exp) : exp =
   Debug.deindent ();
   Debug.print (fun () -> "===> " ^ print_exp res);
   res
-
-
-   

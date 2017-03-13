@@ -1,4 +1,5 @@
 open Syntax.Int
+open Print.Int
 open Sign
 open Name
 
@@ -18,7 +19,7 @@ let is_syntax = function
   | Snoc _
   | Nil -> true
   | _ -> false
-    
+
 let lookup x cG =
   begin
     try List.assoc x cG
@@ -32,7 +33,7 @@ let is_ctx (sign, cG) = function
   | Snoc _ -> true
   | Var g when lookup g cG = Ctx -> true
   | _ -> false
-    
+
 let rec contextify (sign, cG) (g : exp) =
   match Whnf.whnf sign g with
   | Nil -> BNil
