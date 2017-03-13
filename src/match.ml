@@ -3,6 +3,7 @@ open Print.Int
 open Sign
 open Check
 open Name
+open Meta
 
 type ctx_map = pat list
 
