@@ -22,3 +22,6 @@ setup.log
 *.conflicts
 
 *.out
+
+# merlin configuration as it is generated when running make
+*.merlin

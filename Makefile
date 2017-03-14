@@ -2,6 +2,7 @@ OCAMLBUILD = ocamlbuild -use-ocamlfind -yaccflags --infer
 
 default:
 	tools/menhir-clean.sh
+	tools/merlin-init.sh
 	$(OCAMLBUILD) src/orca.byte
 
 test: default
