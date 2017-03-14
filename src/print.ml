@@ -1,3 +1,5 @@
+(* This is the basic printer for the AST, it looks bad but it is
+   always available without contexts *)
 open Syntax
 
 module Ext = struct

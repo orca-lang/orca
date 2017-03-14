@@ -3,5 +3,6 @@ true : use_menhir, use_str, annot
 <src/parser.ml> : package(menhirLib, ulex)
 <src/repl.ml> : package(ulex)
 <src/orca.ml> : package(ulex, menhirLib)
+<src/pretty.ml> : package(fmt)
 
-<src/*.{native,byte}> : package(ulex, menhirLib), use_unix
+<src/*.{native,byte}> : package(ulex, menhirLib, fmt), use_unix

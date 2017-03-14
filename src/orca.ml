@@ -27,6 +27,11 @@ let set_parse_only, get_parse_only =
   (fun () -> print := true),
   (fun () -> !print)
 
+let set_experimental_pp, get_experimental_pp =
+  let pp = ref false in
+  (fun () -> pp := true),
+  (fun () -> !pp)
+
 let usage_msg = "Bears ahead"
 let file = ref ""
 let args = [("-ext", Arg.Unit set_print_external, "Print external syntax before preprocessing.")
@@ -34,6 +39,7 @@ let args = [("-ext", Arg.Unit set_print_external, "Print external syntax before 
            ;("-debug", Arg.Unit Debug.set_debug_on, "Generates a log file with information about the file that was checked")
            ;("-no-wrapper", Arg.Unit Repl.set_no_wrapper, "Turns off using a read line wrapper.")
            ;("-prompt", Arg.String Repl.set_prompt, "<string> Sets a custom prompt.")
+           ;("-pp", Arg.Unit set_experimental_pp, "Uses the new pretty printer.")
            ]
 
 let execute_code (sign : Sign.signature) (program : Syntax.Ext.program list) : Sign.signature =
@@ -58,9 +64,13 @@ let execute_code (sign : Sign.signature) (program : Syntax.Ext.program list) : S
                    "\n"
                    (List.map Print.Int.print_program int_rep)
     in
-
-    print_string ("* The internal tree is:\n" ^ int_pp ^ "\n");
     Debug.print (fun () -> "The internal tree is:\n" ^ int_pp ^ "\n");
+
+    if get_experimental_pp()
+    then List.iter (fun p -> Pretty.fmt_program sign Format.std_formatter p) int_rep
+    else print_string ("* The internal tree is:\n" ^ int_pp ^ "\n")
+
+    ;
 
     if not (get_parse_only ()) then begin
            Debug.print_string "Starting typechecking." ;
