@@ -309,7 +309,8 @@ and check_syn (sign, cG) cP (e : exp) (t : exp) =
           Unify.unify (sign, cG) t t'
       with
         Unify.Unification_failure prob ->
-        raise (Error.Error ("XXXXXChecking syntactic term " ^ print_exp e ^ " against type " ^ print_exp t
+          raise (Error.Error ("Checking syntactic term " ^ print_exp e ^ " against type " ^ print_exp t
+                              ^ "\nIn context " ^ print_bctx cP
                             ^ "\nFailed with unification problem:\n" ^ Unify.print_unification_problem prob))
       in
       ()
@@ -332,9 +333,9 @@ and infer_syn (sign, cG) cP (e : exp) =
       end
 
     | AppL (e, es) ->
-      begin match infer_syn (sign, cG) cP e with
+      begin match Whnf.whnf sign (infer_syn (sign, cG) cP e) with
       | SPi (tel, t) -> check_spi_spine (sign, cG) cP es tel t
-      | _ -> raise (Error.Error "Term in function position is not of function type")
+      | t -> raise (Error.Error ("Term in function position is not of function type. Instead " ^ print_exp t))
       end
     | Var x ->
       Debug.print (fun () -> "Variable " ^ print_name x ^ " is being looked up in context " ^ print_ctx cG);

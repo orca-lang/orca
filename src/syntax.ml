@@ -101,7 +101,7 @@ module Int = struct
    and stel = stel_entry list
 
   type pat_subst
-  = CShift of int
+    = CShift of int
     | CEmpty
     | CDot of pat_subst * index
 

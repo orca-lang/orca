@@ -7,7 +7,7 @@ open Name
 type unification_problem
    = Different_constuctors of def_name * def_name
    | Occur_check of name  * exp
-   | Expressions_dont_unify of exp * exp
+   | Expressions_dont_unify of name list * exp * exp
    | Universes_dont_match of int * int
    | Unequal_number_params of  exp list * exp list
    | Unification_didnt_solve_all_problems of exp * exp * ctx * name list * ctx
@@ -17,10 +17,11 @@ let print_unification_problem = function
      "Constructor " ^ n ^ " and " ^ n' ^ " do not unify."
   | Occur_check (n, e) ->
      "Occurs check failed for " ^ print_name n ^ " in expression " ^ print_exp e ^ "."
-  | Expressions_dont_unify (e1, e2) ->
+  | Expressions_dont_unify (flex, e1, e2) ->
      "Expressions\ne1 = " ^ print_exp e1
      ^ "\ne2 = " ^ print_exp e2
-     ^ "\nDo not unify."
+    ^ "\nDo not unify given flexible variable" ^ (if List.length flex > 1 then "s" else "")
+        ^ ": " ^ String.concat ", " (List.map print_name flex)
   | Universes_dont_match (n, n') ->
      "Universe " ^ string_of_int n
      ^ " and universe " ^ string_of_int n'
@@ -120,7 +121,7 @@ let rec unify_flex (sign, cG) flex e1 e2 =
       | Annot(e1, e2), Annot(e1', e2') -> unify_many cG [e1;e2] [e1';e2']
       | Ctx, Ctx -> cG, []
       | _, _ ->
-         raise (Unification_failure(Expressions_dont_unify (e1, e2)))
+         raise (Unification_failure(Expressions_dont_unify (flex, e1, e2)))
 
   and unify_flex_many (sign, cG) flex es1 es2 =
     let unify_each (cD, sigma1) e1 e2 =

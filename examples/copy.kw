@@ -12,11 +12,11 @@ syn oft : tm -> tp -> * where
 | t-app: (f: tm) -> (e : tm) -> (s: tp) -> (t: tp)
          -> oft f (arr s t) -> oft e s -> oft (app f e) t
 | t-lam: (e:tm ->> tm) -> (s:tp) -> (t:tp)
-         -> ((x:tm) ->> oft x s ->> oft (e ' x) t) -> oft (lam (\x.e ' x)) (arr s t)
+         -> ((x:tm) ->> oft x s ->> oft (e ' x) t) -> oft (lam e) (arr s t)
 
-syn step : tm -> tm -> * where
-| s-app1 : (m : tm) -> (n : tm) -> (m' : tm) -> step m m' -> step (app m n) (app m' n)
-| s-app2 : (a : tm ->> tm) -> (b : tm) -> step (app (lam (\x.a ' x)) b) (a ' b)
+(*) syn step : tm -> tm -> * where
+(*) | s-app1 : (m : tm) -> (n : tm) -> (m' : tm) -> step m m' -> step (app m n) (app m' n)
+(*) | s-app2 : (a : tm ->> tm) -> (b : tm) -> step (app (lam (\x.a ' x)) b) (a ' b)
 
 def copy : (g : ctx) -> (g |- tm) -> (g |- tm) where
 | g one => one
@@ -34,9 +34,10 @@ def oft-copy : (g : ctx) -> (m : (g |- tm)) -> (t : |- tp) -> (g |- oft m t[^]) 
 | g one unit t-unit => t-unit
 | g (app m n) t (t-app .m .n (s[^]) .(t[^]) d1 d2) =>
   t-app (copy g m) (copy g n) s[^] t[^] (oft-copy g m (arr s[^] t[^]) d1) (oft-copy g n s[^] d2)
-(*) | g (lam m) (arr s t) (t-lam .m .(s[^]) .(t[^]) d) => ?
+| g (lam (\x.m)) (arr s[^] t[^]) (t-lam .(\x.m) .(s[^]) .(t[^]) d) =>
+  t-lam (\x.copy (g,tm) m) s[^] t[^] (\x. \u. oft-copy (g,x:tm,oft u s[^]) m[^1] t[^] (d[^2] ' x ' u))
 
-def oft-copy-wkn : (g : ctx) -> (m : (g |- tm)) -> (t : |- tp) -> (g |- oft m t[^]) -> (g,x:tm |- oft ((copy g m)[^1]) t[^]) where
-| g one unit t-unit => t-unit
-| g (app m n) t (t-app .m .n (s[^]) .(t[^]) d1 d2) =>
-  t-app (copy g m)[^1] (copy g n)[^1] s[^] t[^] (oft-copy-wkn g m (arr s[^] t[^]) d1) (oft-copy-wkn g n s[^] d2)
+(*) def oft-copy-wkn : (g : ctx) -> (m : (g |- tm)) -> (t : |- tp) -> (g |- oft m t[^]) -> (g,x:tm |- oft ((copy g m)[^1]) t[^]) where
+(*) | g one unit t-unit => t-unit
+(*) | g (app m n) t (t-app .m .n (s[^]) .(t[^]) d1 d2) =>
+(*)   t-app (copy g m)[^1] (copy g n)[^1] s[^] t[^] (oft-copy-wkn g m (arr s[^] t[^]) d1) (oft-copy-wkn g n s[^] d2)

@@ -23,6 +23,7 @@ let rec matching (p : pat) (q : pat) : pats =
   match p, q with
   | PVar n, _ -> [q]
   | PPar n, PPar n' -> [PVar n']
+  | PBVar i, PBVar i' when i = i' -> []
   | Innac e, _ ->  []
   | PConst (n, ps) , PConst (n', qs) when n = n' -> matchings ps qs
   | PConst (n, ps) , PConst (n', qs) -> raise(Error.Error "Pattern matching does not match.")
@@ -132,7 +133,7 @@ let split_lam (sign : signature) (p1 : pats) (xs, p : string list * pat) (cD1 : 
 let split_const (sign : signature) (p1 : pats) (c, ps : def_name * pats)
                 (cD1 : ctx) (x, t : name * exp) (cD2 : ctx) : ctx * ctx_map =
   Debug.indent ();
-  Debug.print (fun () -> "Split type " ^ print_exp t) ;
+  Debug.print (fun () -> "Splitting on constructor " ^ c ^ "\nSplit type " ^ print_exp t) ;
   let maybe_g, n, sp =
     match Whnf.whnf sign t with
     | App(Const n, sp) -> None, n, sp
@@ -179,14 +180,19 @@ let split_clos (sign : signature) (p1 : pats) (n, s : name * pat_subst) (cD1 : c
                                ^ print_exp t))
   in
   let rec get_domain g s =
-    match g, s with
-    | _, CEmpty -> Nil
-    | _, CDot(s, y) ->
-      let cP = contextify (sign, cD1 @ cD2) g in
-      Snoc(get_domain g s, "_", lookup_bound y cP)
-    | _, CShift 0 -> g
-    | Snoc(g, _, _), CShift n -> get_domain g (CShift (n-1))
-    | _ -> raise (Error.Violation ("This should be a context"))
+    if is_ctx (sign, cD1) g then
+      match g, s with
+      | _, CEmpty -> Nil
+      | _, CDot(s, y) ->
+        let cP = contextify (sign, cD1 @ cD2) g in
+        Snoc(get_domain g s, "_", lookup_bound y cP)
+      | _, CShift 0 -> g
+      | Snoc(g, _, _), CShift m -> get_domain g (CShift (m-1))
+      | _, CShift m -> raise (Error.Error ("When checking pattern " ^ print_name n ^ "[" ^ print_pat_subst s
+                                           ^ "], expected context " ^ print_exp g ^ " to have at least "
+                                           ^ string_of_int m ^ " variable" ^ if m > 1 then "s" else "" ^ " to shift over."))
+    else
+      raise (Error.Violation ("This should be a context " ^ print_exp g))
   in
   let rec subst_of_pat_subst = function
     | CShift n -> Shift n

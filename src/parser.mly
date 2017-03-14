@@ -16,14 +16,14 @@ open Syntax.Ext
 %token COMMA EMPTYS DOT NIL
 %token <int>SHIFT
 
-%nonassoc TURNSTILE TTS STT
+%nonassoc TURNSTILE TTS
 %nonassoc DOT RARR
 %left COMMA SEMICOLON
 %nonassoc COLON
 %right ARR SARR
 %left APPL
 
-%nonassoc STAR SHIFT SET EMPTYS IDENT NIL UNDERSCORE HOLE CTX
+%nonassoc STAR SHIFT SET EMPTYS IDENT NIL HOLE CTX
 %right LPAREN
 
 %start <Syntax.Ext.program list>program
@@ -113,12 +113,12 @@ simple_pattern:
 | n = SHIFT {PShift n}
 | NIL {PNil}
 | UNDERSCORE {PUnder}
+| x = IDENT LSQUARE e = exp RSQUARE {PClos (x, e)}
 | PATTERNWILD  {PWildcard}
 
 pattern:
 | LAM x = IDENT+ DOT p = pattern {PLam (x, p)}
 | c = IDENT ps = simple_pattern+ {PConst (c, ps)}
-| x = IDENT LSQUARE e = exp RSQUARE {PClos (x, e)}
 | p1 = pattern SEMICOLON p2 = pattern {PDot (p1, p2)}
 | s = pattern COMMA e = pattern {PComma (s, e)}
 | p1 = pattern TTS p2 = pattern {PBox (p1, p2)}
