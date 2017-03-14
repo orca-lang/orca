@@ -67,7 +67,9 @@ let execute_code (sign : Sign.signature) (program : Syntax.Ext.program list) : S
     Debug.print (fun () -> "The internal tree is:\n" ^ int_pp ^ "\n");
 
     if get_experimental_pp()
-    then List.iter (fun p -> Pretty.fmt_program sign Format.std_formatter p) int_rep
+    then
+      let _ = Fmt.set_style_renderer Fmt.stdout `Ansi_tty; in
+      List.iter (fun p -> Pretty.fmt_program sign Fmt.stdout p) int_rep
     else print_string ("* The internal tree is:\n" ^ int_pp ^ "\n")
 
     ;

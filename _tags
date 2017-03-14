@@ -2,7 +2,7 @@ true : use_menhir, use_str, annot
 <src/lexer.ml> : syntax(camlp4o), package(ulex)
 <src/parser.ml> : package(menhirLib, ulex)
 <src/repl.ml> : package(ulex)
-<src/orca.ml> : package(ulex, menhirLib)
+<src/orca.ml> : package(ulex, menhirLib, fmt)
 <src/pretty.ml> : package(fmt)
 
 <src/*.{native,byte}> : package(ulex, menhirLib, fmt), use_unix
