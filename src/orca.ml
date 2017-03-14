@@ -54,8 +54,9 @@ let execute_code (sign : Sign.signature) (program : Syntax.Ext.program list) : S
     in
     let int_rep = List.rev int_rep in (* Because the fold inverts them. TODO consider a right fold? *)
 
-    let int_pp = String.concat "\n"
-        (List.rev (List.map Print.Int.print_program int_rep))
+    let int_pp = String.concat
+                   "\n"
+                   (List.map Print.Int.print_program int_rep)
     in
 
     print_string ("* The internal tree is:\n" ^ int_pp ^ "\n");
