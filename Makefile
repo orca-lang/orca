@@ -13,5 +13,6 @@ menhir:
 
 clean:
 	$(OCAMLBUILD) -clean
+	rm .merlin
 
 all: default test
