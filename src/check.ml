@@ -131,7 +131,7 @@ and check_type (sign, cG : signature * ctx) (s : exp) : universe =
 
 and check (sign , cG : signature * ctx) (e : exp) (t : exp) : unit =
   Debug.print (fun () ->
-      "Check called with: " ^ print_exp e ^ ":" ^ print_exp t ^ " in context: " ^ print_ctx cG);
+      "Check called with: " ^ print_exp e ^ ":" ^ print_exp t ^ "\nin context: " ^ print_ctx cG);
   Debug.indent();
   begin match e, Whnf.whnf sign t with
   (* checkable terms *)
@@ -216,7 +216,7 @@ and check_pi (sign, cG) tel t =
      end
 
 and check_syn_type (sign, cG) cP (e : exp) : unit =
-  Debug.print (fun () -> "Checking syntactic type " ^ print_exp e ^ " in context " ^ print_ctx cG);
+  Debug.print (fun () -> "Checking syntactic type " ^ print_exp e ^ "\nin context " ^ print_ctx cG);
   Debug.indent ();
   begin
     match e with
@@ -268,7 +268,7 @@ and check_ctx (sign, cG) g =
 
 and check_syn (sign, cG) cP (e : exp) (t : exp) =
   Debug.print (fun () -> "Checking syntactic expression " ^ print_exp e ^ " against type "
-    ^ print_exp t ^ " in bound context " ^ print_bctx cP ^ " and context " ^ print_ctx cG);
+    ^ print_exp t ^ "\nin bound context " ^ print_bctx cP ^ "\nand context " ^ print_ctx cG);
   Debug.indent ();
   begin
     match e, Whnf.whnf sign t with
@@ -285,7 +285,8 @@ and check_syn (sign, cG) cP (e : exp) (t : exp) =
       let _ = try Unify.unify (sign, cG) g g'
         with Unify.Unification_failure prob ->
           raise (Error.Error ("Expected context: " ^ print_exp g ^ " shifted by " ^ string_of_int n
-                              ^ "positions.\nFound context: " ^ print_exp g' ^ "\nUnification failed with : "
+                              ^ " position" ^ (if n > 1 then "s" else "")
+                              ^".\nFound context: " ^ print_exp g' ^ "\nUnification failed with : "
                               ^ Unify.print_unification_problem prob))
       in ()
     | Dot (s, e), Snoc (g, _, t) ->
@@ -299,13 +300,11 @@ and check_syn (sign, cG) cP (e : exp) (t : exp) =
       Debug.print(fun ()-> "Expression " ^ print_exp e ^ " is syntactic and thus being inferred");
       let t' = match infer_syn (sign, cG) cP e with
         | Box (g, t) ->
-          Debug.print (fun () -> "Hello I was in a box");
           let cD, sigma = unify_ctx (sign, cG) t g cP in
           simul_subst sigma t
-        | t -> Debug.print (fun () -> "I am not a box: " ^ print_exp t); t
+        | t -> t
       in
       let _ = try
-          Debug.print (fun () -> "Who am I \"t\"?: " ^ print_exp t);
           Unify.unify (sign, cG) t t'
       with
         Unify.Unification_failure prob ->
@@ -321,7 +320,7 @@ and check_syn (sign, cG) cP (e : exp) (t : exp) =
 
 and infer_syn (sign, cG) cP (e : exp) =
   Debug.print (fun () -> "Inferring type of syntactic expression " ^ print_exp e
-    ^ " in bound context " ^ print_bctx cP ^ " and context " ^ print_ctx cG);
+    ^ "\nin bound context " ^ print_bctx cP ^ "\nand context " ^ print_ctx cG);
   Debug.indent ();
   let res =
     match e with
@@ -345,7 +344,7 @@ and infer_syn (sign, cG) cP (e : exp) =
       let t = lookup_bound i cP in
       Debug.print (fun () -> "Looking bound variable " ^ string_of_int i ^ " resulted in type " ^ print_exp t
         ^ "\n Context is " ^ print_bctx cP);
-      t
+      Clos(t, Shift (i+1))
     (* | Clos (Var x, s) -> *)
     (*   Debug.print(fun () -> "Hello I am a clos on a var"); *)
     (*   begin match lookup x cG with *)

@@ -121,7 +121,7 @@ let rec unify_flex (sign, cG) flex e1 e2 =
       | Annot(e1, e2), Annot(e1', e2') -> unify_many cG [e1;e2] [e1';e2']
       | Ctx, Ctx -> cG, []
       | _, _ ->
-         raise (Unification_failure(Expressions_dont_unify (flex, e1, e2)))
+         raise (Unification_failure(Expressions_dont_unify (flex, e1', e2')))
 
   and unify_flex_many (sign, cG) flex es1 es2 =
     let unify_each (cD, sigma1) e1 e2 =
@@ -168,8 +168,8 @@ let get_flex_vars cG e1 e2 = fv cG e1 @ fv cG e2
 
 let unify (sign, cG) e1 e2 =
   let flex_vars = get_flex_vars cG e1 e2 in
-  Debug.print(fun () -> "Flexible unify " ^ print_exp e1
-                        ^ " and " ^ print_exp e2
+  Debug.print(fun () -> "Flexible unify\ne1 = " ^ print_exp e1
+                        ^ "\ne2 = " ^ print_exp e2
                         ^ "\nwith flexible variables= " ^ print_names flex_vars
                         ^ "\nin context Γ = " ^ print_ctx cG
                         ^ ".");

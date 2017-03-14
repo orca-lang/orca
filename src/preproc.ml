@@ -107,7 +107,7 @@ let rec get_bound_var_ctx_in_pat (p : E.pat) : bctx =
   | E.PIdent _ -> []
   | p -> raise (Error.Error (EP.print_pat p ^ " is a forbidden pattern on the left hand side of :>"))
 
-let rec pproc_exp (s : sign) (cG : ctx) (cP : bctx) (e :E.exp) : I.exp =
+let rec pproc_exp (s : sign) (cG : ctx) (cP : bctx) (e : E.exp) : I.exp =
   Debug.print (fun () -> "Preprocessing expression " ^ EP.print_exp e);
   Debug.indent ();
   let f e = pproc_exp s cG cP e in
@@ -152,8 +152,10 @@ let rec pproc_exp (s : sign) (cG : ctx) (cP : bctx) (e :E.exp) : I.exp =
   | E.EmptyS -> I.EmptyS
   | E.Shift n -> I.Shift n
   | E.Semicolon (e1, e2) -> I.Dot(f e1, f e2)
-  | E.Comma (e1, P(_, E.Annot (P(_, E.Ident x), e2))) -> I.Snoc (f e1, x, f e2)
-  | E.Comma (e1, e2) -> I.Snoc (f e1, "_", f e2)
+  | E.Comma (e1, e2) ->
+    snd (pproc_comma s cG [] e)
+  (* | E.Comma (e1, P(_, E.Annot (P(_, E.Ident x), e2))) -> I.Snoc (f e1, x, f e2) *)
+  (* | E.Comma (e1, e2) -> I.Snoc (f e1, "_", f e2) *)
   | E.Nil -> I.Nil
   | E.Annot (e1, e2) -> I.Annot(f e1, f e2)
   | E.Hole (Some n) -> I.Hole (Name.gen_name n)
@@ -161,6 +163,24 @@ let rec pproc_exp (s : sign) (cG : ctx) (cP : bctx) (e :E.exp) : I.exp =
   in Debug.deindent ();
   res
 
+and pproc_comma (s : sign) (cG : ctx) (cP : bctx) (g : E.exp) : bctx * I.exp =
+  match content g with
+  | E.Ident n ->
+    begin match find_name s cG cP (n, loc g) with
+    | I.Var n as e -> cP, e
+    | e -> raise (Error.Error ("End of a comma expression needs to be a context variable. Instead found: " ^ IP.print_exp e))
+    end
+  | E.Annot (P(_, E.Ident n), e) ->
+    n::cP, I.Snoc(I.Nil, n, pproc_exp s cG cP e)
+  | E.Nil -> cP, I.Nil
+  | E.Comma(e1, e2) ->
+    let cP', e1' = pproc_comma s cG cP e1 in
+    begin match content e2 with
+    | E.Annot (P(_, E.Ident n), e) ->
+      n::cP', I.Snoc(e1', n, pproc_exp s cG cP' e)
+    | _ -> "_"::cP', I.Snoc(e1', "_", pproc_exp s cG cP' e2)
+    end
+  | _ -> raise (Error.Error_loc (loc g, "Left hand side of comma should be a context. Instead found: " ^ EP.print_exp g))
 
 and pproc_tel (s : sign) (cG : ctx) (cP : bctx) (e : E.exp) : I.tel * I.exp =
   let rec g cG e t0 = match content e with
