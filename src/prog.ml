@@ -61,6 +61,8 @@ let tc_program (sign : signature) : program -> signature = function
      (List.map (tc_constructor (sign', cG) u (ps @ is)) ds) @ sign'
      (* TODO Add positivity checking *)
 
+  | Codata (n, ps, is, u, ds) -> assert false
+
   | Syn (n, tel, ds) ->
     Debug.print_string ("Typechecking syn declaration: " ^ n);
     check_syn_tel (sign, []) tel;

@@ -404,6 +404,27 @@ let pre_process s = function
      let s' = add_name_sign s n in
      let s'', ds' = List.fold_left (fun (s, dos) d -> let ss, dd = pproc_decl s cG d n in ss, (dd :: dos)) (s', []) ds in
      s'', I.Data (n, ps', is, u, ds')
+  | E.Codata (n, ps, e, ds) ->
+    Debug.print (fun () -> "Preprocessing datatype : " ^ n ^ "\nps = " ^ EP.print_params ps);
+    let rec fold_param cG ps =
+      match ps with
+      | p :: ps ->
+        let cG', p' = pproc_param s cG p in
+        let cG'', ps' = fold_param cG' ps in
+        cG'', p' :: ps'
+      | [] -> cG, []
+    in
+    let cGa, ps' = fold_param [] ps in
+    Debug.print ~verbose:true (fun () -> "ps' = " ^ IP.print_tel ps');
+     let cG = params_to_ctx ps ps' in
+     let is, u = match pproc_tel s cG [] e with
+       | tel, I.Set u -> tel, u
+       | _, t -> raise (Error.Error_loc (loc e, "Expected universe but instead got expression " ^ IP.print_exp t))
+     in
+     let s' = add_name_sign s n in
+     assert false
+     (* let s'', ds' = List.fold_left (fun (s, dos) d -> let ss, dd = pproc_codecl s cG d n in ss, (dd :: dos)) (s', []) ds in *)
+     (* s'', I.Codata (n, ps', is, u, ds') *)
   | E.Syn (n, e, ds) ->
     let tel, e' = pproc_tel s [] [] e in
     let _ = match e' with

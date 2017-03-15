@@ -12,7 +12,7 @@ let regexp lower = ['a'-'z']
 let regexp upper = ['A'-'Z']
 
 (* Old regexp: (lower | upper) (lower | upper | digit)* *)
-let regexp identifier = [^ '\x09'-'\x0a' '\x20' '\x0d' '(' ')' ':' ',' '\\' '.' '[' ']']+
+let regexp identifier = [^ '\x09'-'\x0a' '\x20' '\x0d' '(' ')' ':' ',' '\\' '.' '[' ']' ';']+
 
 let regexp hole = "?" identifier
 
@@ -53,6 +53,7 @@ let rec main_scanner pos = lexer
   | eof -> add_word pos (Ulexing.lexeme_length lexbuf), EOF
 
   | "data" -> add_word pos (Ulexing.lexeme_length lexbuf), DATA
+  | "codata" -> add_word pos (Ulexing.lexeme_length lexbuf), CODATA
   | "syn" -> add_word pos (Ulexing.lexeme_length lexbuf), SYN
   | "def" | "thm" | "lem" -> add_word pos (Ulexing.lexeme_length lexbuf), DEF
   | "|" -> add_word pos (Ulexing.lexeme_length lexbuf), MID
@@ -101,6 +102,7 @@ let rec main_scanner pos = lexer
   | hole -> add_word pos (Ulexing.lexeme_length lexbuf)
           , HOLE (Some (remove_leading_char '?' (Ulexing.utf8_lexeme lexbuf)))
   | "?" -> add_word pos (Ulexing.lexeme_length lexbuf), HOLE None
+  | "&" -> add_word pos (Ulexing.lexeme_length lexbuf), AMP
   | identifier -> add_word pos (Ulexing.lexeme_length lexbuf), IDENT (Ulexing.utf8_lexeme lexbuf)
 
 

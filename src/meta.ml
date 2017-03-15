@@ -24,6 +24,7 @@ let rec fv cG =
   | App (e1, es) -> fv e1 @ List.concat (List.map fv es)
   | AppL (e, es) -> fv e @ List.concat (List.map fv es)
   | Const n -> []
+  | Dest n -> []
   | Var n when in_ctx n cG -> []
   | Var n -> [n]
   | BVar i -> []
@@ -88,6 +89,7 @@ let refresh (e : exp) : exp =
     | App (e1, es) -> App(f e1, List.map f es)
     | AppL (e1, es) -> AppL(f e1, List.map f es)
     | Const n -> Const n
+    | Dest n -> Dest n
     | Var n ->
        (try
           Var (List.assoc n rep)
@@ -142,6 +144,7 @@ let rec refresh_free_var (x , y : name * name) (e : exp) : exp =
   | App (e1, es) -> App(f e1, List.map f es)
   | AppL (e1, es) -> AppL(f e1, List.map f es)
   | Const n -> Const n
+  | Dest n -> Dest n
   | Var n when n = x -> Var y
   | Var n -> Var n
   | BVar i -> BVar i
@@ -206,6 +209,7 @@ let rec subst (x, es : single_subst) (e : exp) :  exp =
   | App (e1, es) -> App(f e1, List.map f es)
   | AppL (e1, es) -> AppL(f e1, List.map f es)
   | Const n -> Const n
+  | Dest n -> Dest n
   | Var n  when x = n -> refresh es
   | Var n -> Var n
   | BVar i -> BVar i

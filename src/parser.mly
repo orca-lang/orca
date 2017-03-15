@@ -5,7 +5,7 @@ open Syntax.Ext
 
 %}
 
-%token DATA SYN DEF MID RARR COLON SEMICOLON WHERE EQ UNDERSCORE PATTERNWILD CTX
+%token DATA CODATA SYN DEF MID AMP RARR COLON SEMICOLON WHERE EQ UNDERSCORE PATTERNWILD CTX
 %token LPAREN RPAREN LCURLY RCURLY LSQUARE RSQUARE
 %token FN LAM APPL
 %token STAR ARR SARR TURNSTILE TTS (* term turnstile *) STT
@@ -47,6 +47,8 @@ program:
 toplevel:
 | DATA s = IDENT p = params t = type_dec? WHERE option(MID) d = separated_list (MID, decl)
     {Data (s, p, unwrap_or (Location.ghost (Set 0)) t, d)}
+| CODATA s = IDENT p = params t = type_dec? WHERE option (AMP) d = separated_list (AMP, decl)
+    {Codata (s, p, unwrap_or (Location.ghost (Set 0)) t, d)}
 | SYN s = IDENT t = type_dec? WHERE option(MID) d = separated_list (MID, decl)
     {Syn (s, unwrap_or (Location.ghost Star) t, d)}
 | DEF f = IDENT COLON t = exp WHERE option(MID) d = separated_list (MID, def_decl) {DefPM (f, t, d)}

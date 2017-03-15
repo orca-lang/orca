@@ -57,6 +57,7 @@ module Ext = struct
 
   type program =
     | Data of name * params * exp * decls
+    | Codata of name * params * exp * decls
     | Syn of name * exp * decls
     | DefPM of name * exp * def_decls
     | Def of name * exp * exp
@@ -77,6 +78,7 @@ module Int = struct
     | Box of exp * exp
     | Ctx (* of exp *) (* Let's think about it *)
     | Const of def_name (* The name of a constant *)
+    | Dest of def_name
     | Var of name
     | Fn of name list * exp
     | App of exp * exp list
@@ -125,6 +127,7 @@ module Int = struct
   (* name of the constructed type, the type parameters, and the indices *)
   type dsig = def_name * exp list
   type decls = (def_name * tel * dsig) list
+  type codecls = (def_name * tel * dsig * exp) list
   type sdecls = (def_name * stel * dsig) list
   type rhs
     = Just of exp
@@ -134,6 +137,7 @@ module Int = struct
   type program =
     (* name, parameters, indices, universe *)
     | Data of def_name * tel * tel * universe * decls
+    | Codata of def_name * tel * tel * universe * codecls
     | Syn of def_name * tel * decls
     | DefPM of def_name * tel * exp * pat_decls
     | Def of def_name * exp * exp

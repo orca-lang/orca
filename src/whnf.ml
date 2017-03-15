@@ -34,6 +34,7 @@ let apply_inv e s =
     | Box (g, e), _ -> raise Inv_fail
     | Ctx, _ -> Ctx
     | Const c, _ -> Const c
+    | Dest d, _ -> Dest d
     | Var x, _ -> Var x                 (* MMMM *)
     | Fn (xs, e),_ -> Fn (xs, apply_inv e s)
     | App (e, es),_ -> App(apply_inv e s, List.map (fun e -> apply_inv e s) es)
