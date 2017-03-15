@@ -193,6 +193,7 @@ and rewrite (sign : signature) (e : exp) : exp =
   let dmsg msg e' = Debug.print (fun () -> "Rewriting rule: " ^ msg ^ "\ne = " ^ print_exp e ^ "\ne' = " ^ print_exp e'); e' in
   (* Debug.print (fun () -> "Rewriting " ^ print_exp e); *)
   Debug.indent ();
+  Debug.begin_verbose();
   let res = match e with
 
   (* Syntactic rewriting rules *)
@@ -351,5 +352,6 @@ and rewrite (sign : signature) (e : exp) : exp =
 
   in
   Debug.deindent ();
+  Debug.end_verbose();
   (* Debug.print (fun () -> "===> " ^ print_exp res); *)
   res

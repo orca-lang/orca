@@ -40,6 +40,7 @@ let args = [("-ext", Arg.Unit set_print_external, "Print external syntax before 
            ;("-no-wrapper", Arg.Unit Repl.set_no_wrapper, "Turns off using a read line wrapper.")
            ;("-prompt", Arg.String Repl.set_prompt, "<string> Sets a custom prompt.")
            ;("-pp", Arg.Unit set_experimental_pp, "Uses the new pretty printer.")
+           ;("-verbose", Arg.Unit Debug.set_verbose_on, "Turns on verbose debugging")
            ]
 
 let execute_code (sign : Sign.signature) (program : Syntax.Ext.program list) : Sign.signature =

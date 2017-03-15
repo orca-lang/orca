@@ -109,6 +109,7 @@ let rec get_bound_var_ctx_in_pat (p : E.pat) : bctx =
 
 let rec pproc_exp (s : sign) (cG : ctx) (cP : bctx) (e : E.exp) : I.exp =
   Debug.print (fun () -> "Preprocessing expression " ^ EP.print_exp e);
+  Debug.begin_verbose();
   Debug.indent ();
   let f e = pproc_exp s cG cP e in
   let res = match content e with
@@ -161,6 +162,7 @@ let rec pproc_exp (s : sign) (cG : ctx) (cP : bctx) (e : E.exp) : I.exp =
   | E.Hole (Some n) -> I.Hole (Name.gen_name n)
   | E.Hole None -> I.Hole (Name.gen_name "H")
   in Debug.deindent ();
+     Debug.end_verbose();
   res
 
 and pproc_comma (s : sign) (cG : ctx) (cP : bctx) (g : E.exp) : bctx * I.exp =
@@ -197,16 +199,16 @@ and pproc_tel (s : sign) (cG : ctx) (cP : bctx) (e : E.exp) : I.tel * I.exp =
     | E.Annot (e, t0) ->
       let t0' = pproc_exp s cG cP t0 in
       let cG', tel = g cG e t0' in
-      Debug.print(fun () -> "Calling f in pproc_tel\ntel = " ^ IP.print_tel tel);
+      Debug.print ~verbose:true (fun () -> "Calling f in pproc_tel\ntel = " ^ IP.print_tel tel);
       cG', tel
     | E.App (P(_, E.Annot(e, t0)), t1) ->
       let t0' = pproc_exp s cG cP t0 in
       let cG', tel = g cG e t0' in
       let cG'', tel'  = f cG' t1 in
-      Debug.print(fun () -> "Calling f in pproc_tel\ntel = " ^ IP.print_tel tel ^ "\ntel' = " ^ IP.print_tel tel');
+      Debug.print ~verbose:true (fun () -> "Calling f in pproc_tel\ntel = " ^ IP.print_tel tel ^ "\ntel' = " ^ IP.print_tel tel');
       cG'', tel @ tel'
     | _ -> let tel = [Syntax.Explicit, Name.gen_floating_name (), pproc_exp s cG cP e] in
-           Debug.print(fun () -> "Calling f in pproc_tel. Fall through, resulting in = " ^ IP.print_tel tel);
+           Debug.print ~verbose:true (fun () -> "Calling f in pproc_tel. Fall through, resulting in = " ^ IP.print_tel tel);
       cG, tel
   in
   match content e with
@@ -214,7 +216,7 @@ and pproc_tel (s : sign) (cG : ctx) (cP : bctx) (e : E.exp) : I.tel * I.exp =
     let cG', tel = f cG t0 in
     let tel', t = pproc_tel s cG' cP t1 in
      tel @ tel' , t
-  | _ -> Debug.print(fun () -> "preproc tel matched against " ^ EP.print_exp e);
+  | _ -> Debug.print ~verbose:true (fun () -> "preproc tel matched against " ^ EP.print_exp e);
     [], pproc_exp s cG cP e
 
 and pproc_stel (s : sign) (cG : ctx) (cP : bctx) (e : E.exp) : I.stel * I.exp =
@@ -393,7 +395,7 @@ let pre_process s = function
       | [] -> cG, []
     in
     let cGa, ps' = fold_param [] ps in
-    Debug.print (fun () -> "ps' = " ^ IP.print_tel ps');
+    Debug.print ~verbose:true (fun () -> "ps' = " ^ IP.print_tel ps');
      let cG = params_to_ctx ps ps' in
      let is, u = match pproc_tel s cG [] e with
        | tel, I.Set u -> tel, u
