@@ -14,7 +14,9 @@ let gen_floating_name () = ("@", gen_sym(), true)
 
 let refresh_name (s, _, fl) = (s, gen_sym(), fl)
 
-let print_name (n, i, _) = n ^ "_" ^ string_of_int i
+let print_name = function
+  | n, i, false -> n ^ "_" ^ string_of_int i
+  | _, i, true -> "@" ^ string_of_int i
 
 let print_names ns = "(" ^ (String.concat ", " (List.map print_name ns)) ^ ")"
 
