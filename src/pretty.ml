@@ -50,7 +50,16 @@ let fmt_universe pps = function
   | 0 -> Fmt.pf pps "set"
   | n -> Fmt.pf pps "set%d" n
 
+let fmt_decl sign pps = function
+  | n, tel, dsig ->
+     Fmt.pf pps ""
+
+let fmt_decls sign pps ds =
+  Fmt.pf pps "@[%a@]"
+
+
 let fmt_program sign pps = function
+  (* printing inductive types *)
   | Data (n, [], [], 0, ds) ->
      Fmt.pf pps "@[%a %a %a@]\n"
             keyword "data"
