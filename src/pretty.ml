@@ -23,6 +23,7 @@ let keyword = styled keyword_color string (* coloured word *)
 let def = styled def_color string
 let const = styled def_color string
 let comp_var = styled comp_var_color Name.fmt_name
+let bound_var = styled bound_var_color Fmt.int
 
 let rec fmt_tel_entry (sign, cG) pps = function
   | Explicit, n, t ->
@@ -61,18 +62,134 @@ and fmt_exp (sign, cG) pps = function
      Fmt.pf pps "?%a"
             Name.fmt_name n
 
-  | e -> Fmt.pf pps "¡%s!" (Print.Int.print_exp e)
+  | Star -> string pps "*"
+  | Ctx -> string pps "ctx"
+  | Pi (tel, e) ->
+     Fmt.pf pps "%a -> %a"
+            (fmt_tel (sign, cG)) tel
+            (fmt_exp (sign, cG)) e
+  | SPi _ -> string pps "..."
+  | Box _ -> string pps "..."
+  | Fn (xs, e) ->
+     Fmt.pf pps "fn %a => %a"
+            (list comp_var) xs
+            (fmt_exp (sign, cG)) e
+
+
+  | Comp(e1, e2) ->
+     Fmt.pf pps "%a o %a"
+            (fmt_exp (sign, cG)) e1
+            (fmt_exp (sign, cG)) e2
+
+  | ShiftS e ->
+     Fmt.pf pps "⇑%a"
+            (fmt_exp (sign, cG)) e
+
+  | Annot (e1, e2) ->
+     Fmt.pf pps "%a : %a"
+            (fmt_exp (sign, cG)) e1
+            (fmt_exp (sign, cG)) e2
+
+  | AppL(e, es) ->
+     Fmt.pf pps "(%a ' %a)"
+            (fmt_exp (sign, cG)) e
+            (list ~sep:nbsp (fmt_exp (sign, cG))) es
+
+
+  | BVar i ->
+     Fmt.pf pps "i%a"
+            bound_var i
+  | Lam (xs, e) ->
+     Fmt.pf pps "\\%a. %a"
+            (list string) xs
+            (fmt_exp (sign, cG)) e
+
+  | Clos (e1, e2) ->
+     Fmt.pf pps "%a[%a]"
+            (fmt_exp (sign, cG)) e1
+            (fmt_exp (sign, cG)) e2
+
+  | EmptyS -> string pps "^"
+  | Shift n ->
+     Fmt.pf pps "^%d" n
+  | Dot (e1, e2) ->
+     Fmt.pf pps "%a; %a"
+            (fmt_exp (sign, cG)) e1
+            (fmt_exp (sign, cG)) e2
+
+  | Nil -> string pps "0"
+
+  | Snoc (e1, n, e2) ->
+     Fmt.pf pps "%a, %s: %a"
+            (fmt_exp (sign, cG)) e1
+            n
+            (fmt_exp (sign, cG)) e2
+
+  | Dest n -> string pps n
+
+let rec fmt_pat_subst pps = function
+  | CShift 0 ->
+     Fmt.pf pps "id"
+  | CShift n ->
+     Fmt.pf pps "^%d" n
+  | CEmpty -> string pps "^"
+  | CDot (sigma, i) ->
+     Fmt.pf pps "%a; i%a"
+            fmt_pat_subst sigma
+            bound_var i
 
 let rec fmt_pat (sign, cG) pps = function
   | PVar n -> comp_var pps n
   | Innac e ->
      Fmt.pf pps ".%a"
             (fmt_exp (sign, cG)) e
+
+  | PConst (n, []) ->
+     Fmt.pf pps "%a"
+            const n
   | PConst (n, pats) ->
      Fmt.pf pps "(%a %a)"
             const n
             (fmt_pats (sign, cG)) pats
-  | p -> Fmt.pf pps "¡%s!" (Print.Int.print_pat p)
+
+  (* syntax *)
+
+  | PBVar i ->
+     Fmt.pf pps "i%a"
+            bound_var i
+  | PLam (xs, p) ->
+     Fmt.pf pps "\\%a. %a"
+            (list string) xs
+            (fmt_pat (sign, cG)) p
+
+  | PClos (n, psub) ->
+     Fmt.pf pps "%a[%a]"
+            comp_var n
+            fmt_pat_subst psub
+
+  | PEmptyS -> string pps "^"
+  | PShift n ->
+     Fmt.pf pps "^%d" n
+  | PDot (p1, p2) ->
+     Fmt.pf pps "%a; %a"
+            (fmt_pat (sign, cG)) p1
+            (fmt_pat (sign, cG)) p2
+
+  | PNil -> string pps "0"
+
+  | PSnoc (p1, n, p2) ->
+     Fmt.pf pps "%a, %s: %a"
+            (fmt_pat (sign, cG)) p1
+            n
+            (fmt_pat (sign, cG)) p2
+
+  | PPar n ->
+     Fmt.pf pps "<:%a"
+            comp_var n
+
+  (* extra cases *)
+  | PUnder
+  | PWildcard -> string pps "¿?"
 
 and fmt_pats (sign, cG) pps pats =
   Fmt.pf pps "%a"
