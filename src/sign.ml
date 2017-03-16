@@ -296,6 +296,14 @@ let rec beautify_bound_name x cP =
   if c = 0 then x
   else x ^ string_of_int c
 
+let rec beautify_bound_names xs cP =
+  match xs with
+  |[] -> []
+  | x::xs ->
+    let x' = beautify_bound_name x cP in
+    x'::beautify_bound_names xs (BSnoc (cP, x, Star)) (* star is a dummy type *)
+
+
 let rec beautify_idx i cP =
   if not (do_beautify ()) then None
   else match i, cP with

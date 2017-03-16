@@ -33,6 +33,11 @@ let bound_name = styled `Bold (styled bound_var_color Fmt.string)
 (* some dummy type *)
 let dt = EmptyS
 
+let rec bctx_of_names xs cP =
+  match xs with
+  | [] -> cP
+  | x::xs -> BSnoc(bctx_of_names xs cP, x, dt)
+
 let rec fmt_tel_entry (sign, cG) pps = function
   | Explicit, n, t ->
      Fmt.pf pps "(%a : %a)"
@@ -138,9 +143,10 @@ and fmt_exp (sign, cG) cP pps = function
      | Some n -> bound_name pps n
      end
   | Lam (xs, e) ->
+    let cP' = bctx_of_names xs cP in
      Fmt.pf pps "\\%a. %a"
-            (list bound_name) xs
-            (fmt_exp (sign, cG) cP) e
+            (list bound_name) (beautify_bound_names xs cP)
+            (fmt_exp (sign, cG) cP') e
 
   | Clos (e1, e2) ->
      Fmt.pf pps "%a[%a]"
@@ -159,9 +165,9 @@ and fmt_exp (sign, cG) cP pps = function
 
   | Snoc (e1, n, e2) ->
      let cP' = bctx_of_ctx_exp e1 in
-     Fmt.pf pps "%a, %s: %a"
+     Fmt.pf pps "%a, %a: %a"
             (fmt_exp (sign, cG) BNil) e1
-            n
+            bound_name n
             (fmt_exp (sign, cG) cP') e2
 
   | Dest n -> string pps n
@@ -198,11 +204,7 @@ let rec fmt_pat (sign, cG) cP pps = function
      Fmt.pf pps "i%a"
             bound_var i
   | PLam (xs, p) ->
-     let rec gen_cP = function
-       | [] -> cP
-       | x::xs -> BSnoc(gen_cP xs, x, dt)
-     in
-     let cP' = gen_cP xs in
+     let cP' = bctx_of_names xs cP in
      Fmt.pf pps "\\%a. %a"
             (list bound_name) xs
             (fmt_pat (sign, cG) cP') p
@@ -223,9 +225,9 @@ let rec fmt_pat (sign, cG) cP pps = function
   | PNil -> string pps "0"
 
   | PSnoc (p1, n, p2) ->
-     Fmt.pf pps "%a, %s: %a"
+     Fmt.pf pps "%a, %a: %a"
             (fmt_pat (sign, cG) cP) p1
-            n
+            bound_name n
             (fmt_pat (sign, cG) cP) p2
 
   | PPar n ->
