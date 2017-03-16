@@ -323,7 +323,7 @@ let fmt_program sign pps = function
             keyword "where"
             (fmt_pat_decls sign) pats
 
-  | _ -> ()
+  | p -> string pps (Print.Int.print_program p)
 
 let fmt_programs sign pps ps =
   let rec fmt_programs sign pps = function
