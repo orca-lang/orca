@@ -27,6 +27,12 @@ let set_parse_only, get_parse_only =
   (fun () -> print := true),
   (fun () -> !print)
 
+let disable_ansi, ansi_on =
+  let ansi = ref true in
+  (fun () -> ansi := false),
+  (fun () -> !ansi)
+
+
 let usage_msg = "Bears ahead"
 let file = ref ""
 let args = [("-ext", Arg.Unit set_print_external, "Print external syntax before preprocessing.")
@@ -36,6 +42,7 @@ let args = [("-ext", Arg.Unit set_print_external, "Print external syntax before 
            ;("-prompt", Arg.String Repl.set_prompt, "<string> Sets a custom prompt.")
            ;("-verbose", Arg.Unit Debug.set_verbose_on, "Turns on verbose debugging")
            ;("-no-beauty", Arg.Unit Name.disable_beautify, "Turns off beautification in pretty printing")
+           ;("-ansi-off", Arg.Unit disable_ansi, "Turns off ansi colours in pretty printing")
            ]
 
 let execute_code (sign : Sign.signature) (program : Syntax.Ext.program list) : Sign.signature =
@@ -62,7 +69,7 @@ let execute_code (sign : Sign.signature) (program : Syntax.Ext.program list) : S
     in
     Debug.print (fun () -> "The internal tree is:\n" ^ int_pp ^ "\n");
 
-    let _ = Fmt.set_style_renderer Fmt.stdout `Ansi_tty; in
+    if ansi_on() then Fmt.set_style_renderer Fmt.stdout `Ansi_tty;
     Pretty.fmt_programs sign Fmt.stdout int_rep;
 
     if not (get_parse_only ()) then begin
