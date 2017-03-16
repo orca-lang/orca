@@ -297,7 +297,8 @@ let rec beautify_bound_name x cP =
   else x ^ string_of_int c
 
 let rec beautify_idx i cP =
-  match i, cP with
+  if not (do_beautify ()) then None
+  else match i, cP with
   | _, CtxVar _
   | _, BNil -> None
   | 0, BSnoc(cP', x, _) -> Some (beautify_bound_name x cP')

@@ -16,4 +16,8 @@ val is_name_floating : name -> bool
 
 val fmt_name : Format.formatter -> name -> unit
 
+val disable_beautify : unit -> unit
+
+val do_beautify : unit -> bool
+
 val beautify_name : name -> (name * 'a) list -> string option

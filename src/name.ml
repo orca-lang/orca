@@ -27,7 +27,14 @@ let fmt_name pps (s, n, b) =
   then Format.printf "_%s%d_" s n
   else Format.printf "%s!%d" s n
 
-let rec beautify_name (s, _, _ as n) = function
+let disable_beautify, do_beautify =
+  let beau = ref true in
+  (fun () -> beau := false),
+  (fun () -> !beau)
+
+let rec beautify_name (s, _, _ as n) cG =
+  if not (do_beautify ()) then None
+  else match cG with
   | [] -> None
   | (n', _)::cG when n = n' ->
      let rec count = function
