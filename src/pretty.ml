@@ -2,6 +2,7 @@
 
 open Syntax
 open Syntax.Int
+open Sign
 
 (* Supports utf8 and colours that Format doesn't, and the output is
    cute *)
@@ -36,44 +37,43 @@ let rec fmt_tel_entry (sign, cG) pps = function
   | Explicit, n, t ->
      Fmt.pf pps "(%a : %a)"
             (comp_var ((n, dt) ::cG)) n
-            (fmt_exp (sign, cG)) t
+            (fmt_exp (sign, cG) BNil) t
   | Implicit, n, t ->
      Fmt.pf pps "{%a : %a}"
             (comp_var ((n, dt) ::cG)) n
-            (fmt_exp (sign, cG)) t
+            (fmt_exp (sign, cG) BNil) t
 
 and fmt_tel (sign, cG) pps (tel, e) =
   match tel with
   | (Explicit, n, t) :: tel when Name.is_name_floating n ->
      Fmt.pf pps "(%a) -> %a"
-            (fmt_exp (sign, cG)) t
+            (fmt_exp (sign, cG) BNil) t
             (fmt_tel (sign, (n, dt)::cG)) (tel, e)
   | (_, n, _ as entry) :: tel ->
      Fmt.pf pps "%a %a"
             (fmt_tel_entry (sign, cG)) entry
             (fmt_tel (sign, (n, dt)::cG)) (tel, e)
-  | [] ->
-     Fmt.pf pps "%a"
-            (fmt_exp (sign, cG))  e
+  | [] -> fmt_exp (sign, cG) BNil pps  e
 
-and fmt_stel_entry (sign, cG) pps = function
+and fmt_stel_entry (sign, cG) cP pps = function
   | Explicit, n, t ->
      Fmt.pf pps "(%a : %a)"
-            bound_name n
-            (fmt_exp (sign, cG)) t
+            bound_name (beautify_bound_name n cP)
+            (fmt_exp (sign, cG) cP) t
   | Implicit, n, t ->
      Fmt.pf pps "{%a : %a}"
             bound_name n
-            (fmt_exp (sign, cG)) t
+            (fmt_exp (sign, cG) cP) t
 
-and fmt_stel (sign, cG) pps = function
-  | entry :: tel ->
-     Fmt.pf pps "%a %a"
-            (fmt_stel_entry (sign, cG)) entry
-            (fmt_stel (sign, cG)) tel
-  | [] -> ()
+and fmt_stel (sign, cG) cP pps (tel, e) =
+  match tel with
+  | (_, n, _ as entry) :: tel ->
+     Fmt.pf pps "%a ->> %a"
+            (fmt_stel_entry (sign, cG) cP) entry
+            (fmt_stel (sign, cG) (BSnoc(cP, n, dt))) (tel, e)
+  | [] -> fmt_exp (sign, cG) cP pps e
 
-and fmt_exp (sign, cG) pps = function
+and fmt_exp (sign, cG) cP pps = function
   | Set 0 -> (string pps "set")
   | Set n ->
      Fmt.pf pps "set%d" n
@@ -82,8 +82,8 @@ and fmt_exp (sign, cG) pps = function
             const n
   | App(e, es) ->
      Fmt.pf pps "(%a %a)"
-            (fmt_exp (sign, cG)) e
-            (list ~sep:nbsp (fmt_exp (sign, cG))) es
+            (fmt_exp (sign, cG) cP) e
+            (list ~sep:nbsp (fmt_exp (sign, cG) cP)) es
 
   | Var n -> comp_var cG pps n
 
@@ -98,69 +98,71 @@ and fmt_exp (sign, cG) pps = function
      Fmt.pf pps "%a"
             (fmt_tel (sign, cG)) (tel, e)
 
-  | SPi (stel, e) ->
-          Fmt.pf pps "%a ->> %a"
-            (fmt_stel (sign, cG)) stel
-            (fmt_exp (sign, cG)) e
+  | SPi (stel, e) -> fmt_stel (sign, cG) cP pps (stel, e)
 
   | Box (g, e) ->
+     let cP' = bctx_of_ctx_exp g in
      Fmt.pf pps "(%a |- %a)"
-            (fmt_exp (sign, cG)) g
-            (fmt_exp (sign, cG)) e
+            (fmt_exp (sign, cG) BNil) g
+            (fmt_exp (sign, cG) cP') e
 
   | Fn (xs, e) ->
      let cG' = (List.map (fun x -> x, dt) xs) @ cG in
      Fmt.pf pps "fn %a => %a"
             (list ~sep:nbsp (comp_var cG')) xs
-            (fmt_exp (sign, cG')) e
+            (fmt_exp (sign, cG') cP) e
 
   | Comp(e1, e2) ->
      Fmt.pf pps "%a o %a"
-            (fmt_exp (sign, cG)) e1
-            (fmt_exp (sign, cG)) e2
+            (fmt_exp (sign, cG) cP) e1
+            (fmt_exp (sign, cG) cP) e2
 
   | ShiftS e ->
      Fmt.pf pps "⇑%a"
-            (fmt_exp (sign, cG)) e
+            (fmt_exp (sign, cG) cP) e
 
   | Annot (e1, e2) ->
      Fmt.pf pps "%a : %a"
-            (fmt_exp (sign, cG)) e1
-            (fmt_exp (sign, cG)) e2
+            (fmt_exp (sign, cG) cP) e1
+            (fmt_exp (sign, cG) cP) e2
 
   | AppL(e, es) ->
      Fmt.pf pps "(%a ' %a)"
-            (fmt_exp (sign, cG)) e
-            (list ~sep:nbsp (fmt_exp (sign, cG))) es
+            (fmt_exp (sign, cG) cP) e
+            (list ~sep:nbsp (fmt_exp (sign, cG) cP)) es
 
   | BVar i ->
-     Fmt.pf pps "i%a"
-            bound_var i
+     begin match beautify_idx i cP with
+     | None -> Fmt.pf pps "i%a"
+                      bound_var i
+     | Some n -> bound_name pps n
+     end
   | Lam (xs, e) ->
      Fmt.pf pps "\\%a. %a"
             (list bound_name) xs
-            (fmt_exp (sign, cG)) e
+            (fmt_exp (sign, cG) cP) e
 
   | Clos (e1, e2) ->
      Fmt.pf pps "%a[%a]"
-            (fmt_exp (sign, cG)) e1
-            (fmt_exp (sign, cG)) e2
+            (fmt_exp (sign, cG) cP) e1
+            (fmt_exp (sign, cG) cP) e2
 
   | EmptyS -> string pps "^"
   | Shift n ->
      Fmt.pf pps "^%d" n
   | Dot (e1, e2) ->
      Fmt.pf pps "%a; %a"
-            (fmt_exp (sign, cG)) e1
-            (fmt_exp (sign, cG)) e2
+            (fmt_exp (sign, cG) cP) e1
+            (fmt_exp (sign, cG) cP) e2
 
   | Nil -> string pps "0"
 
   | Snoc (e1, n, e2) ->
+     let cP' = bctx_of_ctx_exp e1 in
      Fmt.pf pps "%a, %s: %a"
-            (fmt_exp (sign, cG)) e1
+            (fmt_exp (sign, cG) BNil) e1
             n
-            (fmt_exp (sign, cG)) e2
+            (fmt_exp (sign, cG) cP') e2
 
   | Dest n -> string pps n
 
@@ -176,11 +178,11 @@ let rec fmt_pat_subst pps = function
             bound_var i
 
 
-let rec fmt_pat (sign, cG) pps = function
+let rec fmt_pat (sign, cG) cP pps = function
   | PVar n -> comp_var cG pps n
   | Innac e ->
      Fmt.pf pps ".%a"
-            (fmt_exp (sign, cG)) e
+            (fmt_exp (sign, cG) cP) e
 
   | PConst (n, []) ->
      Fmt.pf pps "%a"
@@ -196,9 +198,14 @@ let rec fmt_pat (sign, cG) pps = function
      Fmt.pf pps "i%a"
             bound_var i
   | PLam (xs, p) ->
+     let rec gen_cP = function
+       | [] -> cP
+       | x::xs -> BSnoc(gen_cP xs, x, dt)
+     in
+     let cP' = gen_cP xs in
      Fmt.pf pps "\\%a. %a"
             (list bound_name) xs
-            (fmt_pat (sign, cG)) p
+            (fmt_pat (sign, cG) cP') p
 
   | PClos (n, psub) ->
      Fmt.pf pps "%a[%a]"
@@ -210,16 +217,16 @@ let rec fmt_pat (sign, cG) pps = function
      Fmt.pf pps "^%d" n
   | PDot (p1, p2) ->
      Fmt.pf pps "%a; %a"
-            (fmt_pat (sign, cG)) p1
-            (fmt_pat (sign, cG)) p2
+            (fmt_pat (sign, cG) cP) p1
+            (fmt_pat (sign, cG) cP) p2
 
   | PNil -> string pps "0"
 
   | PSnoc (p1, n, p2) ->
      Fmt.pf pps "%a, %s: %a"
-            (fmt_pat (sign, cG)) p1
+            (fmt_pat (sign, cG) cP) p1
             n
-            (fmt_pat (sign, cG)) p2
+            (fmt_pat (sign, cG) cP) p2
 
   | PPar n ->
      Fmt.pf pps "<:%a"
@@ -231,7 +238,7 @@ let rec fmt_pat (sign, cG) pps = function
 
 and fmt_pats (sign, cG) pps pats=
   Fmt.pf pps "%a"
-         (list ~sep:nbsp (fmt_pat (sign, cG))) pats
+         (list ~sep:nbsp (fmt_pat (sign, cG) BNil)) pats
 
 
 
@@ -244,7 +251,7 @@ let fmt_decl (sign, cG) pps = function
      Fmt.pf pps "| %a : %a @[%a@]"
             const n
             const tn
-            (list ~sep:sp (fmt_exp (sign, cG))) es
+            (list ~sep:sp (fmt_exp (sign, cG) BNil)) es
 
   | n, tel, (tn, es) ->
      Fmt.pf pps "| %a : %a"
@@ -258,14 +265,14 @@ let rec fmt_decls (sign, cG) pps = function
                     (fmt_decls (sign, cG)) ds
 
 let fmt_rhs (sign, cG) pps = function
-  | Just e -> fmt_exp (sign, cG) pps e
+  | Just e -> fmt_exp (sign, cG) BNil pps e
   | Impossible n ->
      Fmt.pf pps "impossible %a" (comp_var cG) n
 
 let fmt_pat_decl (sign, cG) pps (pats, rhs) =
   let cG' = (List.map (fun x -> x, dt) (Meta.fv_pats pats)) @ cG in
   Fmt.pf pps "%a => %a"
-         (list ~sep:nbsp (fmt_pat (sign, cG'))) pats
+         (list ~sep:nbsp (fmt_pat (sign, cG') BNil)) pats
          (fmt_rhs (sign, cG')) rhs
 
 let rec fmt_pat_decls (sign, cG) pps = function
@@ -319,25 +326,23 @@ let fmt_program sign pps = function
             keyword "data"
             def n
             (fmt_params (sign, [])) ps
-            (* (list ~sep:nbsp (fmt_tel_entry (sign, cG))) ps *)
             (fmt_tel (sign, cG)) (is, Set u)
-            (* fmt_universe u *)
             keyword "where"
             (fmt_decls (sign, cG))
             ds
-
+  (* printing definitions and theorems *)
   | Def (n, t, e) ->
      Fmt.pf pps "%a %a : %a = %a"
             keyword "def"
             const n
-            (fmt_exp (sign, [])) t
-            (fmt_exp (sign, [])) e
+            (fmt_exp (sign, []) BNil) t
+            (fmt_exp (sign, []) BNil) e
 
   | DefPM (n, [], t, pats) ->
      Fmt.pf pps "%a %a : %a %a@,%a"
             keyword "def"
             const n
-            (fmt_exp (sign, [])) t
+            (fmt_exp (sign, []) BNil) t
             keyword "where"
             (fmt_pat_decls (sign, [])) pats
 
@@ -350,6 +355,7 @@ let fmt_program sign pps = function
             keyword "where"
             (fmt_pat_decls (sign, [])) pats
 
+  (* printing specification types *)
   | Syn (n, [], ds) ->
      Fmt.pf pps "%a %a %a@,%a"
             keyword "syn"
@@ -388,6 +394,6 @@ let produce_string f e =
 
 let print_program sign p = produce_string (fmt_program sign) p
 let print_programs sign p = produce_string (fmt_programs sign) p
-let print_exp cs e = produce_string (fmt_exp cs) e
+let print_exp cs cP e = produce_string (fmt_exp cs cP) e
 let print_tel_entry cs te = produce_string (fmt_tel_entry cs) te
 let print_tel cs tel = produce_string (fmt_tel cs) tel

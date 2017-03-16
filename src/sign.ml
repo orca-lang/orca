@@ -263,6 +263,10 @@ let bctx_of_stel tel =
   in
   make (List.rev tel)
 
+let rec bctx_of_ctx_exp = function
+  | Snoc(g, x, e) -> BSnoc(bctx_of_ctx_exp g, x, e)
+  | _ -> BNil
+
 let print_bctx cP =
   let rec print = function
     | BNil -> ""
@@ -280,3 +284,21 @@ let drop_suffix cP n =
       | _ -> raise (Error.Error ("Tried to drop " ^ string_of_int n ^ " terms out of " ^ print_bctx cP ^ " which is too short."))
     in
     drop cP n
+
+let rec beautify_bound_name x cP =
+  let rec count = function
+    | CtxVar _
+      | BNil -> 0
+    | BSnoc (cP', x', _) when x = x' -> 1 + count cP'
+    | BSnoc (cP', x', _) -> count cP'
+  in
+  let c = count cP in
+  if c = 0 then x
+  else x ^ string_of_int c
+
+let rec beautify_idx i cP =
+  match i, cP with
+  | _, CtxVar _
+  | _, BNil -> None
+  | 0, BSnoc(cP', x, _) -> Some (beautify_bound_name x cP')
+  | i, BSnoc(cP', _, _) -> beautify_idx (i-1) cP'
