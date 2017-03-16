@@ -24,6 +24,7 @@ let def = styled def_color string
 let const = styled def_color string
 let comp_var = styled comp_var_color Name.fmt_name
 let bound_var = styled bound_var_color Fmt.int
+let bound_name = styled bound_var_color Fmt.string
 
 let rec fmt_tel_entry (sign, cG) pps = function
   | Explicit, n, t ->
@@ -45,14 +46,35 @@ and fmt_tel (sign, cG) pps = function
             (fmt_tel (sign, cG)) tel
   | [] -> ()
 
+and fmt_stel_entry (sign, cG) pps = function
+  | Explicit, n, t ->
+     Fmt.pf pps "(%a : %a)"
+            bound_name n
+            (fmt_exp (sign, cG)) t
+  | Implicit, n, t ->
+     Fmt.pf pps "{%a : %a}"
+            bound_name n
+            (fmt_exp (sign, cG)) t
+
+and fmt_stel (sign, cG) pps = function
+  (* | (Explicit, n, t) :: tel -> *)
+  (*    Fmt.pf pps "%a" *)
+  (*           (fmt_exp (sign, cG)) t *)
+  | entry :: tel ->
+     Fmt.pf pps "%a %a"
+            (fmt_stel_entry (sign, cG)) entry
+            (fmt_stel (sign, cG)) tel
+  | [] -> ()
+
 and fmt_exp (sign, cG) pps = function
   | Set 0 -> (string pps "set")
-  | Set n -> ()
+  | Set n ->
+     Fmt.pf pps "set%d" n
   | Const n ->
      Fmt.pf pps "%a"
             const n
   | App(e, es) ->
-     Fmt.pf pps "%a %a"
+     Fmt.pf pps "(%a %a)"
             (fmt_exp (sign, cG)) e
             (list ~sep:nbsp (fmt_exp (sign, cG))) es
 
@@ -64,17 +86,26 @@ and fmt_exp (sign, cG) pps = function
 
   | Star -> string pps "*"
   | Ctx -> string pps "ctx"
+
   | Pi (tel, e) ->
      Fmt.pf pps "%a -> %a"
             (fmt_tel (sign, cG)) tel
             (fmt_exp (sign, cG)) e
-  | SPi _ -> string pps "..."
-  | Box _ -> string pps "..."
+
+  | SPi (stel, e) ->
+          Fmt.pf pps "%a ->> %a"
+            (fmt_stel (sign, cG)) stel
+            (fmt_exp (sign, cG)) e
+
+  | Box (g, e) ->
+     Fmt.pf pps "(%a |- %a)"
+            (fmt_exp (sign, cG)) g
+            (fmt_exp (sign, cG)) e
+
   | Fn (xs, e) ->
      Fmt.pf pps "fn %a => %a"
             (list comp_var) xs
             (fmt_exp (sign, cG)) e
-
 
   | Comp(e1, e2) ->
      Fmt.pf pps "%a o %a"
@@ -95,13 +126,12 @@ and fmt_exp (sign, cG) pps = function
             (fmt_exp (sign, cG)) e
             (list ~sep:nbsp (fmt_exp (sign, cG))) es
 
-
   | BVar i ->
      Fmt.pf pps "i%a"
             bound_var i
   | Lam (xs, e) ->
      Fmt.pf pps "\\%a. %a"
-            (list string) xs
+            (list bound_name) xs
             (fmt_exp (sign, cG)) e
 
   | Clos (e1, e2) ->
@@ -138,6 +168,7 @@ let rec fmt_pat_subst pps = function
             fmt_pat_subst sigma
             bound_var i
 
+
 let rec fmt_pat (sign, cG) pps = function
   | PVar n -> comp_var pps n
   | Innac e ->
@@ -159,7 +190,7 @@ let rec fmt_pat (sign, cG) pps = function
             bound_var i
   | PLam (xs, p) ->
      Fmt.pf pps "\\%a. %a"
-            (list string) xs
+            (list bound_name) xs
             (fmt_pat (sign, cG)) p
 
   | PClos (n, psub) ->
