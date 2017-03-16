@@ -144,7 +144,7 @@ and fmt_exp (sign, cG) cP pps = function
      end
   | Lam (xs, e) ->
     let cP' = bctx_of_names xs cP in
-     Fmt.pf pps "\\%a. %a"
+     Fmt.pf pps "(\\%a. %a)"
             (list bound_name) (beautify_bound_names xs cP)
             (fmt_exp (sign, cG) cP') e
 
@@ -165,7 +165,7 @@ and fmt_exp (sign, cG) cP pps = function
 
   | Snoc (e1, n, e2) ->
      let cP' = bctx_of_ctx_exp e1 in
-     Fmt.pf pps "%a, %a: %a"
+     Fmt.pf pps "(%a, %a: %a)"
             (fmt_exp (sign, cG) BNil) e1
             bound_name n
             (fmt_exp (sign, cG) cP') e2
@@ -205,7 +205,7 @@ let rec fmt_pat (sign, cG) cP pps = function
             bound_var i
   | PLam (xs, p) ->
      let cP' = bctx_of_names xs cP in
-     Fmt.pf pps "\\%a. %a"
+     Fmt.pf pps "(\\%a. %a)"
             (list bound_name) xs
             (fmt_pat (sign, cG) cP') p
 

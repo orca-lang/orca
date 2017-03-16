@@ -378,7 +378,8 @@ and infer_syn (sign, cG) cP (e : exp) =
         let t = try infer (sign, cG) e
           with Error.Error msg ->
             Debug.print (fun () -> "Inferring " ^ print_exp e ^ " returned message:\n" ^ msg);
-            raise (Error.Error ("The left hand side of the closure " ^ print_exp (Clos (e, s)) ^ " was not inferrable."))
+            raise (Error.Error ("Unable to infer the left hand side of the closure " ^ print_exp (Clos (e, s))
+                                ^ "\nbecause " ^ msg ^"."))
         in
         match t with
         | Box(g, t) ->
