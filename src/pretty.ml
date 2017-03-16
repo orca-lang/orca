@@ -10,9 +10,9 @@ open Fmt
 
 (* Ansi formats *)
 
-let keyword_color = `Magenta
+let keyword_color = `Bold
 let bound_var_color = `Green
-let comp_var_color = `Bold
+let comp_var_color = `Magenta
 let def_color = `Blue
 
 (* Non-breakable space *)
@@ -28,7 +28,7 @@ let comp_var cG pps n =
   | None -> (styled comp_var_color Name.fmt_name) pps n
   | Some s -> (styled comp_var_color string) pps s
 let bound_var = styled bound_var_color Fmt.int
-let bound_name = styled bound_var_color Fmt.string
+let bound_name = styled `Bold (styled bound_var_color Fmt.string)
 
 (* some dummy type *)
 let dt = EmptyS
@@ -271,7 +271,7 @@ let fmt_rhs (sign, cG) pps = function
 
 let fmt_pat_decl (sign, cG) pps (pats, rhs) =
   let cG' = (List.map (fun x -> x, dt) (Meta.fv_pats pats)) @ cG in
-  Fmt.pf pps "%a => %a"
+  Fmt.pf pps "| %a => %a"
          (list ~sep:nbsp (fmt_pat (sign, cG') BNil)) pats
          (fmt_rhs (sign, cG')) rhs
 
@@ -283,7 +283,7 @@ let rec fmt_pat_decls (sign, cG) pps = function
 
 
 let rec fmt_sdecl sign pps (n, stel, (tn, es)) =
-  Fmt.pf pps "| %a : %a @,"
+  Fmt.pf pps "| %a : %a"
          def n
          (fmt_tel (sign, [])) (stel, App(Const tn, es))
 
