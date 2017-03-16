@@ -15,3 +15,5 @@ val print_names : name list -> string
 val is_name_floating : name -> bool
 
 val fmt_name : Format.formatter -> name -> unit
+
+val beautify_name : name -> (name * 'a) list -> string option

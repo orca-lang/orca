@@ -25,4 +25,19 @@ let is_name_floating (_, _, x) = x
 let fmt_name pps (s, n, b) =
   if b
   then Format.printf "_%s%d_" s n
-  else Format.printf "%s%d" s n
+  else Format.printf "%s_%d" s n
+
+let rec beautify_name (s, _, _ as n) = function
+  | [] -> None
+  | (n', _)::cG when n = n' ->
+     let rec count = function
+       | [] -> 0
+       | ((s', _, _), _) :: cG' when s' = s -> 1 + count cG'
+       | _ :: cG' -> count cG'
+     in
+     let c = count cG in
+     if c = 0 then
+       Some s
+     else
+       Some (s ^ string_of_int c)
+  | (n', _)::cG -> beautify_name n cG

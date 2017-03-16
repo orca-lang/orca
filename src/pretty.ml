@@ -22,18 +22,21 @@ let nbsp : unit Fmt.t = fun pps () -> Fmt.pf pps " "
 let keyword = styled keyword_color string (* coloured word *)
 let def = styled def_color string
 let const = styled def_color string
-let comp_var = styled comp_var_color Name.fmt_name
+let comp_var cG pps n =
+  match Name.beautify_name n cG with
+  | None -> (styled comp_var_color Name.fmt_name) pps n
+  | Some s -> (styled comp_var_color string) pps s
 let bound_var = styled bound_var_color Fmt.int
 let bound_name = styled bound_var_color Fmt.string
 
 let rec fmt_tel_entry (sign, cG) pps = function
   | Explicit, n, t ->
      Fmt.pf pps "(%a : %a)"
-            comp_var n
+            (comp_var cG) n
             (fmt_exp (sign, cG)) t
   | Implicit, n, t ->
      Fmt.pf pps "{%a : %a}"
-            comp_var n
+            (comp_var cG) n
             (fmt_exp (sign, cG)) t
 
 and fmt_tel (sign, cG) pps = function
@@ -57,9 +60,6 @@ and fmt_stel_entry (sign, cG) pps = function
             (fmt_exp (sign, cG)) t
 
 and fmt_stel (sign, cG) pps = function
-  (* | (Explicit, n, t) :: tel -> *)
-  (*    Fmt.pf pps "%a" *)
-  (*           (fmt_exp (sign, cG)) t *)
   | entry :: tel ->
      Fmt.pf pps "%a %a"
             (fmt_stel_entry (sign, cG)) entry
@@ -78,7 +78,7 @@ and fmt_exp (sign, cG) pps = function
             (fmt_exp (sign, cG)) e
             (list ~sep:nbsp (fmt_exp (sign, cG))) es
 
-  | Var n -> comp_var pps n
+  | Var n -> comp_var cG pps n
 
   | Hole n ->
      Fmt.pf pps "?%a"
@@ -104,7 +104,7 @@ and fmt_exp (sign, cG) pps = function
 
   | Fn (xs, e) ->
      Fmt.pf pps "fn %a => %a"
-            (list comp_var) xs
+            (list (comp_var cG)) xs
             (fmt_exp (sign, cG)) e
 
   | Comp(e1, e2) ->
@@ -170,7 +170,7 @@ let rec fmt_pat_subst pps = function
 
 
 let rec fmt_pat (sign, cG) pps = function
-  | PVar n -> comp_var pps n
+  | PVar n -> comp_var cG pps n
   | Innac e ->
      Fmt.pf pps ".%a"
             (fmt_exp (sign, cG)) e
@@ -195,7 +195,7 @@ let rec fmt_pat (sign, cG) pps = function
 
   | PClos (n, psub) ->
      Fmt.pf pps "%a[%a]"
-            comp_var n
+            (comp_var cG) n
             fmt_pat_subst psub
 
   | PEmptyS -> string pps "^"
@@ -216,7 +216,7 @@ let rec fmt_pat (sign, cG) pps = function
 
   | PPar n ->
      Fmt.pf pps "<:%a"
-            comp_var n
+            (comp_var cG) n
 
   (* extra cases *)
   | PUnder
@@ -251,21 +251,21 @@ let rec fmt_decls sign pps = function
                     (fmt_decl sign) d
                     (fmt_decls sign) ds
 
-let fmt_rhs sign pps = function
+let fmt_rhs (sign, cG) pps = function
   | Just e -> fmt_exp (sign, []) pps e (* should have the context from the patterns *)
   | Impossible n ->
-     Fmt.pf pps "impossible %a" comp_var n
+     Fmt.pf pps "impossible %a" (comp_var cG) n
 
-let fmt_pat_decl sign pps (pats, rhs) =
+let fmt_pat_decl (sign, cG) pps (pats, rhs) =
   Fmt.pf pps "| %a => %a"
          (fmt_pats (sign, [])) pats
-         (fmt_rhs sign) rhs
+         (fmt_rhs (sign, cG)) rhs
 
-let rec fmt_pat_decls sign pps = function
+let rec fmt_pat_decls (sign, cG) pps = function
   | [] -> ()
   | pat::pats -> Fmt.pf pps "%a@,%a"
-                    (fmt_pat_decl sign) pat
-                    (fmt_pat_decls sign) pats
+                    (fmt_pat_decl (sign, cG)) pat
+                    (fmt_pat_decls (sign, cG)) pats
 
 
 let rec fmt_sdecl sign pps (n, stel, dsig) =
@@ -323,7 +323,7 @@ let fmt_program sign pps = function
             const n
             (fmt_exp (sign, [])) t
             keyword "where"
-            (fmt_pat_decls sign) pats
+            (fmt_pat_decls (sign, [])) pats
 
 
   | DefPM (n, tel, t, pats) ->
@@ -333,7 +333,7 @@ let fmt_program sign pps = function
             (fmt_tel (sign, [])) tel
             (fmt_exp (sign, [])) t
             keyword "where"
-            (fmt_pat_decls sign) pats
+            (fmt_pat_decls (sign, [])) pats
 
   | Syn (n, [], ds) ->
      Fmt.pf pps "%a %a %a@,%a"
