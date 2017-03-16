@@ -38,7 +38,7 @@ let rec fmt_tel_entry (sign, cG) pps = function
 
 and fmt_tel (sign, cG) pps = function
   | (Explicit, n, t) :: tel when Name.is_name_floating n ->
-     Fmt.pf pps "%a"
+     Fmt.pf pps "(%a)"
             (fmt_exp (sign, cG)) t
   | entry :: tel ->
      Fmt.pf pps "%a %a"
@@ -268,6 +268,18 @@ let rec fmt_pat_decls sign pps = function
                     (fmt_pat_decls sign) pats
 
 
+let rec fmt_sdecl sign pps (n, stel, dsig) =
+  Fmt.pf pps "| %a : @,"
+         def n
+
+
+let rec fmt_sdecls sign pps = function
+  | [] -> ()
+  | d::ds -> Fmt.pf pps "%a@,%a"
+                   (fmt_decl sign) d
+                   (fmt_decls sign) ds
+
+
 let fmt_program sign pps = function
   (* printing inductive types *)
   | Data (n, [], [], 0, ds) ->
@@ -322,6 +334,21 @@ let fmt_program sign pps = function
             (fmt_exp (sign, [])) t
             keyword "where"
             (fmt_pat_decls sign) pats
+
+  | Syn (n, [], ds) ->
+     Fmt.pf pps "%a %a %a@,%a"
+            keyword "syn"
+            const n
+            keyword "where"
+            (fmt_sdecls sign) ds
+
+  | Syn (n, tel, ds) ->
+     Fmt.pf pps "%a %a : %a -> * %a@,%a"
+            keyword "syn"
+            const n
+            (fmt_tel (sign, [])) tel
+            keyword "where"
+            (fmt_sdecls sign) ds
 
   | p -> string pps (Print.Int.print_program p)
 
