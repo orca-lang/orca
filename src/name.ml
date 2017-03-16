@@ -20,6 +20,8 @@ let print_name = function
 
 let print_names ns = "(" ^ (String.concat ", " (List.map print_name ns)) ^ ")"
 
+let print_names_no_comma ns = "(" ^ (String.concat " " (List.map print_name ns)) ^ ")"
+
 let is_name_floating (_, _, x) = x
 
 let fmt_name pps (s, n, b) =
@@ -48,3 +50,7 @@ let rec beautify_name (s, _, _ as n) cG =
      else
        Some (s ^ "_" ^ string_of_int c)
   | (n', _)::cG -> beautify_name n cG
+
+
+(* THIS FUNCTION NEEDS TO BE ELIMINATED *)
+let get_user_name (_, n, _) = n

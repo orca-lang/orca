@@ -1,7 +1,7 @@
 open Syntax.Int
 open Print.Int
 open Sign
-open Check
+open Recon
 open Name
 open Meta
 
@@ -110,7 +110,7 @@ let split_lam (sign : signature) (p1 : pats) (xs, p : string list * pat) (cD1 : 
     | t -> raise (Error.Error ("Syntactic abstraction was define in a pattern against"
         ^ " type which was not syntactic function type in a box. Found " ^ print_exp t))
   in
-  Debug.print (fun () -> "Split SPi(" ^ print_stel tel ^ ", " ^ print_exp t ^ ")");
+  Debug.print (fun () -> "Split SPi(" ^ print_tel tel ^ ", " ^ print_exp t ^ ")");
   let g', tel0, tel' = theta_of_lam g xs tel in
   let vs = [Box(g, SPi (tel, t))] in
   let thetatel = [Syntax.Explicit, gen_floating_name (),

@@ -43,10 +43,9 @@ and fv_pi cG (tel : tel) (t : exp) = match tel with
   | [] -> fv cG t
   | (_, n, e)::tel -> fv cG e @ (fv_pi cG tel t -- n)
 
-and fv_spi cG (tel : stel) (t : exp) = match tel with
+and fv_spi cG (tel : tel) (t : exp) = match tel with
   | [] -> fv cG t
   | (_, n, e)::tel -> fv cG e @ (fv_spi cG tel t)
-
 
 let rec fv_pat =
   function
@@ -115,7 +114,7 @@ let refresh (e : exp) : exp =
        let tel', t' = refresh_tel ((n, n')::rep) tel t in
        ((i, n', refresh rep e)::tel'), t'
 
-  and refresh_stel (rep : (name * name) list) (tel : stel) (t : exp) : stel * exp =
+  and refresh_stel (rep : (name * name) list) (tel : tel) (t : exp) : tel * exp =
     match tel with
     | [] -> [], refresh rep t
     | (i, n, e) :: tel ->

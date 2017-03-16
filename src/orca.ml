@@ -56,25 +56,27 @@ let execute_code (sign : Sign.signature) (program : Syntax.Ext.program list) : S
       in
       print_string ("The external tree is:\n" ^ ext_pp ^ "\n")
     end;
-    let _, int_rep = List.fold_left
+    let _, apx_rep = List.fold_left
                            (fun (s, ds) d -> let s', d' = Preproc.pre_process s d in s', (d' :: ds))
                            (List.map Sign.signature_entry_name sign, [])
                            program
     in
-    let int_rep = List.rev int_rep in (* Because the fold inverts them. TODO consider a right fold? *)
+    let apx_rep = List.rev apx_rep in (* Because the fold inverts them. TODO consider a right fold? *)
 
-    let int_pp = String.concat
+    let apx_pp = String.concat
                    "\n"
-                   (List.map Print.Int.print_program int_rep)
+                   (List.map Print.Apx.print_program apx_rep)
     in
-    Debug.print (fun () -> "The internal tree is:\n" ^ int_pp ^ "\n");
+    Debug.print (fun () -> "The approximate tree is:\n" ^ apx_pp ^ "\n");
 
-    if ansi_on() then Fmt.set_style_renderer Fmt.stdout `Ansi_tty;
-    Pretty.fmt_programs sign Fmt.stdout int_rep;
+    print_string apx_pp ;       (* TODO : add back the nice pretty printer *)
+
+    (* if ansi_on() then Fmt.set_style_renderer Fmt.stdout `Ansi_tty; *)
+    (* Pretty.fmt_programs sign Fmt.stdout apx_rep; *)
 
     if not (get_parse_only ()) then begin
            Debug.print_string "Starting typechecking." ;
-            let sign' = List.fold_left Prog.tc_program sign int_rep in
+            let sign' = List.fold_left Prog.tc_program sign apx_rep in
             Debug.print_string "The file was typechecked.";
             print_string "File type-checked successfully.\n";
             sign'

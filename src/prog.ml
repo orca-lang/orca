@@ -1,14 +1,14 @@
 open Sign
-open Syntax.Int
-open Print.Int
+open Syntax.Apx
+open Print.Apx
 open Meta
 open Match
-open Check
+open Recon
 
 let tc_constructor (sign , cG : signature * ctx) (u : universe) (tel : tel)
                    (n , tel', (n', es) : def_name * tel * dsig) : signature_entry =
   Debug.print_string ("Typechecking constructor: " ^ n) ;
-  let uc = check_tel (sign, cG) u tel' in
+  let tel'', uc = check_tel (sign, cG) u tel' in
   if uc <= u then
     begin
       let check' = check (sign, (ctx_of_tel tel') @ cG) in
@@ -34,7 +34,7 @@ let tc_constructor (sign , cG : signature * ctx) (u : universe) (tel : tel)
 let tc_syn_constructor (sign , cG : signature * ctx) (tel : tel)
                        (n , tel', (n', es) : def_name * tel * dsig) : signature_entry =
   Debug.print_string ("Typechecking syntax constructor: " ^ n) ;
-  check_syn_tel (sign, cG) tel';
+  let tel'' = check_syn_tel (sign, cG) tel' in
   (* let cP = bctx_of_stel tel' in *)
   let check' = check_syn (sign, (ctx_of_tel tel') @ cG) BNil in
   let rec check_indices es tel =

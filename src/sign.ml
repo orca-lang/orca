@@ -234,7 +234,7 @@ let rec rename_ctx_using_psubst (cG : ctx) (sigma : psubst) =
 type bctx =
 | BNil
 | CtxVar of name
-| BSnoc of bctx * string * exp
+| BSnoc of bctx * name * exp
 
 let rec append_bctx cP cP' =
   match cP with
@@ -242,17 +242,20 @@ let rec append_bctx cP cP' =
   | CtxVar _ -> raise (Error.Violation "Appended a bctx terminating with a CtxVar to another bctx")
   | BSnoc (cP, x, e) -> BSnoc (append_bctx cP cP', x, e)
 
-let rec lookup_bound i cP =
-  match i, cP with
-  | 0, BSnoc (_, _, t) -> t
-  | n, BSnoc (cP', _, _) -> lookup_bound (n-1) cP'
-  | _ -> raise (Error.Error ("Bound variable had index larger than bound context"))
+let lookup_bound x cP =
+  let rec lookup i cP =
+    match cP with
+    | BSnoc (_, x', t) when x = x' -> i, t
+    | BSnoc (cP', _, _) -> lookup (i+1) cP'
+    | _ -> raise (Error.Error ("Bound variable had index larger than bound context"))
+  in
+  lookup 0 cP
 
-let rec bctx_of_lam_stel (f : string list) (tel : stel) =
+let rec bctx_of_lam_tel (f : name list) (tel : tel) =
     match f, tel with
     | [], tel' -> BNil, tel'
     | f::fs, (_, _, t)::tel' ->
-      let cP, tel'' = bctx_of_lam_stel fs tel' in
+      let cP, tel'' = bctx_of_lam_tel fs tel' in
       BSnoc (cP, f, t), tel''
     | _, [] -> raise (Error.Error ("Too many variables declared in lambda"))
 
@@ -271,8 +274,8 @@ let print_bctx cP =
   let rec print = function
     | BNil -> ""
     | CtxVar x -> print_name x
-    | BSnoc(BNil, x, t) -> x ^ ":" ^ print_exp t
-    | BSnoc(g, x, t) -> print g ^ ", " ^ x ^ ":" ^ print_exp t
+    | BSnoc(BNil, x, t) -> print_name x ^ ":" ^ print_exp t
+    | BSnoc(g, x, t) -> print g ^ ", " ^ print_name x ^ ":" ^ print_exp t
   in
   "{" ^ print cP ^ "}"
 
@@ -286,10 +289,11 @@ let drop_suffix cP n =
     drop cP n
 
 let rec beautify_bound_name x cP =
+  let x = get_user_name x in
   let rec count = function
     | CtxVar _
       | BNil -> 0
-    | BSnoc (cP', x', _) when x = x' -> 1 + count cP'
+    | BSnoc (cP', x', _) when x = (get_user_name x') -> 1 + count cP'
     | BSnoc (cP', x', _) -> count cP'
   in
   let c = count cP in
