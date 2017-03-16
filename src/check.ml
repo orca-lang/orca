@@ -131,7 +131,8 @@ and check_type (sign, cG : signature * ctx) (s : exp) : universe =
 
 and check (sign , cG : signature * ctx) (e : exp) (t : exp) : unit =
   Debug.print (fun () ->
-      "Check called with: " ^ print_exp e ^ ":" ^ print_exp t ^ "\nin context: " ^ print_ctx cG);
+    "Checking " ^ Pretty.print_exp (sign, cG) BNil e ^ "\nagainst "
+    ^ Pretty.print_exp (sign, cG) BNil t ^ "\nin context: " ^ print_ctx cG);
   Debug.indent();
   begin match e, Whnf.whnf sign t with
   (* checkable terms *)
@@ -267,8 +268,9 @@ and check_ctx (sign, cG) g =
 
 
 and check_syn (sign, cG) cP (e : exp) (t : exp) =
-  Debug.print (fun () -> "Checking syntactic expression " ^ print_exp e ^ " against type "
-    ^ print_exp t ^ "\nin bound context " ^ print_bctx cP ^ "\nand context " ^ print_ctx cG);
+  Debug.print (fun () -> "Checking syntactic expression " ^ Pretty.print_exp (sign, cG) cP e
+    ^ "\nagainst type " ^ Pretty.print_exp (sign, cG) cP t ^ "\nin bound context "
+    ^ print_bctx cP ^ "\nand context " ^ print_ctx cG);
   Debug.indent ();
   begin
     match e, Whnf.whnf sign t with
