@@ -417,11 +417,11 @@ let pre_process s = function
     let cGa, ps' = fold_param [] ps in
     Debug.print ~verbose:true (fun () -> "ps' = " ^ IP.print_tel ps');
      let cG = params_to_ctx ps ps' in
-     let is, u = match pproc_tel s cG [] e with
+     let _is, _u = match pproc_tel s cG [] e with
        | tel, I.Set u -> tel, u
        | _, t -> raise (Error.Error_loc (loc e, "Expected universe but instead got expression " ^ IP.print_exp t))
      in
-     let s' = add_name_sign s n in
+     let _s' = add_name_sign s n in
      assert false
      (* let s'', ds' = List.fold_left (fun (s, dos) d -> let ss, dd = pproc_codecl s cG d n in ss, (dd :: dos)) (s', []) ds in *)
      (* s'', I.Codata (n, ps', is, u, ds') *)
