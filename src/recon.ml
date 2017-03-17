@@ -20,6 +20,7 @@ let is_syntax = function
   | A.Shift _
   | A.Dot _
   | A.Snoc _
+  | A.TBox _
   | A.Nil -> true
   | _ -> false
 
@@ -305,6 +306,14 @@ and check_syn (sign, cG) cP (e : A.exp) (t : I.exp) =
     | A.Dot (s, e), I.Snoc (g, _, t) ->
       let s' = check_syn (sign, cG) cP s g in
       I.Dot (s', check_syn (sign, cG) cP e (I.Clos(t, s')))
+    | A.TBox (xs, e), t ->
+       let rec f cP' ys = match ys, cP' with
+         | [], _ -> A.Shift 0
+         | y::ys'', BSnoc(cP'', z, e) -> A.Dot(f cP'' ys'', A.BVar z)
+         | _ -> raise (Error.Error (":> asserted that the tail of the context was " ^ print_names xs
+                                    ^ " instead context was " ^ print_bctx cP))
+       in
+       check_syn (sign, cG) cP (A.Clos (e, f cP xs)) t
     | e, t when is_syntax e ->
       Debug.print(fun ()-> "Expression " ^ AP.print_exp e ^ " is syntactic and thus being inferred");
       let e', t' = match infer_syn (sign, cG) cP e with

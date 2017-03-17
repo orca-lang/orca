@@ -132,11 +132,8 @@ let rec pproc_exp (s : sign) (cG : ctx) (cP : ctx) (e : E.exp) : A.exp =
     else
       raise (Error.Error_loc (loc e, "Bound variables bindings (|-) cannot be nested"))
   | E.TBox (g, e) ->
-     if cP = [] then
-       let cP', g' = add_names_ctx cP g in
-       A.TBox(g', pproc_exp s cG cP' e)
-    else
-      raise (Error.Error_loc (loc e, "Bound variables bindings (:>) cannot be nested"))
+     let cP', g' = add_names_ctx cP g in
+     A.TBox(g', pproc_exp s cG cP' e)
   | E.Fn (ns, e) ->
      let cG', n' = add_names_ctx cG ns in
      A.Fn(n', pproc_exp s cG' cP e)
