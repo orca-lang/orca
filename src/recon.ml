@@ -357,7 +357,7 @@ and infer_syn (sign, cG) cP (e : A.exp) =
       check_box (sign, cG) cP (I.Var x) (lookup x cG)
     | A.Const n -> check_box (sign, cG) cP (I.Const n) (lookup_sign sign n)
     | A.BVar x ->
-      let i, t = lookup_bound x cP in
+      let i, t = lookup_bound_name x cP in
       Debug.print (fun () -> "Looking bound variable " ^ string_of_int i ^ " resulted in type " ^ IP.print_exp t
         ^ "\n Context is " ^ print_bctx cP);
       I.BVar i, I.Clos(t, I.Shift (i+1))

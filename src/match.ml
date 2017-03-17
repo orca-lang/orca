@@ -102,7 +102,7 @@ let rec theta_of_lam g xs tel =
      Snoc(g', x, t), (i, y, t)::tel0, tel''
   | _ -> raise (Error.Error ("Somethng went wrong as always"))
 
-let split_lam (sign : signature) (p1 : pats) (xs, p : string list * pat) (cD1 : ctx)
+let split_lam (sign : signature) (p1 : pats) (xs, p : name list * pat) (cD1 : ctx)
               (x, t : name * exp) (cD2 : ctx) : ctx * ctx_map =
   Debug.indent ();
   let g, tel, t = match Whnf.whnf sign t with
@@ -185,7 +185,7 @@ let split_clos (sign : signature) (p1 : pats) (n, s : name * pat_subst) (cD1 : c
       | _, CEmpty -> Nil
       | _, CDot(s, y) ->
         let cP = contextify (sign, cD1 @ cD2) g in
-        Snoc(get_domain g s, "_", lookup_bound y cP)
+        Snoc(get_domain g s, Name.gen_floating_name(), lookup_bound y cP)
       | _, CShift 0 -> g
       | Snoc(g, _, _), CShift m -> get_domain g (CShift (m-1))
       | _, CShift m -> raise (Error.Error ("When checking pattern " ^ print_name n ^ "[" ^ print_pat_subst s

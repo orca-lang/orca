@@ -242,7 +242,7 @@ let rec append_bctx cP cP' =
   | CtxVar _ -> raise (Error.Violation "Appended a bctx terminating with a CtxVar to another bctx")
   | BSnoc (cP, x, e) -> BSnoc (append_bctx cP cP', x, e)
 
-let lookup_bound x cP =
+let lookup_bound_name x cP =
   let rec lookup i cP =
     match cP with
     | BSnoc (_, x', t) when x = x' -> i, t
