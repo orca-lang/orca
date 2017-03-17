@@ -2,6 +2,7 @@
 
 open Util
 open Name
+open Syntax
 open Syntax.Int
 
 let rec fv cG =
@@ -179,8 +180,6 @@ let refresh_free_vars (rep : (name * name) list) e =
 
 type single_subst = name * exp
 type subst = single_subst list
-type single_psubst = name * pat
-type psubst = single_psubst list
 
 let fv_subst cG sigma = List.concat (List.map (fun (n, e) -> fv cG e -- n) sigma)
 
@@ -254,6 +253,8 @@ let rec compose_single_with_subst s = function
 
 let compose_subst sigma delta = List.map (fun (x, t) -> x, simul_subst sigma t) delta
 
+let exp_list_of_tel tel = List.map (fun (_, _, s) -> s) tel
+
 let rec exp_of_pat_subst : pat_subst -> exp = function
   | CShift n -> Shift n
   | CEmpty -> EmptyS
@@ -272,45 +273,11 @@ let rec exp_of_pat : pat -> exp = function
   | PDot (p1, p2) -> Dot (exp_of_pat p1, exp_of_pat p2)
   | PNil -> Nil
   | PSnoc (p1, x, p2) -> Snoc (exp_of_pat p1, x, exp_of_pat p2)
-  | PUnder -> raise (Error.Violation "We'd also be very surprised if this were to happen.")
+  | PUnder -> raise (Error.Violation "We'd be very surprised if this were to happen.")
   | PWildcard -> raise (Error.Violation "We'd also be very surprised if this were to happen.")
 
-let rec psubst ((x, p') as s) (p : pat) :  pat =
-  match p with
-  | PVar n when n = x -> p'
-  | PVar n -> PVar n
-  | PPar n when n = x -> p'   (* MMMMM *)
-  | PPar n -> PPar n
-  | PBVar i -> PBVar i
-  | Innac e -> Innac (subst (x, exp_of_pat p') e)
-  | PLam (f, p) -> PLam(f, psubst s p)
-  | PConst (n, ps) -> PConst(n, List.map (psubst s) ps)
-  | PClos (n, s) when n = x ->
-     begin match p' with
-     | PVar n' -> PClos (n', s)
-     | _ -> assert false (* MMMMMMM *)
-     end
-  | PClos (n, s) -> PClos (n, s)
-  | PEmptyS -> PEmptyS
-  | PShift i -> PShift i
-  | PDot (p1, p2) -> PDot (psubst s p1, psubst s p2)
-  | PNil -> PNil
-  | PSnoc (p1, x, p2) -> PSnoc (psubst s p1, x, psubst s p2)
-  | PUnder -> PUnder
-  | PWildcard -> PWildcard
-
-let rec compose_single_with_psubst s = function
-  | [] -> []
-  | (y, t') :: sigma -> (y, psubst s t') :: (compose_single_with_psubst s sigma)
-
-let pats_of_psubst : psubst -> pats = List.map snd
-
-let simul_psubst sigma p =
-  List.fold_left (fun p s -> psubst s p) p sigma
-
-let simul_psubst_on_list sigma ps =
-  List.map (simul_psubst sigma) ps
-
-let compose_psubst sigma delta = List.map (fun (x, t) -> x, simul_psubst sigma t) delta
-
-let exp_list_of_tel tel = List.map (fun (_, _, s) -> s) tel
+let rec subst_of_pats (sigma : pats) (tel : tel) : subst =
+  match sigma, tel with
+  | [], [] -> []
+  | p :: ps, (_, n, t) :: tel' -> (n, exp_of_pat p) :: (subst_of_pats ps tel')
+  | _ -> raise (Error.Violation "subst_of_ctx_map got lists of different lengths")

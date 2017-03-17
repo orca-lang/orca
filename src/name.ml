@@ -53,4 +53,4 @@ let rec beautify_name (s, _, _ as n) cG =
 
 
 (* THIS FUNCTION NEEDS TO BE ELIMINATED *)
-let get_user_name (_, n, _) = n
+let get_user_name (n, _, _) = n

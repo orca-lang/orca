@@ -69,14 +69,15 @@ let execute_code (sign : Sign.signature) (program : Syntax.Ext.program list) : S
     in
     Debug.print (fun () -> "The approximate tree is:\n" ^ apx_pp ^ "\n");
 
-    print_string apx_pp ;       (* TODO : add back the nice pretty printer *)
+    (* print_string apx_pp ; *)       (* TODO : add back the nice pretty printer *)
 
-    (* if ansi_on() then Fmt.set_style_renderer Fmt.stdout `Ansi_tty; *)
-    (* Pretty.fmt_programs sign Fmt.stdout apx_rep; *)
 
     if not (get_parse_only ()) then begin
            Debug.print_string "Starting typechecking." ;
-            let sign' = List.fold_left Prog.tc_program sign apx_rep in
+           let sign', int_rep = List.fold_left (fun (s, ps) p -> let s', p' = Prog.tc_program s p in s', p'::ps) (sign, []) apx_rep in
+           if ansi_on() then Fmt.set_style_renderer Fmt.stdout `Ansi_tty;
+           Pretty.fmt_programs sign Fmt.stdout int_rep;
+
             Debug.print_string "The file was typechecked.";
             print_string "File type-checked successfully.\n";
             sign'
@@ -105,12 +106,12 @@ let () =
   with
   | Error.Syntax_error pos ->
      Debug.print_string "There was a syntax error in the file." ;
-     Printf.printf "Syntax error in line %d, col %d.\n" pos.Lexing.pos_lnum pos.Lexing.pos_cnum ;
+     Printf.printf "Syntax error in line %d, col %d.\n" pos.Lexing.pos_lnum (pos.Lexing.pos_cnum - pos.Lexing.pos_bol) ;
      exit 1
   | Error.Scanning_error (pos, s) ->
      Debug.print_string "There was a lexing error in the file." ;
      Printf.printf "Scanning error in line %d, col %d\nMessage:%s\n"
-                   pos.Lexing.pos_lnum pos.Lexing.pos_cnum s;
+                   pos.Lexing.pos_lnum (pos.Lexing.pos_cnum - pos.Lexing.pos_bol) s;
      exit 1
   | Ulexing.Error ->
      Debug.print_string "There was a lexing error in the file.(2)" ;

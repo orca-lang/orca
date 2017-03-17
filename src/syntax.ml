@@ -1,4 +1,10 @@
 type icit = Explicit | Implicit
+type def_name = string
+
+type pat_subst
+  = CShift of int
+  | CEmpty
+  | CDot of pat_subst * int
 
 module Ext = struct
 
@@ -64,7 +70,7 @@ module Apx = struct
 
   type index = int
   type universe = int
-  type def_name = string
+
 
   type exp
     = Set of universe
@@ -94,14 +100,9 @@ module Apx = struct
    and tel_entry = icit * name * exp
    and tel = tel_entry list
 
-  type pat_subst
-    = CShift of int
-    | CEmpty
-    | CDot of pat_subst * name
-
   type pat =
     | PVar of name
-    | PBVar of name
+    | PBVar of index
     | Innac of exp
     | PLam of name list * pat
     | PConst of def_name * pat list
@@ -139,7 +140,6 @@ module Int = struct
 
   type index = int
   type universe = int
-  type def_name = string
 
   type exp
     = Set of universe
@@ -170,11 +170,6 @@ module Int = struct
    and tel_entry = icit * name * exp
    and tel = tel_entry list
 
-  type pat_subst
-    = CShift of int
-    | CEmpty
-    | CDot of pat_subst * index
-
   type pat =
     | PVar of name
     | PBVar of index
@@ -194,7 +189,8 @@ module Int = struct
   type pats = pat list
   (* name of the constructed type, the type parameters, and the indices *)
   type dsig = def_name * exp list
-  type decls = (def_name * tel * dsig) list
+  type decl = (def_name * tel * dsig)
+  type decls = decl list
   type codecls = (def_name * tel * dsig * exp) list
   type rhs
     = Just of exp

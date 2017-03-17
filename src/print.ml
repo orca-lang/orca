@@ -2,6 +2,13 @@
    always available without contexts *)
 open Syntax
 
+let rec print_pat_subst : pat_subst -> string =
+  function
+  | CShift n -> "^" ^ string_of_int n
+  | CEmpty -> "^"
+  | CDot (s, i) -> "(" ^ print_pat_subst s ^ "; i" ^ string_of_int i ^ ")"
+
+
 module Ext = struct
   open Syntax.Ext
 
@@ -107,16 +114,10 @@ module Apx = struct
 
   let print_exps es = "(" ^ String.concat ", " (List.map print_exp es) ^ ")"
 
-  let rec print_pat_subst : pat_subst -> string =
-    function
-    | CShift n -> "^" ^ string_of_int n
-    | CEmpty -> "^"
-    | CDot (s, i) -> "(" ^ print_pat_subst s ^ "; i" ^ print_name i ^ ")"
-
   let rec print_pat (p : pat) : string = match p with
     | PVar n -> print_name n
     | PPar n -> "(<: " ^ print_name n ^ ")"
-    | PBVar n -> "i" ^ print_name n
+    | PBVar n -> "i" ^ string_of_int n
     | Innac e -> "." ^ print_exp e
     | PLam (fs, p) -> "(\ " ^ print_names fs ^ " " ^ print_pat p ^ ")"
     | PConst (n, ps) -> "(" ^ n ^ " " ^ (String.concat " " (List.map (fun p -> "(" ^ print_pat p ^ ")") ps)) ^ ")"
@@ -163,7 +164,6 @@ module Apx = struct
   let print_params ps = String.concat " " (List.map print_param ps)
 
   let print_subst c = "[" ^ (String.concat "," (List.map (fun (x, e) -> print_name x ^ " := " ^ print_exp e) c)) ^ "]"
-  let print_psubst c = "[" ^ (String.concat "," (List.map (fun (x, e) -> print_name x ^ " := " ^ print_pat e) c)) ^ "]"
 
   let print_program = function
     | Data (n, ps, is, u, decls) ->
@@ -218,12 +218,6 @@ module Int = struct
     | (_, x, e) :: tel -> "(" ^ print_name x ^ " : " ^ print_exp e ^ ")->> " ^ print_spi tel t ^ ")"
 
   let print_exps es = "(" ^ String.concat ", " (List.map print_exp es) ^ ")"
-
-  let rec print_pat_subst : pat_subst -> string =
-    function
-    | CShift n -> "^" ^ string_of_int n
-    | CEmpty -> "^"
-    | CDot (s, i) -> "(" ^ print_pat_subst s ^ "; i" ^ string_of_int i ^ ")"
 
   let rec print_pat (p : pat) : string = match p with
     | PVar n -> print_name n

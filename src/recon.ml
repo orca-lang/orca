@@ -369,7 +369,7 @@ and infer_syn (sign, cG) cP (e : A.exp) =
       let i, t = lookup_bound_name x cP in
       Debug.print (fun () -> "Looking bound variable " ^ string_of_int i ^ " resulted in type " ^ IP.print_exp t
         ^ "\n Context is " ^ print_bctx cP);
-      I.BVar i, I.Clos(t, I.Shift (i+1))
+      I.BVar i, t
     | A.Clos (e, s) ->
       begin
         let e', t = try infer (sign, cG) e

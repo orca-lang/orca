@@ -28,7 +28,8 @@ let comp_var cG pps n =
   | None -> (styled comp_var_color Name.fmt_name) pps n
   | Some s -> (styled comp_var_color string) pps s
 let bound_var = styled bound_var_color Fmt.int
-let bound_name = styled `Bold (styled bound_var_color Fmt.string)
+let bound_name = styled `Bold (styled bound_var_color Name.fmt_name)
+let bound_string = styled `Bold (styled bound_var_color Fmt.string)
 
 (* some dummy type *)
 let dt = EmptyS
@@ -63,7 +64,7 @@ and fmt_tel (sign, cG) pps (tel, e) =
 and fmt_stel_entry (sign, cG) cP pps = function
   | Explicit, n, t ->
      Fmt.pf pps "(%a : %a)"
-            bound_name (beautify_bound_name n cP)
+            bound_string (beautify_bound_name n cP)
             (fmt_exp (sign, cG) cP) t
   | Implicit, n, t ->
      Fmt.pf pps "{%a : %a}"
@@ -140,12 +141,12 @@ and fmt_exp (sign, cG) cP pps = function
      begin match beautify_idx i cP with
      | None -> Fmt.pf pps "i%a"
                       bound_var i
-     | Some n -> bound_name pps n
+     | Some n -> bound_string pps n
      end
   | Lam (xs, e) ->
     let cP' = bctx_of_names xs cP in
      Fmt.pf pps "(\\%a. %a)"
-            (list bound_name) (beautify_bound_names xs cP)
+            (list bound_string) (beautify_bound_names xs cP)
             (fmt_exp (sign, cG) cP') e
 
   | Clos (e1, e2) ->

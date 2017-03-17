@@ -1,3 +1,4 @@
+open Syntax
 open Syntax.Int
 open Print.Int
 open Meta
@@ -163,13 +164,9 @@ let exp_list_of_ctx : ctx -> exp list = List.map snd
 
 let subst_of_ctx : ctx -> subst = List.map (fun (x, _) -> x, Var x)
 
-let psubst_of_ctx : ctx -> psubst = List.map (fun (x, _) -> x, PVar x)
-
 let name_list_of_ctx : ctx -> name list = List.map fst
 
 let var_list_of_ctx : ctx -> exp list = List.map (fun (x, _) -> Var x)
-
-let pvar_list_of_ctx : ctx -> pat list = List.map (fun (x, _) -> PVar x)
 
 let rec ctx_subst s = function
   | (x, t) :: cG -> (x, subst s t) :: (ctx_subst s cG)
@@ -183,30 +180,8 @@ let shift_subst_by_ctx sigma cG =
                          ^ ".");
   sigma'
 
-let shift_psubst_by_ctx sigma cG =
-  let sigma' = sigma @ (List.map (fun (x, _) -> x, PVar x) cG) in
-  Debug.print (fun () -> "Shift called with sigma = " ^ print_psubst sigma
-                         ^ "\ncG = " ^ print_ctx cG
-                         ^ "\nresulting in " ^ print_psubst sigma'
-                         ^ ".");
-  sigma'
-
 let simul_subst_on_ctx sigma =
     List.map (fun (x, e) -> x, simul_subst sigma e)
-
-let simul_psubst_on_ctx sigma =
-    List.map (fun (x, e) -> x, simul_psubst sigma e)
-
-let rec rename_ctx_using_pats (cG : ctx) (ps : pats) =
-  match cG, ps with
-  | [], [] -> [], []
-  | (x, t) :: cG', PVar y :: ps' ->
-    let sigma, cD = rename_ctx_using_pats (ctx_subst (x, Var y) cG') ps' in
-    (x, Var y) :: sigma, (y, t) :: cD
-  | s :: cG', _ :: ps' ->
-    let sigma, cD = rename_ctx_using_pats cG' ps' in
-    sigma, s :: cD
-  | _ -> raise (Error.Violation "rename_ctx_using_pats. Both arguments should have same length")
 
 let lookup_ctx cG n =
   try
@@ -222,15 +197,6 @@ let rec rename_ctx_using_subst (cG : ctx) (sigma : subst) =
      | Some (Var y) -> (y, t) :: (rename_ctx_using_subst cG' sigma)
      | _ -> (x, t) :: (rename_ctx_using_subst cG' sigma)
 
-let rec rename_ctx_using_psubst (cG : ctx) (sigma : psubst) =
-  match cG with
-  | [] -> []
-  | (x, t) :: cG' ->
-     match lookup_ctx sigma x with
-     | Some (PVar y) -> (y, t) :: (rename_ctx_using_psubst cG' sigma)
-     | _ -> (x, t) :: (rename_ctx_using_psubst cG' sigma)
-
-
 type bctx =
 | BNil
 | CtxVar of name
@@ -245,11 +211,20 @@ let rec append_bctx cP cP' =
 let lookup_bound_name x cP =
   let rec lookup i cP =
     match cP with
-    | BSnoc (_, x', t) when x = x' -> i, t
+    | BSnoc (_, x', t) when x = x' -> i, Clos(t, Shift (i+1))
     | BSnoc (cP', _, _) -> lookup (i+1) cP'
     | _ -> raise (Error.Error ("Bound variable had index larger than bound context"))
   in
   lookup 0 cP
+
+let lookup_bound x cP =
+  let rec lookup i cP =
+    match cP with
+    | BSnoc (_, _, t) when i = 0 -> Clos(t, Shift (x+1))
+    | BSnoc (cP', _, _) -> lookup (i-1) cP'
+    | _ -> raise (Error.Error ("Bound variable had index larger than bound context"))
+  in
+  lookup x cP
 
 let rec bctx_of_lam_tel (f : name list) (tel : tel) =
     match f, tel with

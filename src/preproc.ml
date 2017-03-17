@@ -16,6 +16,7 @@
 
 *)
 
+open Syntax
 module E = Syntax.Ext
 module EP = Print.Ext
 module A = Syntax.Apx
@@ -44,9 +45,18 @@ let find_name (sign : sign) (cG : ctx) (cP : ctx) (n, pos : E.name * src_pos) : 
                then A.Const n
                else raise (Error.Error_loc (pos, "Unbound variable: " ^ n))
 
+let lookup_bound_name x cP =
+  let rec lookup i cP =
+    match cP with
+    | (_,x')::cP' when x = x' -> i
+    | _::cP' -> lookup (i+1) cP'
+    | _ -> raise (Error.Error ("Bound variable had index larger than bound context"))
+  in
+  lookup 0 cP
+
 let find_name_pat (sign : sign) (cG : ctx) (cP : ctx) (n : E.name) : A.pat =
   match lookup n cP with
-  | Some n -> A.PBVar n
+  | Some n -> A.PBVar (lookup_bound_name n cP)
   | None -> match lookup n cG with
             | Some n -> A.PVar n
             | None ->
@@ -245,7 +255,7 @@ and pproc_app (s : sign) (cG : ctx) (cP : ctx) (e : E.exp) : A.exp * A.exp list 
      h, sp @[pproc_exp s cG cP e2]
   | _ -> pproc_exp s cG cP e, []
 
-let pproc_decl s cG (n, e) (d : A.def_name) =
+let pproc_decl s cG (n, e) (d : def_name) =
   Debug.print (fun () -> "Preprocessing declaration " ^ n ^ "\nCreating telescope out of " ^ EP.print_exp e);
   Debug.indent ();
   let tel, e' = pproc_tel s cG [] e in
@@ -260,7 +270,7 @@ let pproc_decl s cG (n, e) (d : A.def_name) =
   else
     raise (Error.Error_loc (loc e, "Return type of constructor " ^ n ^ " should be " ^ d))
 
-let pproc_sdecl s cG (n, e) (is_syntax : bool) (d : A.def_name) =
+let pproc_sdecl s cG (n, e) (is_syntax : bool) (d : def_name) =
   let tel, e' = pproc_stel s cG [] e in
   let (d', args) = match e' with
     | A.App (A.Const n', ds) -> n', ds
@@ -316,13 +326,13 @@ let rec pproc_pat (s : sign) cG cP p =
      end
   | E.PClos (x, e) ->
     let rec pat_subst_of_exp = function
-      | E.EmptyS -> A.CEmpty
-      | E.Shift n -> A.CShift n
+      | E.EmptyS -> CEmpty
+      | E.Shift n -> CShift n
       | E.Semicolon (sigma, P(_,E.Ident n)) ->
         let n' = match find_name_pat s cG cP n with
           | A.PBVar n' -> n'
           | _ -> raise (Error.Error ("Substitution in pattern can only contain bound variables"))
-        in A.CDot (pat_subst_of_exp (content sigma), n')
+        in CDot (pat_subst_of_exp (content sigma), n')
       | e -> raise (Error.Error ("Expected pattern substitution."))
     in
     let x' = match find_name_pat s cG cP x with
