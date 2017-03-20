@@ -48,14 +48,13 @@ let tc_syn_constructor (sign , cG : signature * ctx) (tel : I.tel)
                        (n , tel', (n', es) : def_name * tel * dsig) : signature_entry * I.decl =
   Debug.print_string ("Typechecking syntax constructor: " ^ n) ;
   let tel'' = check_syn_tel (sign, cG) tel' in
-  (* let cP = bctx_of_stel tel' in *)
   let check' = check_syn (sign, (ctx_of_tel tel'') @ cG) BNil in
   let rec check_indices es tel =
     match es, tel with
     | [], [] -> []
     | e::es', (_, _, t)::tel' ->
        let e' = check' e t in
-       e' :: check_indices es' (List.map (fun (i, x, t) -> i, x, (I.Clos(t, I.Dot (I.Shift 1, e')))) tel'')
+       e' :: check_indices es' (List.map (fun (i, x, t) -> i, x, (I.Clos(t, I.Dot (I.Shift 1, e')))) tel')
     | _ -> raise (Error.Error ("Constructor " ^ n
              ^ " does not return a term of the fully applied type for " ^ n'))
   in
@@ -81,7 +80,7 @@ let tc_program (sign : signature) : program -> signature * I.program = function
      let is', u'' = check_tel (sign, cG) u' is in
      let sign' = DataDef (n, ps', is', u'') :: sign in
      let sign'', ds' = tc_constructors (sign', cG) u (ps' @ is') ds in
-     sign'', I.Data(n, ps', is', u'', ds')
+     sign'', I.Data(n, ps', is', u'', List.rev ds')
      (* TODO Add positivity checking *)
 
   | Codata (n, ps, is, u, ds) -> assert false
@@ -93,7 +92,7 @@ let tc_program (sign : signature) : program -> signature * I.program = function
     let sign' = SynDef (n, tel') :: sign in
     let sign'', ds' = tc_syn_constructors (sign', []) tel' ds in
     Debug.deindent ();
-    sign'', I.Syn(n, tel', ds')
+    sign'', I.Syn(n, tel', List.rev ds')
 
   | DefPM (n, tel, t, ds) ->
      Debug.print_string ("\nTypechecking pattern matching definition: " ^ n);
