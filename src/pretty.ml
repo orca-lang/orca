@@ -54,19 +54,19 @@ let rec fmt_tel_entry (sign, cG) pps = function
             (fmt_exp (sign, cG) BNil) t
 
 and fmt_tel (sign, cG) pps (tel, e) =
-  let rec fmt_tel' (sign, cG) floating pps (tel, e) =
+  let rec fmt_tel' (sign, cG) beginning floating pps (tel, e) =
     match tel with
     | (Explicit, n, t) :: tel when Name.is_name_floating n ->
-      Fmt.pf pps (if not floating then "-> %a -> %a" else "%a -> %a")
+      Fmt.pf pps (if not floating && not beginning then "-> %a -> %a" else "%a -> %a")
         (fmt_exp (sign, cG) BNil) t
-        (fmt_tel' (sign, (n, dt)::cG) true) (tel, e)
+        (fmt_tel' (sign, (n, dt)::cG) false true) (tel, e)
     | (_, n, _ as entry) :: tel ->
-      Fmt.pf pps (if floating then "%a %a" else "%a %a")
+      Fmt.pf pps "%a %a"
         (fmt_tel_entry (sign, cG)) entry
-        (fmt_tel' (sign, (n, dt)::cG) false) (tel, e)
+        (fmt_tel' (sign, (n, dt)::cG) false false) (tel, e)
     | [] -> fmt_exp (sign, cG) BNil pps e
   in
-  fmt_tel' (sign, cG) false pps (tel, e)
+  fmt_tel' (sign, cG) true false pps (tel, e)
 
 and fmt_stel_entry (sign, cG) cP pps = function
   | Explicit, n, t ->
@@ -80,6 +80,11 @@ and fmt_stel_entry (sign, cG) cP pps = function
 
 and fmt_stel (sign, cG) cP pps (tel, e) =
   match tel with
+  | (Explicit, n, t) :: tel when Name.is_name_floating n ->
+     Fmt.pf pps "%a ->> %a"
+            (fmt_exp (sign, cG) cP) t
+            (fmt_stel (sign, cG) (BSnoc(cP, n, dt))) (tel, e)
+
   | (_, n, _ as entry) :: tel ->
      Fmt.pf pps "%a ->> %a"
             (fmt_stel_entry (sign, cG) cP) entry
@@ -111,7 +116,7 @@ and fmt_exp (sign, cG) cP pps = function
      Fmt.pf pps "%a"
             (fmt_tel (sign, cG)) (tel, e)
 
-  | SPi (stel, e) -> fmt_stel (sign, cG) cP pps (stel, e)
+  | SPi (stel, e) -> Fmt.pf pps "(%a)" (fmt_stel (sign, cG) cP) (stel, e)
 
   | Box (g, e) ->
      let cP' = bctx_of_ctx_exp g in
@@ -274,7 +279,7 @@ let fmt_decl (sign, cG) pps = function
   | n, tel, (tn, es) ->
      Fmt.pf pps "| %a : %a"
             const n
-            (fmt_tel (sign, cG)) (tel, App(Const tn, es))
+            (fmt_tel (sign, cG)) (tel, if es = [] then Const tn else App(Const tn, es))
 
 let rec fmt_decls (sign, cG) pps = function
   | [] -> ()

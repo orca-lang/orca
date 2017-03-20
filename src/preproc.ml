@@ -191,8 +191,7 @@ and pproc_comma (s : sign) (cG : ctx) (cP : ctx) (g : E.exp) : ctx * A.exp =
        let cP'', n' = add_name_ctx cP n in
        cP'', A.Snoc(e1', n', pproc_exp s cG cP' e)
     | _ ->
-       let cP'', n' = add_name_ctx cP "_" in (* MMMMM *)
-       cP'', A.Snoc(e1', n', pproc_exp s cG cP' e2)
+       cP', A.Snoc(e1', Name.gen_floating_name (), pproc_exp s cG cP' e2)
     end
   | _ -> raise (Error.Error_loc (loc g, "Left hand side of comma should be a context. Instead found: " ^ EP.print_exp g))
 
@@ -240,9 +239,8 @@ and pproc_stel (s : sign) (cG : ctx) (cP : ctx) (e : E.exp) : A.tel * A.exp =
      (Syntax.Explicit, n', pproc_exp s cG cP t0) :: tel, t
   | E.Arr (t0, t1)
   | E.SArr (t0, t1) ->
-    let cP', n' = add_name_ctx cP "_" in (* MMMMM *)
-     let tel, t = pproc_stel s cG cP' t1 in
-     (Syntax.Explicit, n', pproc_exp s cG cP t0) :: tel , t
+     let tel, t = pproc_stel s cG cP t1 in
+     (Syntax.Explicit, Name.gen_floating_name (), pproc_exp s cG cP t0) :: tel , t
   | t -> [], pproc_exp s cG cP (ghost t)
 
 and pproc_app (s : sign) (cG : ctx) (cP : ctx) (e : E.exp) : A.exp * A.exp list =
