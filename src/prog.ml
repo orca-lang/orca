@@ -108,9 +108,9 @@ let tc_program (sign : signature) : program -> signature * I.program = function
   | Def (n, t, e) ->
      Debug.print_string ("Typechecking definition: " ^ n);
      let t', _ = infer_type (sign, []) t in
-     let tel, t' = match t' with
+     let tel, t'' = match t' with
        | I.Pi(tel, t') -> tel, t'
        | _ -> [], t'
      in
      let e' = check (sign, []) e t' in
-     (Definition (n, tel, t', e'))::sign, I.Def(n, t', e')
+     (Definition (n, tel, t'', e'))::sign, I.Def(n, t', e')
