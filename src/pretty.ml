@@ -307,7 +307,7 @@ let rec fmt_params (sign, cG) pps = function
 let fmt_program sign pps = function
   (* printing inductive types *)
   | Data (n, [], [], 0, ds) ->
-     Fmt.pf pps "%a %a %a@,%a@,"
+     Fmt.pf pps "%a %a %a@,%a"
             keyword "data"
             def n
             keyword "where"
@@ -315,7 +315,7 @@ let fmt_program sign pps = function
             ds
 
   | Data (n, [], [], u, ds) ->
-     Fmt.pf pps "%a %a : %a %a@,%a@,"
+     Fmt.pf pps "%a %a : %a %a@,%a"
             keyword "data"
             def n
             fmt_universe u
@@ -325,7 +325,7 @@ let fmt_program sign pps = function
 
   | Data (n, ps, is, u, ds) ->
      let cG = List.map (fun (_, n, _) -> n, dt) ps in
-     Fmt.pf pps "%a %a %a: %a %a@,%a@,"
+     Fmt.pf pps "%a %a %a: %a %a@,%a"
             keyword "data"
             def n
             (fmt_params (sign, [])) ps
