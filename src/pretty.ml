@@ -27,6 +27,10 @@ let comp_var cG pps n =
   match Name.beautify_name n cG with
   | None -> (styled comp_var_color Name.fmt_name) pps n
   | Some s -> (styled comp_var_color string) pps s
+(* let bound_var_name cG pps n = *)
+(*   match beautify_bound_name n cG with *)
+(*   | None -> (styled comp_var_color Name.fmt_name) pps n *)
+(*   | Some s -> (styled comp_var_color string) pps s *)
 let bound_var = styled bound_var_color Fmt.int
 let bound_name = styled `Bold (styled bound_var_color Name.fmt_name)
 let bound_string = styled `Bold (styled bound_var_color Fmt.string)
@@ -50,16 +54,19 @@ let rec fmt_tel_entry (sign, cG) pps = function
             (fmt_exp (sign, cG) BNil) t
 
 and fmt_tel (sign, cG) pps (tel, e) =
-  match tel with
-  | (Explicit, n, t) :: tel when Name.is_name_floating n ->
-     Fmt.pf pps "(%a) -> %a"
-            (fmt_exp (sign, cG) BNil) t
-            (fmt_tel (sign, (n, dt)::cG)) (tel, e)
-  | (_, n, _ as entry) :: tel ->
-     Fmt.pf pps "%a %a"
-            (fmt_tel_entry (sign, cG)) entry
-            (fmt_tel (sign, (n, dt)::cG)) (tel, e)
-  | [] -> fmt_exp (sign, cG) BNil pps  e
+  let rec fmt_tel' (sign, cG) floating pps (tel, e) =
+    match tel with
+    | (Explicit, n, t) :: tel when Name.is_name_floating n ->
+      Fmt.pf pps (if not floating then "-> %a -> %a" else "%a -> %a")
+        (fmt_exp (sign, cG) BNil) t
+        (fmt_tel' (sign, (n, dt)::cG) true) (tel, e)
+    | (_, n, _ as entry) :: tel ->
+      Fmt.pf pps (if floating then "%a %a" else "%a %a")
+        (fmt_tel_entry (sign, cG)) entry
+        (fmt_tel' (sign, (n, dt)::cG) false) (tel, e)
+    | [] -> fmt_exp (sign, cG) BNil pps e
+  in
+  fmt_tel' (sign, cG) false pps (tel, e)
 
 and fmt_stel_entry (sign, cG) cP pps = function
   | Explicit, n, t ->
@@ -146,7 +153,7 @@ and fmt_exp (sign, cG) cP pps = function
   | Lam (xs, e) ->
     let cP' = bctx_of_names xs cP in
      Fmt.pf pps "(\\%a. %a)"
-            (list bound_string) (beautify_bound_names xs cP)
+            (list bound_string) (beautify_bound_names xs cP')
             (fmt_exp (sign, cG) cP') e
 
   | Clos (e1, e2) ->
@@ -165,10 +172,15 @@ and fmt_exp (sign, cG) cP pps = function
   | Nil -> string pps "0"
 
   | Snoc (e1, n, e2) ->
-     let cP' = bctx_of_ctx_exp e1 in
+    let cP' = bctx_of_ctx_exp e1 in
+    if Name.is_name_floating n then
+      Fmt.pf pps "(%a, %a)"
+            (fmt_exp (sign, cG) BNil) e1
+            (fmt_exp (sign, cG) cP') e2
+    else
      Fmt.pf pps "(%a, %a: %a)"
             (fmt_exp (sign, cG) BNil) e1
-            bound_name n
+            bound_string (beautify_bound_name n cP')
             (fmt_exp (sign, cG) cP') e2
 
   | Dest n -> string pps n
@@ -202,12 +214,15 @@ let rec fmt_pat (sign, cG) cP pps = function
   (* syntax *)
 
   | PBVar i ->
-     Fmt.pf pps "i%a"
-            bound_var i
+    begin match beautify_idx i cP with
+    | None -> Fmt.pf pps "i%a"
+      bound_var i
+    | Some n -> bound_string pps n
+    end
   | PLam (xs, p) ->
      let cP' = bctx_of_names xs cP in
      Fmt.pf pps "(\\%a. %a)"
-            (list bound_name) xs
+            (list bound_string) (beautify_bound_names xs cP)
             (fmt_pat (sign, cG) cP') p
 
   | PClos (n, psub) ->
