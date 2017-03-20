@@ -26,8 +26,8 @@ let is_name_floating (_, _, x) = x
 
 let fmt_name pps (s, n, b) =
   if b
-  then Format.printf "_%s%d_" s n
-  else Format.printf "%s!%d" s n
+  then Format.fprintf pps "_%s%d_" s n
+  else Format.fprintf pps "%s!%d" s n
 
 let disable_beautify, do_beautify =
   let beau = ref true in

@@ -159,16 +159,20 @@ and whnf (sign : signature) (e : exp) : exp =
     | SPi (tel, SPi (tel', t)) -> whnf sign (SPi (tel @ tel', t))
 
     | Const n ->
+      Debug.print (fun () -> "Found constant : " ^ n);
        begin match lookup_sign_def n sign with
-       | D e -> whnf sign e
+       | D e -> Debug.print (fun () -> "Definition of " ^ n ^ " is " ^ print_exp e); whnf sign e
        | _ -> Const n
        end
     | App(h, sp) ->
+      Debug.print (fun () -> "Found application. Head is: " ^ print_exp h);
       begin match whnf sign h with
-      | Fn(xs, e) ->
+      | Fn(xs, e) as f ->
+        Debug.print (fun () -> "Head of application was a function " ^ print_exp f);
         let sigma = List.map2 (fun x e -> x, e) xs sp in
         whnf sign (simul_subst sigma e) (* Beta reduction *)
       | Const n ->
+        Debug.print (fun () -> "Head of application was a constant " ^ print_exp (Const n));
         begin match lookup_sign_def n sign with
         | D e -> whnf sign (App (e, sp))
         | P cls ->

@@ -73,15 +73,16 @@ let execute_code (sign : Sign.signature) (program : Syntax.Ext.program list) : S
 
 
     if not (get_parse_only ()) then begin
-           Debug.print_string "Starting typechecking." ;
-           let sign', int_rep = List.fold_left (fun (s, ps) p -> let s', p' = Prog.tc_program s p in s', p'::ps) (sign, []) apx_rep in
-           if ansi_on() then Fmt.set_style_renderer Fmt.stdout `Ansi_tty;
-           Pretty.fmt_programs sign Fmt.stdout int_rep;
+      Debug.print_string "Starting typechecking." ;
+      let sign', int_rep = List.fold_left (fun (s, ps) p -> let s', p' = Prog.tc_program s p in s', p'::ps) (sign, []) apx_rep in
+      let int_rep = List.rev int_rep in
+      if ansi_on() then Fmt.set_style_renderer Fmt.stdout `Ansi_tty;
+      Pretty.fmt_programs sign' Fmt.stdout int_rep;
 
-            Debug.print_string "The file was typechecked.";
-            print_string "File type-checked successfully.\n";
-            sign'
-      end
+      Debug.print_string "The file was typechecked.";
+      print_string "File type-checked successfully.\n";
+      sign'
+    end
     else
       sign
 

@@ -153,7 +153,7 @@ and check (sign , cG : signature * ctx) (e : A.exp) (t : I.exp) : I.exp =
                               ^ "\nwith renaming " ^ IP.print_subst sigma ^ ".");
        let e' = check (sign, cGext @ cG') e t' in
        Debug.deindent() ;
-       e'
+       I.Fn (fs, e')
 
     | _, I.Box (g, alpha) when is_syntax e ->
        let cP = contextify (sign, cG) g in

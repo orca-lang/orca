@@ -88,9 +88,11 @@ let tc_program (sign : signature) : program -> signature * I.program = function
 
   | Syn (n, tel, ds) ->
     Debug.print_string ("Typechecking syn declaration: " ^ n);
+    Debug.indent ();
     let tel' = check_syn_tel (sign, []) tel in
     let sign' = SynDef (n, tel') :: sign in
     let sign'', ds' = tc_syn_constructors (sign', []) tel' ds in
+    Debug.deindent ();
     sign'', I.Syn(n, tel', ds')
 
   | DefPM (n, tel, t, ds) ->
@@ -107,10 +109,12 @@ let tc_program (sign : signature) : program -> signature * I.program = function
 
   | Def (n, t, e) ->
      Debug.print_string ("Typechecking definition: " ^ n);
+     Debug.indent ();
      let t', _ = infer_type (sign, []) t in
      let tel, t'' = match t' with
        | I.Pi(tel, t') -> tel, t'
        | _ -> [], t'
      in
      let e' = check (sign, []) e t' in
+     Debug.deindent ();
      (Definition (n, tel, t'', e'))::sign, I.Def(n, t', e')
