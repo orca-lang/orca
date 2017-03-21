@@ -25,3 +25,7 @@ setup.log
 
 # merlin configuration as it is generated when running make
 *.merlin
+
+
+# emacs lock files
+\.#*
