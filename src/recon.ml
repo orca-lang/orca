@@ -386,6 +386,7 @@ and check_syn_spine (sign, cG) cP sp tel t =
     | e::sp', (_, x, s)::tel ->
       let e' = match Whnf.whnf sign s with
         | I.Box(g, s) ->
+           (* we forget about cP and go on with g... MMMM *)
            check_syn (sign, cG) (contextify (sign, cG) g) e s
         | s -> check_syn (sign, cG) cP e s
       in
