@@ -160,8 +160,6 @@ let rec pproc_exp (s : sign) (cG : ctx) (cP : bctx) (e : E.exp) : A.exp =
      A.Fn(n', pproc_exp s cG' cP e)
   | E.Lam (ns, e) ->
      A.Lam(ns, pproc_exp s cG (add_name_bvars cP ns) e)
-     (* let cP', ns' = add_names_ctx cP ns in *)
-     (* A.Lam(ns', pproc_exp s cG cP' e) *)
   | E.App (e1, e2) ->
      let h, sp = pproc_app s cG cP e in
      A.App(h, sp)
@@ -169,14 +167,20 @@ let rec pproc_exp (s : sign) (cG : ctx) (cP : bctx) (e : E.exp) : A.exp =
     let h, sp = pproc_app s cG cP e in
      A.AppL(h, sp)
   | E.Ident n -> find_name s cG cP (n, loc e)
-  | E.Clos (e, s) -> A.Clos(f e, f s)
+  | E.Clos (e, P(_, E.Shift 0)) -> A.Clos(f e, A.Shift 0)
+  | E.Clos (e1, e2) ->
+     let e1' = try
+         pproc_exp s cG [] e1
+       with Error.Error msg ->
+         raise (Error.Error ("While indexing on the left of " ^ EP.print_exp e
+                             ^ "\n Faild with: " ^  msg))
+     in
+     A.Clos(e1' , f e2)
   | E.EmptyS -> A.EmptyS
   | E.Shift n -> A.Shift n
   | E.Semicolon (e1, e2) -> A.Dot(f e1, f e2)
   | E.Comma (e1, e2) ->
     snd (pproc_comma s cG [] e)
-  (* | E.Comma (e1, P(_, E.Annot (P(_, E.Ident x), e2))) -> A.Snoc (f e1, x, f e2) *)
-  (* | E.Comma (e1, e2) -> A.Snoc (f e1, "_", f e2) *)
   | E.Nil -> A.Nil
   | E.Annot (e1, e2) -> A.Annot(f e1, f e2)
   | E.Hole (Some n) -> A.Hole (Name.gen_name n)
