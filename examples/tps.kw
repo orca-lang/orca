@@ -33,12 +33,7 @@ thm tps' : (g : ctx) -> (m n : (g |- tm)) -> (t : |- tp) -> (g |- oft m (t[^])) 
   (t-app (lam .m) .n (s[^]) .(t[^]) (t-lam .(s[^]) .(t[^]) .m (\x.(\u.d1))) d2) (s-app2 m .n) =>
   d1[.. ; n ; d2]
 
-(*) x:tm,u:oft n s
-
-(*) tm |- oft n s
-
 (*) Negative test case
-
 
 (*) def test1 : nat -> nat where
 (*) | (<: x) => x

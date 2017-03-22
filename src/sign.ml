@@ -200,7 +200,7 @@ let rec rename_ctx_using_subst (cG : ctx) (sigma : subst) =
 type bctx =
 | BNil
 | CtxVar of name
-| BSnoc of bctx * name * exp
+| BSnoc of bctx * string * exp
 
 let rec append_bctx cP cP' =
   match cP with
@@ -226,12 +226,12 @@ let lookup_bound x cP =
   in
   lookup x cP
 
-let rec bctx_of_lam_tel (f : name list) (tel : tel) =
-    match f, tel with
-    | [], tel' -> BNil, tel'
-    | f::fs, (_, _, t)::tel' ->
-      let cP, tel'' = bctx_of_lam_tel fs tel' in
-      BSnoc (cP, f, t), tel''
+let rec bctx_of_lam_stel (fs : string list) (tel : stel) (cP : bctx) : bctx * stel=
+    match fs, tel with
+    | [], tel' -> cP, tel'
+    | f::fs', (_, _, t)::tel' ->
+       let cP, tel'' = bctx_of_lam_stel fs' tel' cP in
+       BSnoc (cP , f, t), tel''
     | _, [] -> raise (Error.Error ("Too many variables declared in lambda"))
 
 let bctx_of_stel tel =
@@ -249,8 +249,8 @@ let print_bctx cP =
   let rec print = function
     | BNil -> ""
     | CtxVar x -> print_name x
-    | BSnoc(BNil, x, t) -> print_name x ^ ":" ^ print_exp t
-    | BSnoc(g, x, t) -> print g ^ ", " ^ print_name x ^ ":" ^ print_exp t
+    | BSnoc(BNil, x, t) -> x ^ ":" ^ print_exp t
+    | BSnoc(g, x, t) -> print g ^ ", " ^ x ^ ":" ^ print_exp t
   in
   "{" ^ print cP ^ "}"
 
@@ -264,11 +264,10 @@ let drop_suffix cP n =
     drop cP n
 
 let rec beautify_bound_name x cP =
-  let x = get_user_name x in
   let rec count = function
     | CtxVar _
       | BNil -> 0
-    | BSnoc (cP', x', _) when x = (get_user_name x') -> 1 + count cP'
+    | BSnoc (cP', x', _) when x = x' -> 1 + count cP'
     | BSnoc (cP', x', _) -> count cP'
   in
   let c = count cP in

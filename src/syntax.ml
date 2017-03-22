@@ -18,7 +18,7 @@ module Ext = struct
      | Arr of exp * exp
      | SArr of exp * exp
      | Box of exp * exp
-     | TBox of name list * exp
+     | ABox of name list * exp
      | Fn of name list * exp
      | Lam of name list * exp
      | App of exp * exp
@@ -37,7 +37,7 @@ module Ext = struct
   type pat =
     | PIdent of name
     | Innac of exp
-    | PLam of name list * pat
+    | PLam of string list * pat
     | PPar of name
     | PConst of name * pat list
     | PClos of name * exp
@@ -71,28 +71,26 @@ module Apx = struct
   type index = int
   type universe = int
 
-
   type exp
     = Set of universe
     | Star (* Universe of syntax *)
     | Pi of tel * exp  (* A pi type *)
-    | SPi of tel * exp (* A syntactic type *)
+    | SPi of stel * exp (* A syntactic type *)
     | Box of exp * exp
     | Ctx (* of exp *) (* Let's think about it *)
     | Const of def_name (* The name of a constant *)
     | Dest of def_name
     | Var of name
-    | TBox of name list * exp
     | Fn of name list * exp
     | App of exp * exp list
-    | Lam of name list * exp
+    | Lam of string list * exp
     | AppL of exp * exp list
-    | BVar of name
+    | BVar of index
     | Clos of exp * exp
     | EmptyS
     | Shift of int
     | Dot of exp * exp
-    | Snoc of exp * name * exp
+    | Snoc of exp * string * exp
     | Nil
     | Annot of exp * exp
     | Hole of name
@@ -100,18 +98,21 @@ module Apx = struct
    and tel_entry = icit * name * exp
    and tel = tel_entry list
 
+   and stel_entry = icit * string * exp
+   and stel = stel_entry list
+
   type pat =
     | PVar of name
     | PBVar of index
     | Innac of exp
-    | PLam of name list * pat
+    | PLam of string list * pat
     | PConst of def_name * pat list
     | PClos of name * pat_subst
     | PEmptyS
     | PShift of int
     | PDot of pat * pat
     | PNil
-    | PSnoc of pat * name * pat
+    | PSnoc of pat * string * pat
     | PPar of name
     | PUnder
     | PWildcard
@@ -119,7 +120,8 @@ module Apx = struct
   type pats = pat list
   (* name of the constructed type, the type parameters, and the indices *)
   type dsig = def_name * exp list
-  type decls = (def_name * tel * dsig) list
+  type decl = (def_name * tel * dsig)
+  type decls = decl list
   type codecls = (def_name * tel * dsig * exp) list
   type rhs
     = Just of exp
@@ -145,7 +147,7 @@ module Int = struct
     = Set of universe
     | Star (* Universe of syntax *)
     | Pi of tel * exp  (* A pi type *)
-    | SPi of tel * exp (* A syntactic type *)
+    | SPi of stel * exp (* A syntactic type *)
     | Box of exp * exp
     | Ctx (* of exp *) (* Let's think about it *)
     | Const of def_name (* The name of a constant *)
@@ -153,7 +155,7 @@ module Int = struct
     | Var of name
     | Fn of name list * exp
     | App of exp * exp list
-    | Lam of name list * exp
+    | Lam of string list * exp
     | AppL of exp * exp list
     | BVar of index
     | Clos of exp * exp
@@ -162,7 +164,7 @@ module Int = struct
     | Dot of exp * exp
     | Comp of exp * exp
     | ShiftS of exp (* consider shifting by more than one, to improve efficiency *)
-    | Snoc of exp * name * exp
+    | Snoc of exp * string * exp
     | Nil
     | Annot of exp * exp
     | Hole of name
@@ -170,18 +172,21 @@ module Int = struct
    and tel_entry = icit * name * exp
    and tel = tel_entry list
 
+   and stel_entry = icit * string * exp
+   and stel = stel_entry list
+
   type pat =
     | PVar of name
     | PBVar of index
     | Innac of exp
-    | PLam of name list * pat
+    | PLam of string list * pat
     | PConst of def_name * pat list
     | PClos of name * pat_subst
     | PEmptyS
     | PShift of int
     | PDot of pat * pat
     | PNil
-    | PSnoc of pat * name * pat
+    | PSnoc of pat * string * pat
     | PPar of name
     | PUnder
     | PWildcard

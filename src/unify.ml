@@ -150,7 +150,7 @@ let rec unify_flex (sign, cG) flex e1 e2 =
        let cD', sigma'' = (unify_flex_pi (sign, (n2, e2) :: cD) flex tel1' t1 tel2' t2) in
        cD', sigma @ sigma''
 
-   and unify_flex_spi (sign, cG as ctxs: signature * ctx) (flex : name list) (tel1 : tel) (t1 : exp) (tel2 : tel) (t2 : exp) =
+   and unify_flex_spi (sign, cG as ctxs: signature * ctx) (flex : name list) (tel1 : stel) (t1 : exp) (tel2 : stel) (t2 : exp) =
     let simul_subst_in_tel sigma tel =
       List.map (fun (i, n, e) -> i, n, simul_subst sigma e) tel
     in

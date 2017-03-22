@@ -19,7 +19,7 @@ module Ext = struct
     | Arr (t, e) -> "(" ^ print_exp t ^ " -> " ^ print_exp e ^ ")"
     | SArr (t, e) -> "(" ^ print_exp t ^ " ->> " ^ print_exp e ^ ")"
     | Box (ctx, e) -> "(" ^ print_exp ctx ^ " |- " ^ print_exp e ^ ")"
-    | TBox (ns, e) -> "(" ^ String.concat " " ns ^ " :> " ^ print_exp e ^ ")"
+    | ABox (ns, e) -> "(" ^ String.concat " " ns ^ " :> " ^ print_exp e ^ ")"
     | Fn (fs, e) ->
        "(fn " ^ (String.concat " " fs) ^ " " ^ print_exp e ^ ")"
     | Lam (f, e) -> "(\ " ^ String.concat " " f ^ " " ^ print_exp e ^ ")"
@@ -87,19 +87,18 @@ module Apx = struct
     | SPi (tel, t) -> print_spi tel t
     | Box (ctx, e) -> "(" ^ print_exp ctx ^ " |- " ^ print_exp e ^ ")"
     | Fn (fs, e) -> "(fn " ^ (String.concat " " (List.map print_name fs)) ^ " " ^ print_exp e ^ ")"
-    | Lam (fs, e) -> "(\\ " ^ String.concat " " (List.map print_name fs) ^ " " ^ print_exp e ^ ")"
+    | Lam (fs, e) -> "(\\ " ^ String.concat " " fs ^ " " ^ print_exp e ^ ")"
     | App (e, es) -> "(" ^ print_exp e ^ " " ^ String.concat " " (List.map print_exp es) ^ ")"
     | AppL (e1, es) -> "(" ^ print_exp e1 ^ " ' " ^ String.concat " ' " (List.map print_exp es) ^ ")"
     | Const n -> n
     | Dest n -> n
-    | TBox (ns, e) -> "(" ^ print_names_no_comma ns ^ " :> " ^ print_exp e ^ ")"
     | Var n -> Name.print_name n
-    | BVar n -> "i>" ^ print_name n
+    | BVar i -> "i" ^ string_of_int i
     | Clos (e1, e2) -> "(" ^ print_exp e1 ^ " [" ^ print_exp e2 ^ "])"
     | EmptyS -> "^"
     | Shift n -> "^" ^ string_of_int n
     | Dot (e1, e2) -> "(" ^ print_exp e1 ^ " ; " ^ print_exp e2 ^ ")"
-    | Snoc (e1, x, e2) -> "(" ^ print_exp e1 ^ ", " ^ print_name x ^ " : " ^ print_exp e2 ^ ")"
+    | Snoc (e1, x, e2) -> "(" ^ print_exp e1 ^ ", " ^ x ^ " : " ^ print_exp e2 ^ ")"
     | Nil -> "0"
     | Annot (e1, e2) -> "(" ^ print_exp e1 ^ " : " ^ print_exp e2 ^ ")"
     | Hole s -> "?" ^ print_name s
@@ -110,7 +109,7 @@ module Apx = struct
     | (_, x, e) :: tel -> "(" ^ print_name x ^ " : " ^ print_exp e ^ ") -> " ^ print_pi tel t ^ ")"
   and print_spi tel t = match tel with
     | [] -> print_exp t
-    | (_, x, e) :: tel -> "(" ^ print_name x ^ " : " ^ print_exp e ^ ")->> " ^ print_spi tel t ^ ")"
+    | (_, x, e) :: tel -> "(" ^ x ^ " : " ^ print_exp e ^ ")->> " ^ print_spi tel t ^ ")"
 
   let print_exps es = "(" ^ String.concat ", " (List.map print_exp es) ^ ")"
 
@@ -119,20 +118,25 @@ module Apx = struct
     | PPar n -> "(<: " ^ print_name n ^ ")"
     | PBVar n -> "i" ^ string_of_int n
     | Innac e -> "." ^ print_exp e
-    | PLam (fs, p) -> "(\ " ^ print_names fs ^ " " ^ print_pat p ^ ")"
+    | PLam (fs, p) -> "(\ " ^ String.concat " " fs ^ " " ^ print_pat p ^ ")"
     | PConst (n, ps) -> "(" ^ n ^ " " ^ (String.concat " " (List.map (fun p -> "(" ^ print_pat p ^ ")") ps)) ^ ")"
     | PClos (n, s) -> print_name n ^ "[" ^ print_pat_subst s ^ "]"
     | PEmptyS -> "^"
     | PShift i -> "^ " ^ string_of_int i
     | PDot (p1, p2) -> "(" ^ print_pat p1 ^ " ; " ^ print_pat p2 ^ ")"
     | PNil -> "0"
-    | PSnoc (p1, x, p2) -> "(" ^ print_pat p1 ^ " , " ^ print_name x ^ ":" ^ print_pat p1 ^ ")"
+    | PSnoc (p1, x, p2) -> "(" ^ print_pat p1 ^ " , " ^ x ^ ":" ^ print_pat p1 ^ ")"
     | PUnder -> "_"
     | PWildcard -> "._"
 
   let print_tel (tel : tel) : string =
     String.concat ", " (List.map (fun (_, x, e) -> "(" ^ print_name x
                                                    ^ ", " ^ print_exp e ^ ")") tel)
+
+  (* TODO use this in print_spi *)
+  let print_stel (tel : stel) : string =
+    String.concat ", " (List.map (fun (_, x, e) -> "(" ^ x ^ ", " ^ print_exp e ^ ")") tel)
+
 
   let print_dsig ((d, es) : dsig) = "(" ^ d ^ " " ^ String.concat " " (List.map print_exp es) ^ ")"
 
@@ -191,7 +195,7 @@ module Int = struct
     | SPi (tel, t) -> print_spi tel t
     | Box (ctx, e) -> "(" ^ print_exp ctx ^ " |- " ^ print_exp e ^ ")"
     | Fn (fs, e) -> "(fn " ^ (String.concat " " (List.map print_name fs)) ^ " " ^ print_exp e ^ ")"
-    | Lam (f, e) -> "(\\ " ^ print_names_no_comma f ^ " " ^ print_exp e ^ ")"
+    | Lam (fs, e) -> "(\\ " ^ String.concat " " fs ^ " " ^ print_exp e ^ ")"
     | App (e, es) -> "(" ^ print_exp e ^ " " ^ String.concat " " (List.map print_exp es) ^ ")"
     | AppL (e1, es) -> "(" ^ print_exp e1 ^ " ' " ^ String.concat " ' " (List.map print_exp es) ^ ")"
     | Const n -> n
@@ -204,7 +208,7 @@ module Int = struct
     | ShiftS e -> "(^^ " ^ print_exp e ^ ")"
     | Comp (e1, e2) -> "(" ^ print_exp e1 ^ " o " ^ print_exp e2 ^ ")"
     | Dot (e1, e2) -> "(" ^ print_exp e1 ^ " ; " ^ print_exp e2 ^ ")"
-    | Snoc (e1, x, e2) -> "(" ^ print_exp e1 ^ ", " ^ print_name x ^ " : " ^ print_exp e2 ^ ")"
+    | Snoc (e1, x, e2) -> "(" ^ print_exp e1 ^ ", " ^ x ^ " : " ^ print_exp e2 ^ ")"
     | Nil -> "0"
     | Annot (e1, e2) -> "(" ^ print_exp e1 ^ " : " ^ print_exp e2 ^ ")"
     | Hole s -> "?" ^ print_name s
@@ -215,7 +219,7 @@ module Int = struct
     | (_, x, e) :: tel -> "(" ^ print_name x ^ " : " ^ print_exp e ^ ") -> " ^ print_pi tel t ^ ")"
   and print_spi tel t = match tel with
     | [] -> print_exp t
-    | (_, x, e) :: tel -> "(" ^ print_name x ^ " : " ^ print_exp e ^ ")->> " ^ print_spi tel t ^ ")"
+    | (_, x, e) :: tel -> "(" ^ x ^ " : " ^ print_exp e ^ ")->> " ^ print_spi tel t ^ ")"
 
   let print_exps es = "(" ^ String.concat ", " (List.map print_exp es) ^ ")"
 
@@ -224,20 +228,24 @@ module Int = struct
     | PPar n -> "(<: " ^ print_name n ^ ")"
     | PBVar i -> "i" ^ string_of_int i
     | Innac e -> "." ^ print_exp e
-    | PLam (f, p) -> "(\ " ^ print_names_no_comma f ^ " " ^ print_pat p ^ ")"
+    | PLam (fs, p) -> "(\ " ^ String.concat " " fs ^ " " ^ print_pat p ^ ")"
     | PConst (n, ps) -> "(" ^ n ^ " " ^ (String.concat " " (List.map (fun p -> "(" ^ print_pat p ^ ")") ps)) ^ ")"
     | PClos (n, s) -> print_name n ^ "[" ^ print_pat_subst s ^ "]"
     | PEmptyS -> "^"
     | PShift i -> "^ " ^ string_of_int i
     | PDot (p1, p2) -> "(" ^ print_pat p1 ^ " ; " ^ print_pat p2 ^ ")"
     | PNil -> "0"
-    | PSnoc (p1, x, p2) -> "(" ^ print_pat p1 ^ " , " ^ print_name x ^ ":" ^ print_pat p1 ^ ")"
+    | PSnoc (p1, x, p2) -> "(" ^ print_pat p1 ^ " , " ^ x ^ ":" ^ print_pat p1 ^ ")"
     | PUnder -> "_"
     | PWildcard -> "._"
 
   let print_tel (tel : tel) : string =
     String.concat ", " (List.map (fun (_, x, e) -> "(" ^ print_name x
                                                    ^ ", " ^ print_exp e ^ ")") tel)
+
+  let print_stel (tel : stel) : string =
+    String.concat ", " (List.map (fun (_, x, e) -> "(" ^ x ^ ", " ^ print_exp e ^ ")") tel)
+
 
   let print_dsig ((d, es) : dsig) = "(" ^ d ^ " " ^ String.concat " " (List.map print_exp es) ^ ")"
 

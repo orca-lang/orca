@@ -13,14 +13,14 @@ type pat =
   | PBVar of int
   | UInac of A.exp              (* those are user written inacessible patterns *)
   | IInac of I.exp              (* those are inferred inacessible patterns from index unification *)
-  | PLam of name list * pat
+  | PLam of string list * pat
   | PConst of def_name * pat list
   | PClos of name * pat_subst
   | PEmptyS
   | PShift of int
   | PDot of pat * pat
   | PNil
-  | PSnoc of pat * name * pat
+  | PSnoc of pat * string * pat
   | PPar of name
   | PUnder
   | PWildcard
@@ -33,14 +33,14 @@ let rec print_pat (p : pat) : string = match p with
   | PBVar i -> "i" ^ string_of_int i
   | UInac e -> "." ^ AP.print_exp e
   | IInac e -> "+" ^ IP.print_exp e
-  | PLam (f, p) -> "(\ " ^ print_names_no_comma f ^ " " ^ print_pat p ^ ")"
+  | PLam (fs, p) -> "(\ " ^ String.concat " "  fs ^ " " ^ print_pat p ^ ")"
   | PConst (n, ps) -> "(" ^ n ^ " " ^ print_pats ps ^ ")"
   | PClos (n, s) -> print_name n ^ "[" ^ print_pat_subst s ^ "]"
   | PEmptyS -> "^"
   | PShift i -> "^ " ^ string_of_int i
   | PDot (p1, p2) -> "(" ^ print_pat p1 ^ " ; " ^ print_pat p2 ^ ")"
   | PNil -> "0"
-  | PSnoc (p1, x, p2) -> "(" ^ print_pat p1 ^ " , " ^ print_name x ^ ":" ^ print_pat p1 ^ ")"
+  | PSnoc (p1, x, p2) -> "(" ^ print_pat p1 ^ " , " ^ x ^ ":" ^ print_pat p1 ^ ")"
   | PUnder -> "_"
   | PWildcard -> "._"
 and print_pats ps = String.concat " " (List.map (fun p -> "(" ^ print_pat p ^ ")") ps)
@@ -56,7 +56,7 @@ let rec exp_of_pat : pat -> I.exp = function
   | PBVar i -> I.BVar i
   | IInac e -> e
   | UInac e -> raise (Error.Violation "We hope to never see you again (this message, not the user)")
-  | PLam (f, p) -> I.Lam (f, exp_of_pat p)
+  | PLam (fs, p) -> I.Lam (fs, exp_of_pat p)
   | PConst (n, ps) -> I.App (I.Const n, List.map exp_of_pat ps)
   | PClos (n, s) -> I.Clos (I.Var n, exp_of_pat_subst s)
   | PEmptyS -> I.EmptyS

@@ -132,7 +132,7 @@ let rec theta_of_lam' g xs tel =
      I.Snoc(g', x, t), (i, y, t)::tel0, tel''
   | _ -> raise (Error.Error ("Something went wrong as always"))
 
-let split_lam (sign : signature) (p1 : pats) (xs, p : name list * pat) (cD1 : ctx)
+let split_lam (sign : signature) (p1 : pats) (xs, p : string list * pat) (cD1 : ctx)
               (x, t : name * I.exp) (cD2 : ctx) : ctx * ctx_map =
   Debug.indent ();
   let g, tel, t = match Whnf.whnf sign t with
@@ -140,7 +140,7 @@ let split_lam (sign : signature) (p1 : pats) (xs, p : name list * pat) (cD1 : ct
     | t -> raise (Error.Error ("Syntactic abstraction was define in a pattern against"
         ^ " type which was not syntactic function type in a box. Found " ^ IP.print_exp t))
   in
-  Debug.print (fun () -> "Split SPi(" ^ IP.print_tel tel ^ ", " ^ IP.print_exp t ^ ")");
+  Debug.print (fun () -> "Split SPi(" ^ IP.print_stel tel ^ ", " ^ IP.print_exp t ^ ")");
   let g', tel0, tel' = theta_of_lam' g xs tel in
   let vs = [I.Box(g, I.SPi (tel, t))] in
   let thetatel = [Syntax.Explicit, gen_floating_name (),
@@ -215,7 +215,7 @@ let split_clos (sign : signature) (p1 : pats) (n, s : name * pat_subst) (cD1 : c
       | _, CEmpty -> I.Nil
       | _, CDot(s, y) ->
         let cP = contextify (sign, cD1 @ cD2) g in
-        I.Snoc(get_domain g s, Name.gen_floating_name(), lookup_bound y cP)
+        I.Snoc(get_domain g s, "_", lookup_bound y cP)
       | _, CShift 0 -> g
       | I.Snoc(g, _, _), CShift m -> get_domain g (CShift (m-1))
       | _, CShift m -> raise (Error.Error ("When checking pattern " ^ print_name n ^ "[" ^ print_pat_subst s

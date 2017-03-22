@@ -44,7 +44,7 @@ and fv_pi cG (tel : tel) (t : exp) = match tel with
   | [] -> fv cG t
   | (_, n, e)::tel -> fv cG e @ (fv_pi cG tel t -- n)
 
-and fv_spi cG (tel : tel) (t : exp) = match tel with
+and fv_spi cG (tel : stel) (t : exp) = match tel with
   | [] -> fv cG t
   | (_, n, e)::tel -> fv cG e @ (fv_spi cG tel t)
 
@@ -115,7 +115,7 @@ let refresh (e : exp) : exp =
        let tel', t' = refresh_tel ((n, n')::rep) tel t in
        ((i, n', refresh rep e)::tel'), t'
 
-  and refresh_stel (rep : (name * name) list) (tel : tel) (t : exp) : tel * exp =
+  and refresh_stel (rep : (name * name) list) (tel : stel) (t : exp) : stel * exp =
     match tel with
     | [] -> [], refresh rep t
     | (i, n, e) :: tel ->
@@ -265,7 +265,7 @@ let rec exp_of_pat : pat -> exp = function
   | PPar n -> Var n           (* MMMMM *)
   | PBVar i -> BVar i
   | Innac e -> e
-  | PLam (f, p) -> Lam (f, exp_of_pat p)
+  | PLam (fs, p) -> Lam (fs, exp_of_pat p)
   | PConst (n, ps) -> App (Const n, List.map exp_of_pat ps)
   | PClos (n, s) -> Clos (Var n, exp_of_pat_subst s)
   | PEmptyS -> EmptyS

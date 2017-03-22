@@ -50,7 +50,3 @@ let rec beautify_name (s, _, _ as n) cG =
      else
        Some (s ^ "_" ^ string_of_int c)
   | (n', _)::cG -> beautify_name n cG
-
-
-(* THIS FUNCTION NEEDS TO BE ELIMINATED *)
-let get_user_name (n, _, _) = n

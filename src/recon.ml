@@ -20,7 +20,6 @@ let is_syntax = function
   | A.Shift _
   | A.Dot _
   | A.Snoc _
-  | A.TBox _
   | A.Nil -> true
   | _ -> false
 
@@ -234,14 +233,14 @@ and check_syn_type (sign, cG) cP (e : A.exp) : I.exp =
     match e with
     | A.Star -> I.Star
     | A.SPi (tel, e') ->
-      let rec check_tel_type cP = function
+      let rec check_stel_type cP = function
         | [] -> [], cP
         | (i, x, s) :: tel ->
            let s' = check_syn_type (sign, cG) cP s in
-           let tel', cP' = check_tel_type (BSnoc (cP, x, s')) tel in
+           let tel', cP' = check_stel_type (BSnoc (cP, x, s')) tel in
           (i, x, s') :: tel', cP'
       in
-      let tel', cP' = check_tel_type cP tel in
+      let tel', cP' = check_stel_type cP tel in
       I.SPi (tel', check_syn_type (sign, cG) cP' e')
     | A.Pi (tel, e') ->
       let rec check_tel_type cG = function
@@ -287,10 +286,11 @@ and check_syn (sign, cG) cP (e : A.exp) (t : I.exp) =
   let res =
     match e, Whnf.whnf sign t with
     | A.Lam (f, e), I.SPi (tel, t) ->
-      let cP', tel' = bctx_of_lam_tel f tel in
+       let cP', tel' = bctx_of_lam_stel f tel cP in
+       (* let cP'' = append_bctx cP' cP in *)
       begin match tel' with
-      | [] -> I.Lam (f, check_syn (sign, cG) (append_bctx cP' cP) e t)
-      | _ -> I.Lam (f, check_syn (sign, cG) (append_bctx cP' cP) e (I.SPi (tel', t)))
+      | [] -> I.Lam (f, check_syn (sign, cG) cP' e t)
+      | _ -> I.Lam (f, check_syn (sign, cG) cP' e (I.SPi (tel', t)))
       end
     | _, I.Ctx -> check_ctx (sign, cG) e
     | A.EmptyS, I.Nil -> I.EmptyS
@@ -306,14 +306,6 @@ and check_syn (sign, cG) cP (e : A.exp) (t : I.exp) =
     | A.Dot (s, e), I.Snoc (g, _, t) ->
       let s' = check_syn (sign, cG) cP s g in
       I.Dot (s', check_syn (sign, cG) cP e (I.Clos(t, s')))
-    | A.TBox (xs, e), t ->
-       let rec f cP' ys = match ys, cP' with
-         | [], _ -> A.Shift 0
-         | y::ys'', BSnoc(cP'', z, e) -> A.Dot(f cP'' ys'', A.BVar z)
-         | _ -> raise (Error.Error (":> asserted that the tail of the context was " ^ print_names xs
-                                    ^ " instead context was " ^ print_bctx cP))
-       in
-       check_syn (sign, cG) cP (A.Clos (e, f cP xs)) t
     | e, t when is_syntax e ->
       Debug.print(fun ()-> "Expression " ^ AP.print_exp e ^ " is syntactic and thus being inferred");
       let e', t' = match infer_syn (sign, cG) cP e with
@@ -365,11 +357,11 @@ and infer_syn (sign, cG) cP (e : A.exp) =
       Debug.print (fun () -> "Variable " ^ print_name x ^ " is being looked up in context " ^ print_ctx cG);
       check_box (sign, cG) cP (I.Var x) (lookup x cG)
     | A.Const n -> check_box (sign, cG) cP (I.Const n) (lookup_sign sign n)
-    | A.BVar x ->
-      let i, t = lookup_bound_name x cP in
-      Debug.print (fun () -> "Looking bound variable " ^ string_of_int i ^ " resulted in type " ^ IP.print_exp t
-        ^ "\n Context is " ^ print_bctx cP);
-      I.BVar i, t
+    | A.BVar i ->
+       let t = lookup_bound i cP in
+       Debug.print (fun () -> "Looking bound variable " ^ string_of_int i ^ " resulted in type " ^ IP.print_exp t
+                              ^ "\n Context is " ^ print_bctx cP);
+       I.BVar i, t
     | A.Clos (e, s) ->
       begin
         let e', t = try infer (sign, cG) e
@@ -432,7 +424,7 @@ and check_spi_spine (sign, cG) cP sp tel t =
     end
   | [], _ -> [], I.SPi (tel, t)
 
-and check_spi (sign, cG) cP tel t =
+and check_spi (sign, cG) cP (tel : A.stel) t =
   match tel with
   | [] -> [], check_syn_type (sign, cG) cP t
   | (i, x, s)::tel' ->
