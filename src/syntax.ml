@@ -18,7 +18,7 @@ module Ext = struct
      | Arr of exp * exp
      | SArr of exp * exp
      | Box of exp * exp
-     | ABox of name list * exp
+     | ABox of exp * exp
      | Fn of name list * exp
      | Lam of name list * exp
      | App of exp * exp

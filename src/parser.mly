@@ -74,6 +74,7 @@ exp:
 | e = almost_simple_exp {e}
 
 raw_exp:
+| g =  exp TTS e = exp {ABox (g, e)}
 | g = exp TURNSTILE e = exp {Box (g, e)}
 | TURNSTILE e = exp {Box (Location.ghost Nil, e)}
 | e1 = exp e2 = almost_simple_exp {App (e1, e2)}
@@ -85,6 +86,7 @@ raw_exp:
 | s = exp SARR t = exp {SArr (s, t)}
 | s = exp COMMA e = exp {Comma (s, e)}
 | s = exp SEMICOLON e = exp {Semicolon (s, e)}
+
 
 almost_simple_exp:
 | e = simple_exp {e}
@@ -107,7 +109,7 @@ raw_simple_exp:
 | n = INDEX {BVar n}
 | NIL {Nil}
 | CTX {Ctx}
-(* | LPAREN g = IDENT+ TTS e = exp RPAREN {TBox (g, e)} *)
+
 
 
 simple_pattern:

@@ -121,9 +121,8 @@ let rec get_bound_var_ctx_in_pat (p : E.pat) : bctx =
   match p with
   | E.PComma (g, E.PIdent n) -> n :: (get_bound_var_ctx_in_pat g)
   | E.PNil -> []
-  | E.PIdent _ -> []
+  | E.PIdent _ -> []            (* MMMM *)
   | p -> raise (Error.Error (EP.print_pat p ^ " is a forbidden pattern on the left hand side of :>"))
-
 
 let rec pproc_exp (s : sign) (cG : ctx) (cP : bctx) (e : E.exp) : A.exp =
   Debug.print (fun () -> "Preprocessing expression " ^ EP.print_exp e);
@@ -151,7 +150,8 @@ let rec pproc_exp (s : sign) (cG : ctx) (cP : bctx) (e : E.exp) : A.exp =
       raise (Error.Error_loc (loc e, "Bound variables bindings (|-) cannot be nested"))
   | E.ABox (g, e) ->
      if cP = [] then
-      pproc_exp s cG g e
+       let cP' = get_bound_var_ctx g in
+       pproc_exp s cG cP' e
     else
       raise (Error.Error_loc (loc e, "Bound variables bindings (:>) cannot be nested"))
 

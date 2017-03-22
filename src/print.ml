@@ -19,7 +19,7 @@ module Ext = struct
     | Arr (t, e) -> "(" ^ print_exp t ^ " -> " ^ print_exp e ^ ")"
     | SArr (t, e) -> "(" ^ print_exp t ^ " ->> " ^ print_exp e ^ ")"
     | Box (ctx, e) -> "(" ^ print_exp ctx ^ " |- " ^ print_exp e ^ ")"
-    | ABox (ns, e) -> "(" ^ String.concat " " ns ^ " :> " ^ print_exp e ^ ")"
+    | ABox (e1, e2) -> "(" ^ print_exp e1 ^ " :> " ^ print_exp e2 ^ ")"
     | Fn (fs, e) ->
        "(fn " ^ (String.concat " " fs) ^ " " ^ print_exp e ^ ")"
     | Lam (f, e) -> "(\ " ^ String.concat " " f ^ " " ^ print_exp e ^ ")"
