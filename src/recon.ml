@@ -1,6 +1,7 @@
 open Meta
 open Sign
 open Name
+open TCTools
 
 module A = Syntax.Apx
 module AP = Print.Apx
@@ -23,40 +24,6 @@ let is_syntax = function
   | A.Nil -> true
   | _ -> false
 
-let lookup x cG =
-  begin
-    try List.assoc x cG
-    with Not_found ->
-      raise (Error.Violation
-               ("Unbound var after preprocessing, this cannot happen. (Var: " ^ print_name x ^ ")"))
-  end
-
-let is_ctx (sign, cG) = function
-  | I.Nil
-  | I.Snoc _ -> true
-  | I.Var g when lookup g cG = I.Ctx -> true
-  | _ -> false
-
-let rec contextify (sign, cG) (g : I.exp) =
-  match Whnf.whnf sign g with
-  | I.Nil -> BNil
-  | I.Var x ->
-    begin match lookup x cG with
-    | I.Ctx -> CtxVar x
-    | _ -> raise (Error.Violation ("Tried to contextify non context variable " ^ print_name x))
-    end
-  | I.Snoc (g', x, e) ->
-    let cP = contextify (sign, cG) g' in
-    (* is_syn_type (sign, cG) cP e; *)
-    BSnoc (cP, x, e)
-  | _ -> raise (Error.Error ("Expected context, obtained " ^ IP.print_exp g))
-
-let rec decontextify cP =
-  match cP with
-  | BNil -> I.Nil
-  | CtxVar x -> I.Var x
-  | BSnoc (cP', x, e) -> I.Snoc (decontextify cP', x, e)
-
 let unify_ctx (sign, cG) e g cP =
   let g' = decontextify cP in
   Debug.print(fun () -> "Unifying contexts.\ng  = " ^ IP.print_exp g ^ "\ng' = " ^ IP.print_exp g' ^ "\n with ctx " ^ print_ctx cG);
@@ -70,7 +37,6 @@ let unify_ctx (sign, cG) e g cP =
                             ^ " but it was expected to be in bound context " ^ IP.print_exp g'))
   in
   cD, sigma
-
 
 let check_box (sign, cG) cP e = function
   | I.Box (g, t) ->
@@ -89,13 +55,12 @@ let rec infer (sign, cG : signature * ctx) (e : A.exp) : I.exp * I.exp =
        check (sign, cG) e t', t'
     | A.Const n ->
        I.Const n, lookup_sign sign n
-    | A.Var n -> I.Var n, lookup n cG
+    | A.Var n -> I.Var n, lookup_ctx_fail cG n
     | A.App (h, sp) ->
       begin match infer (sign, cG) h with
        | h', I.Pi (tel, t) ->
           let sp', t' = check_spine (sign, cG) sp tel t in
           I.App (h', sp'), t'
-
 
        | _, (I.SPi _ as t) ->
          raise (Error.Error ("The left hand side (" ^ AP.print_exp h ^ ") was expected to be of extensional "
@@ -271,7 +236,7 @@ and check_ctx (sign, cG) g =
     I.Snoc (g', x, check_syn_type (sign, cG) cP' e)
   | A.Nil -> I.Nil
   | A.Var x ->
-    begin match lookup x cG with
+    begin match lookup_ctx_fail cG x with
     | I.Ctx -> I.Var x
     | _ -> raise (Error.Error ("Variable " ^ print_name x ^ " was expected to be a context variable."))
     end
@@ -355,7 +320,7 @@ and infer_syn (sign, cG) cP (e : A.exp) =
       end
     | A.Var x ->
       Debug.print (fun () -> "Variable " ^ print_name x ^ " is being looked up in context " ^ print_ctx cG);
-      check_box (sign, cG) cP (I.Var x) (lookup x cG)
+      check_box (sign, cG) cP (I.Var x) (lookup_ctx_fail cG x)
     | A.Const n -> check_box (sign, cG) cP (I.Const n) (lookup_sign sign n)
     | A.BVar i ->
        let t = lookup_bound i cP in

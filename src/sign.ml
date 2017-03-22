@@ -189,6 +189,12 @@ let lookup_ctx cG n =
   with
     Not_found -> None
 
+let lookup_ctx_fail cG n =
+  match lookup_ctx cG n with
+  | None -> raise (Error.Violation
+                     ("Unbound var after preprocessing, this cannot happen. (Var: " ^ print_name n ^ ")"))
+  | Some n -> n
+
 let rec rename_ctx_using_subst (cG : ctx) (sigma : subst) =
   match cG with
   | [] -> []
