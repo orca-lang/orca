@@ -26,6 +26,7 @@ module Ext = struct
     | App (e1, e2) -> "(" ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
     | AppL (e1, e2) -> "(' " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
     | Ident n -> n
+    | BVar i -> "i" ^ string_of_int i
     | Clos (e1, e2) -> "([] " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
     | EmptyS -> "^"
     | Shift n -> "^" ^ string_of_int n

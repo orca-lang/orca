@@ -167,6 +167,7 @@ let rec pproc_exp (s : sign) (cG : ctx) (cP : bctx) (e : E.exp) : A.exp =
     let h, sp = pproc_app s cG cP e in
      A.AppL(h, sp)
   | E.Ident n -> find_name s cG cP (n, loc e)
+  | E.BVar i -> A.BVar i
   | E.Clos (e, P(_, E.Shift 0)) -> A.Clos(f e, A.Shift 0)
   | E.Clos (e1, e2) ->
      let e1' = try

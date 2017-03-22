@@ -14,6 +14,7 @@ open Syntax.Ext
 %token <string option>HOLE
 %token EOF
 %token COMMA EMPTYS DOT NIL
+%token <int>INDEX
 %token <int>SHIFT
 
 %nonassoc TURNSTILE TTS
@@ -23,7 +24,7 @@ open Syntax.Ext
 %right ARR SARR
 %left APPL
 
-%nonassoc STAR SHIFT SET EMPTYS IDENT NIL HOLE CTX
+%nonassoc STAR SHIFT SET EMPTYS IDENT NIL HOLE CTX INDEX
 %right LPAREN
 
 %start <Syntax.Ext.program list>program
@@ -103,6 +104,7 @@ raw_simple_exp:
 | s = IDENT {Ident s}
 | EMPTYS {EmptyS}
 | n = SHIFT {Shift n}
+| n = INDEX {BVar n}
 | NIL {Nil}
 | CTX {Ctx}
 (* | LPAREN g = IDENT+ TTS e = exp RPAREN {TBox (g, e)} *)

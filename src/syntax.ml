@@ -25,6 +25,7 @@ module Ext = struct
      | AppL of exp * exp
      | Hole of name option
      | Ident of name
+     | BVar of int
      | Clos of exp * exp
      | EmptyS
      | Shift of int
