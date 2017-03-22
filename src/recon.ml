@@ -173,7 +173,7 @@ and check (sign , cG : signature * ctx) (e : A.exp) (t : I.exp) : I.exp =
          Debug.print (fun () -> "Unification for " ^ IP.print_exp t ^ " with " ^
                                   IP.print_exp t' ^ " succeeded with substitution "
                                   ^ Unify.print_subst sigma ^ ".");
-         e
+         simul_subst sigma e
        with
        | Unify.Unification_failure prob ->
           let string_e = IP.print_exp e in
@@ -314,7 +314,7 @@ and check_syn (sign, cG) cP (e : A.exp) (t : I.exp) =
           simul_subst sigma e, simul_subst sigma t
         | e, t -> e, t
       in
-      let _ = try
+      let _, sigma = try
           Unify.unify (sign, cG) t t'
       with
         Unify.Unification_failure prob ->
@@ -322,7 +322,7 @@ and check_syn (sign, cG) cP (e : A.exp) (t : I.exp) =
                               ^ "\nIn context " ^ print_bctx cP
                             ^ "\nFailed with unification problem:\n" ^ Unify.print_unification_problem prob))
       in
-      e'
+      simul_subst sigma e'
     | e, t ->
       Debug.print(fun ()-> "Expression " ^ AP.print_exp e ^ " is not syntactic and thus back to check");
       check (sign, cG) e (I.Box (decontextify cP, t))
