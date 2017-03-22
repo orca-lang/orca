@@ -153,7 +153,6 @@ type ctx = (name * exp) list
 
 let print_ctx c = "[" ^ (String.concat "," (List.map (fun (x, e) -> print_name x ^ ": " ^ print_exp e) c)) ^ "]"
 
-
 type bctx =
 | BNil
 | CtxVar of name

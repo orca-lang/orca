@@ -4,6 +4,7 @@ open Sign
 open Recon
 open Name
 open Procpat
+open TCTools
 
 module A = Syntax.Apx
 module AP = Print.Apx
@@ -12,7 +13,6 @@ module IP = Print.Int
 open Meta
 
 type ctx_map = pats
-
 
 let rec rename_ctx_using_pats (cG : ctx) (ps : pats) =
   match cG, ps with
