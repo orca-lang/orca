@@ -70,7 +70,7 @@ let inac_ctx = List.map (fun (_, t) -> IInac t)
 let inac_subst = List.map (fun (x, e) -> x, IInac e)
 
 let split_flex_unify (sign : signature) (p1 : pats) (thetatel : I.tel) (ps : pats)
-                     (cD1 : ctx) (vs : I.exp list) (ws : I.exp list) =
+                     (cD1 : ctx) (vs : I.exp list) (ws : I.exp list) (ts : I.exp list)=
   let sigma, cT = rename_ctx_using_pats (ctx_of_tel thetatel) ps in
   Debug.begin_verbose ();
   Debug.print (fun () -> "Creating set of flexible variables\np1 = " ^ print_pats p1
@@ -82,7 +82,8 @@ let split_flex_unify (sign : signature) (p1 : pats) (thetatel : I.tel) (ps : pat
   let cD', delta =
     Debug.print (fun () -> "Split unifies vs = " ^ IP.print_exps vs ^ ", ws = " ^ IP.print_exps ws);
     try
-      Unify.unify_flex_many (sign, cD1 @ cT) flex vs ws
+      let cG = cD1 @ cT in
+      Unify.unify_flex_many (sign, cG) cG BNil flex vs ws ts
     with
       Unify.Unification_failure prob ->
       raise (Error.Error ("Split failed with unification problem " ^ Unify.print_unification_problem prob))
@@ -153,7 +154,7 @@ let split_lam (sign : signature) (p1 : pats) (xs, p : string list * pat) (cD1 : 
   let thetatel = [Syntax.Explicit, gen_floating_name (),
                   I.Box(g', if tel' = [] then t else I.SPi (tel', t))] in
   let ws = [I.Box(g, I.SPi (tel0, I.SPi(tel', t)))] in
-  let cD', cT, delta, pdelta, td = split_flex_unify sign p1 thetatel [p] cD1 vs ws in
+  let cD', cT, delta, pdelta, td = split_flex_unify sign p1 thetatel [p] cD1 vs ws [I.Set 0] in
   let e = match var_list_of_ctx td with
     | [e] -> e
     | _ -> raise (Error.Violation ("Split_lam obtained more than one parameter out of td (" ^ print_ctx td ^ ")"))
@@ -187,7 +188,7 @@ let split_const (sign : signature) (p1 : pats) (c, ps : def_name * pats)
        end
     | e -> raise (Error.Error ("Expected constructor application. Got " ^ IP.print_exp e))
   in
-  let us, vs = split_idx_param sign n sp in
+  let us, vs, ts = split_idx_param sign n sp in
   Debug.print (fun () -> "For " ^ n ^ " the split of " ^ IP.print_exps sp
                          ^ " resulted in parameters " ^ IP.print_exps us
                          ^ " and indices " ^ IP.print_exps vs);
@@ -200,8 +201,8 @@ let split_const (sign : signature) (p1 : pats) (c, ps : def_name * pats)
   Debug.print (fun () -> "thetatel = " ^ IP.print_tel thetatel);
   if n = n'
   then
-    let us', ws = split_idx_param sign n sp in
-    let cD', cT, delta, pdelta, td = split_flex_unify sign p1 thetatel ps cD1 vs ws in
+    let us', ws, ts = split_idx_param sign n sp in
+    let cD', cT, delta, pdelta, td = split_flex_unify sign p1 thetatel ps cD1 vs ws ts in
     let ss = if is_syn_con sign c then
                x, I.AppL (I.Const c, var_list_of_ctx td)
              else
@@ -392,7 +393,7 @@ and check_inac (sign, cD : signature * ctx) (p : pat) (q : pat) (t : I.exp) : I.
      Debug.indent ();
      let ep' = check (sign, cD) ep t in
      let eq' = check (sign, cD) eq t in
-     let _, sigma = try Unify.unify (sign, cD) ep' eq'
+     let _, sigma = try Unify.unify (sign, cD) ep' eq' t
              with Unify.Unification_failure prob ->
                raise (Error.Error ("Inacessible pattern check failed with:\n" ^ Unify.print_unification_problem prob))
      in
@@ -401,7 +402,7 @@ and check_inac (sign, cD : signature * ctx) (p : pat) (q : pat) (t : I.exp) : I.
   | UInac ep, IInac eq ->
      Debug.indent ();
      let ep' = check (sign, cD) ep t in
-     let _, sigma = try Unify.unify (sign, cD) ep' eq
+     let _, sigma = try Unify.unify (sign, cD) ep' eq t
              with Unify.Unification_failure prob ->
                raise (Error.Error ("Inacessible pattern check failed with:\n" ^ Unify.print_unification_problem prob))
      in
@@ -433,7 +434,7 @@ and check_inac_syn (sign, cD : signature * ctx) (cP : bctx) (p : pat) (q : pat) 
      Debug.indent ();
      let ep' = check_syn (sign, cD) cP ep t in
      let eq' = check_syn (sign, cD) cP eq t in
-     let _, sigma = try Unify.unify (sign, cD) ep' eq'
+     let _, sigma = try Unify.unify (sign, cD) ep' eq' t
              with Unify.Unification_failure prob ->
                raise (Error.Error ("Inacessible pattern check failed with:\n" ^ Unify.print_unification_problem prob))
      in
@@ -442,7 +443,7 @@ and check_inac_syn (sign, cD : signature * ctx) (cP : bctx) (p : pat) (q : pat) 
   | UInac ep, IInac eq ->
      Debug.indent ();
      let ep' = check_syn (sign, cD) cP ep t in
-     let _, sigma = try Unify.unify (sign, cD) ep' eq
+     let _, sigma = try Unify.unify (sign, cD) ep' eq t
              with Unify.Unification_failure prob ->
                raise (Error.Error ("Inacessible pattern check failed with:\n" ^ Unify.print_unification_problem prob))
      in

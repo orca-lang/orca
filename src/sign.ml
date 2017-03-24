@@ -131,8 +131,8 @@ let lookup_constructors sign n =
   List.map signature_entry_name (List.filter constructs_n sign)
 
 (* Given the name of a type and a spine, return the parameter, the indices *)
-let split_idx_param (sign : signature) (n : def_name) (es : exp list) : exp list * exp list =
-  match lookup_sign_entry sign n with
+let split_idx_param (sign : signature) (n : def_name) (es : exp list) : exp list * exp list * exp list =
+  match lookup_sign_entry n sign with
   | DataDef (_, ps, is, _) ->
      Debug.print (fun () -> "Splitting parameters " ^ print_exps es ^ " against " ^ print_tel ps);
      let rec split = function
@@ -142,9 +142,10 @@ let split_idx_param (sign : signature) (n : def_name) (es : exp list) : exp list
        | es, [] -> [], es
        | _ -> raise (Error.Violation "Ran out of parameters.")
      in
-     split (es, ps)
-  | SynDef _ ->
-    [], es
+     let vs, us = split (es, ps) in
+     vs, us, List.map (fun (_, _,t) -> t) is
+  | SynDef (_, ts) ->
+    [], es, List.map (fun (_, _,t) -> t) ts
   | _ -> raise (Error.Error ("split_idx_param expected a datatype."))
 
 let rec print_signature sign = "[" ^ String.concat "; " (List.map signature_entry_name sign) ^ "]"

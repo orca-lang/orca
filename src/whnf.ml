@@ -153,7 +153,7 @@ and whnf (sign : signature) (e : exp) : exp =
   Debug.print (fun () -> "Computing the whnf of " ^ print_exp e) ;
   Debug.indent();
   let res = match e with
-    (* this removes degenerate applications should they occur *)
+    (* this removes degenerate applications, types and functions should they occur *)
     | App(App(h, sp), sp') ->
        whnf sign (App(h, sp @ sp'))
     | App(h, []) ->
@@ -163,7 +163,13 @@ and whnf (sign : signature) (e : exp) : exp =
     | AppL(h, []) ->
        whnf sign h
     | Pi (tel, Pi (tel', t)) -> whnf sign (Pi (tel @ tel', t))
+    | Pi ([], t) -> whnf sign t
     | SPi (tel, SPi (tel', t)) -> whnf sign (SPi (tel @ tel', t))
+    | SPi ([], t) -> whnf sign t
+    | Fn (xs, Fn(ys, e)) -> whnf sign (Fn (xs@ys, e))
+    | Fn ([], e) -> whnf sign e
+    | Lam (xs, Lam(ys, e)) -> whnf sign (Lam (xs@ys, e))
+    | Lam ([], e) -> whnf sign e
 
     | Const n ->
       Debug.print (fun () -> "Found constant : " ^ n);

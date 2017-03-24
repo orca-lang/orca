@@ -29,7 +29,7 @@ let unify_ctx (sign, cG) e g cP =
   Debug.print(fun () -> "Unifying contexts.\ng  = " ^ IP.print_exp g ^ "\ng' = " ^ IP.print_exp g' ^ "\n with ctx " ^ print_ctx cG);
   let cD, sigma =
     try
-      Unify.unify (sign, cG) g g'
+      Unify.unify (sign, cG) g g' I.Ctx
     with
       Unify.Unification_failure problem ->
         Debug.print (fun () -> Unify.print_unification_problem problem);
@@ -136,7 +136,7 @@ and check (sign , cG : signature * ctx) (e : A.exp) (t : I.exp) : I.exp =
        in
        try
          let _, sigma =
-           Unify.unify (sign, cG) t t' in
+           Unify.unify (sign, cG) t t' (I.Set 0) in (* Set 0 because we don't really care *)
          Debug.print (fun () -> "Unification for " ^ IP.print_exp t ^ " with " ^
                                   IP.print_exp t' ^ " succeeded with substitution "
                                   ^ Unify.print_subst sigma ^ ".");
@@ -273,7 +273,7 @@ and check_syn (sign, cG) cP (e : A.exp) (t : I.exp) =
         | e, t -> e, t
       in
       let _, sigma = try
-          Unify.unify (sign, cG) t t'
+          Unify.unify (sign, cG) t t' (I.Set 0) (* Set 0 because we don't really care about which universe in unification *)
       with
         Unify.Unification_failure prob ->
           raise (Error.Error ("Checking syntactic term " ^ AP.print_exp e ^ " against type " ^ IP.print_exp t
