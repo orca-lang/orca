@@ -136,7 +136,7 @@ let lookup_constructors n sign =
   List.map signature_entry_name (List.filter constructs_n sign)
 
 (* Given the name of a type and a spine, return the parameter, the indices *)
-let split_idx_param (sign : signature) (n : def_name) (es : exp list) : exp list * exp list =
+let split_idx_param (sign : signature) (n : def_name) (es : exp list) : exp list * exp list * exp list =
   match lookup_sign_entry n sign with
   | DataDef (_, ps, is, _) ->
      Debug.print (fun () -> "Splitting parameters " ^ print_exps es ^ " against " ^ print_tel ps);
@@ -147,9 +147,10 @@ let split_idx_param (sign : signature) (n : def_name) (es : exp list) : exp list
        | es, [] -> [], es
        | _ -> raise (Error.Violation "Ran out of parameters.")
      in
-     split (es, ps)
-  | SynDef _ ->
-    [], es
+     let vs, us = split (es, ps) in
+     vs, us, List.map (fun (_, _,t) -> t) is
+  | SynDef (_, ts) ->
+    [], es, List.map (fun (_, _,t) -> t) ts
   | _ -> raise (Error.Error ("split_idx_param expected a datatype."))
 
 let rec print_signature sign = "[" ^ String.concat "; " (List.map signature_entry_name sign) ^ "]"
@@ -223,7 +224,7 @@ let lookup_bound_name x cP =
   in
   lookup 0 cP
 
-let lookup_bound x cP =
+let lookup_bound cP x =
   let rec lookup i cP =
     match cP with
     | BSnoc (_, _, t) when i = 0 -> Clos(t, Shift (x+1))

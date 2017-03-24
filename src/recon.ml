@@ -29,7 +29,7 @@ let unify_ctx (sign, cG) e g cP =
   Debug.print(fun () -> "Unifying contexts.\ng  = " ^ IP.print_exp g ^ "\ng' = " ^ IP.print_exp g' ^ "\n with ctx " ^ print_ctx cG);
   let cD, sigma =
     try
-      Unify.unify (sign, cG) g g'
+      Unify.unify (sign, cG) g g' I.Ctx
     with
       Unify.Unification_failure problem ->
         Debug.print (fun () -> Unify.print_unification_problem problem);
@@ -134,7 +134,7 @@ and check (sign , cG : signature * ctx) (e : A.exp) (t : I.exp) : I.exp =
        in
        try
          let _, sigma =
-           Unify.unify (sign, cG) t t' in
+           Unify.unify (sign, cG) t t' (I.Set 0) in (* Set 0 because we don't really care *)
          Debug.print (fun () -> "Unification for " ^ IP.print_exp t ^ " with " ^
                                   IP.print_exp t' ^ " succeeded with substitution "
                                   ^ Unify.print_subst sigma ^ ".");
@@ -280,7 +280,7 @@ and check_syn (sign, cG) cP (e : A.exp) (t : I.exp) =
         | e, t -> e, t
       in
       let _, sigma = try
-          Unify.unify (sign, cG) t t'
+          Unify.unify (sign, cG) t t' (I.Set 0) (* Set 0 because we don't really care about which universe in unification *)
       with
         Unify.Unification_failure prob ->
           raise (Error.Error ("Checking syntactic term " ^ AP.print_exp e ^ " against type " ^ IP.print_exp t
@@ -323,7 +323,7 @@ and infer_syn (sign, cG) cP (e : A.exp) =
       check_box (sign, cG) cP (I.Var x) (lookup_ctx_fail cG x)
     | A.Const n -> check_box (sign, cG) cP (I.Const n) (lookup_sign sign n)
     | A.BVar i ->
-       let t = lookup_bound i cP in
+       let t = lookup_bound cP i in
        Debug.print (fun () -> "Looking bound variable " ^ string_of_int i ^ " resulted in type " ^ IP.print_exp t
                               ^ "\n Context is " ^ print_bctx cP);
        I.BVar i, t
