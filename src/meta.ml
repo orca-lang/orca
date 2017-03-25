@@ -281,3 +281,13 @@ let rec subst_of_pats (sigma : pats) (tel : tel) : subst =
   | [], [] -> []
   | p :: ps, (_, n, t) :: tel' -> (n, exp_of_pat p) :: (subst_of_pats ps tel')
   | _ -> raise (Error.Violation "subst_of_ctx_map got lists of different lengths")
+
+(* Applying syntactic substitutions *)
+
+let rec syn_subst_spi (sigma : exp) (tel : stel) (t : exp) : stel * exp =
+  match tel with
+  | [] -> [], Clos (t, sigma)
+  | (i, n, tt as te)::tel' ->
+     (* MMMM is the direction of the compostion the right one? *)
+     let tel'', t' = syn_subst_spi (Comp (sigma, Shift 1)) tel' t in
+     (i, n, Clos(tt, sigma))::tel'', t'

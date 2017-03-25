@@ -338,11 +338,12 @@ and infer_syn (sign, cG) cP (e : A.exp) =
     | A.SPi (tel, t) ->
        let tel', t' = check_spi (sign, cG) cP tel t in
        I.SPi (tel', t'), I.Star
+    (* App of Spi type get translated to AppL *)
     | A.App (e, es) ->
       begin match infer_syn (sign, cG) cP e with
-      | e', I.Pi (tel, t) ->
+      | e', I.SPi (tel, t) ->
          let es', t' = check_syn_spine (sign, cG) cP es tel t in
-         I.App (e', es'), t'
+         I.AppL (e', es'), t'
       | _ -> raise (Error.Error "Term in function position is not of function type")
       end
 
@@ -381,7 +382,8 @@ and infer_syn (sign, cG) cP (e : A.exp) =
   in Debug.deindent (); res
 
 and check_syn_spine (sign, cG) cP sp tel t =
-  Debug.print (fun () -> "Checking syn spine:\nsp = " ^ AP.print_exps sp ^ "\ntel = " ^ IP.print_tel tel);
+  Debug.print (fun () -> "Checking syn spine:\nsp = " ^ AP.print_exps sp
+                         ^ "\ntel = " ^ IP.print_stel tel);
   Debug.indent ();
   let res = match sp, tel with
     | e::sp', (_, x, s)::tel ->
@@ -391,18 +393,22 @@ and check_syn_spine (sign, cG) cP sp tel t =
            check_syn (sign, cG) (contextify (sign, cG) g) e s
         | s -> check_syn (sign, cG) cP e s
       in
-      Debug.print (fun () -> "Checking syn spine:\ne = " ^ AP.print_exp e ^ "\ns = " ^ IP.print_exp s);
-      let tel', t' = subst_pi (x, e') tel t in
+      Debug.print (fun () -> "Checking syn spine:\ne = " ^ AP.print_exp e
+                             ^ "\ns = " ^ IP.print_exp s);
+
+      let tel', t' = syn_subst_spi (I.Dot(I.Shift 0, e')) tel t in
       let sp'', t'' = check_syn_spine (sign, cG) cP sp' tel' t' in
       e'::sp'', t''
+
+
   | [], [] -> [], t
   | _, [] ->
     begin
       match Whnf.whnf sign t with
-      | I.Pi (tel', t') -> check_syn_spine (sign, cG) cP sp tel' t'
+      | I.SPi (tel', t') -> check_syn_spine (sign, cG) cP sp tel' t'
       | _ -> raise (Error.Error ("Unconsumed application cannot check against type " ^ IP.print_exp t))
     end
-  | [], _ -> [], I.Pi (tel, t)
+  | [], _ -> [], I.SPi (tel, t)
   in
   Debug.deindent ();
   res
@@ -452,13 +458,6 @@ let rec check_tel (sign, cG) u tel =
      in
      (i, x, s')::tel', u'
 
-
-(* let rec check_syn_tel (sign, cG) tel = *)
-(*   match tel with *)
-(*   | [] -> [] *)
-(*   | (i, x, s) :: tel' -> *)
-(*     let s' = check_syn_type (sign, cG) BNil s in *)
-(*     (i, x, s') :: (check_syn_tel (sign, (x, s') :: cG) tel') *)
 
 let rec check_stel (sign, cG) cP tel =
   match tel with

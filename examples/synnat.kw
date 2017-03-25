@@ -1,0 +1,11 @@
+(*) Simple examples wit syntax level natural numbers
+
+syn nat where
+| z : nat
+| s : nat ->> nat
+
+def zero : |- nat = z
+
+def one : |- nat = s ' z
+
+def one' : |- nat = s z (*) Should elaborate to syntactic application
