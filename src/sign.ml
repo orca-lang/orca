@@ -32,6 +32,11 @@ let rec lookup_sign_entry (n : def_name) (sign : signature) : signature_entry =
     with Not_found ->
       raise (Error.Violation ("Unable to find " ^ n ^ " in the signature"))
 
+let is_syn_con (sign : signature) (n : def_name) =
+  match lookup_sign_entry n sign with
+  | SConstructor _ -> true
+  | _ -> false
+
 let lookup_syn_def (n : def_name) (sign : signature) : stel =
   match lookup_sign_entry n sign with
   | SynDef (_, tel) -> tel
@@ -40,7 +45,7 @@ let lookup_syn_def (n : def_name) (sign : signature) : stel =
 let lookup_cons_entry (c : def_name) (sign : signature) (mg : exp option) : tel * dsig =
   match lookup_sign_entry c sign, mg with
   | Constructor (_, tel, dsig), None -> tel, dsig
-  | _ -> raise (Error.Error ("Constant " ^ c ^ " was expected to be a constructor."))
+  | _ -> raise (Error.Error ("Constant " ^ c ^ " was expected to be a constructor.(1)"))
 
 let lookup_syn_cons_entry (c : def_name) (sign : signature) (mg : exp option) : stel * dsig =
   match lookup_sign_entry c sign, mg with
@@ -70,7 +75,7 @@ let lookup_syn_cons_entry (c : def_name) (sign : signature) (mg : exp option) : 
         (i, x, box n s) :: tel', t'
     in
     List.map (fun (i, x, s) -> i, x, Box (g, box 0 s)) tel, dsig
-  | _ -> raise (Error.Error ("Constant " ^ c ^ " was expected to be a constructor."))
+  | _ -> raise (Error.Error ("Constant " ^ c ^ " was expected to be a constructor.(2)"))
 
 
 let lookup_sign sign n =

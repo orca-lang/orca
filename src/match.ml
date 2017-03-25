@@ -173,9 +173,14 @@ let split_const (sign : signature) (p1 : pats) (c, ps : def_name * pats)
     | e -> raise (Error.Error ("Expected constructor application. Got " ^ IP.print_exp e))
   in
   let us, vs = split_idx_param sign n sp in
-    Debug.print (fun () -> "For " ^ n ^ " the split of " ^ IP.print_exps sp
-      ^ " resulted in parameters " ^ IP.print_exps us
-      ^ " and indices " ^ IP.print_exps vs);
+  Debug.print (fun () -> "For " ^ n ^ " the split of " ^ IP.print_exps sp
+                         ^ " resulted in parameters " ^ IP.print_exps us
+                         ^ " and indices " ^ IP.print_exps vs);
+
+  if is_syn_con sign c then
+    raise (Error.Error ("Pattern matching on syntactic constructors not implemented yet."))
+
+  else
     let thetatel, (n', sp) = lookup_cons_entry c sign maybe_g in
     Debug.print (fun () -> "thetatel = " ^ IP.print_tel thetatel);
     if n = n'

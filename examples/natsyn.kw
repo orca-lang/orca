@@ -9,3 +9,7 @@ def zero : |- nat = z
 def one : |- nat = s ' z
 
 def one' : |- nat = s z (*) Should elaborate to syntactic application
+
+def pred : (|- nat) -> (|- nat) where
+| z => z
+| (s n) => n
