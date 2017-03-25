@@ -18,4 +18,4 @@ To build orca simply run ```make``` on the repository and run:
 
 Orca is under heavy development, but you can check some information
 and the theory in
-[this document](https://github.com/orca-lang/orca/doc/orcadoc.pdf).
+[this document](https://github.com/orca-lang/orca/raw/master/doc/orcadoc.pdf).
