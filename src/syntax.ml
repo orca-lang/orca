@@ -123,6 +123,8 @@ module Apx = struct
   type dsig = def_name * exp list
   type decl = (def_name * tel * dsig)
   type decls = decl list
+  type sdecl = (def_name * stel * dsig)
+  type sdecls = sdecl list
   type codecls = (def_name * tel * dsig * exp) list
   type rhs
     = Just of exp
@@ -133,7 +135,7 @@ module Apx = struct
     (* name, parameters, indices, universe *)
     | Data of def_name * tel * tel * universe * decls
     | Codata of def_name * tel * tel * universe * codecls
-    | Syn of def_name * tel * decls
+    | Syn of def_name * stel * sdecls
     | DefPM of def_name * tel * exp * pat_decls
     | Def of def_name * exp * exp
 end
@@ -197,6 +199,8 @@ module Int = struct
   type dsig = def_name * exp list
   type decl = (def_name * tel * dsig)
   type decls = decl list
+  type sdecl = (def_name * stel * dsig)
+  type sdecls = sdecl list
   type codecls = (def_name * tel * dsig * exp) list
   type rhs
     = Just of exp
@@ -207,7 +211,7 @@ module Int = struct
     (* name, parameters, indices, universe *)
     | Data of def_name * tel * tel * universe * decls
     | Codata of def_name * tel * tel * universe * codecls
-    | Syn of def_name * tel * decls
+    | Syn of def_name * stel * sdecls
     | DefPM of def_name * tel * exp * pat_decls
     | Def of def_name * exp * exp
 end

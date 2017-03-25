@@ -390,11 +390,12 @@ and check_inac (sign, cD : signature * ctx) (p : pat) (q : pat) (t : I.exp) : I.
      begin match lookup_sign_entry n sign with
      | Constructor (_, tel, _) -> I.PConst (n, check_inacs (sign, cD) sp sq (ctx_of_tel tel))
      | SConstructor (_, tel, _) ->
-        let g = match t with
-          | I.Box(g, _) -> g
-          | _ -> raise (Error.Violation ("Syntactic constructor was used to split on a non boxed type"))
-        in
-        I.PConst (n, check_inacs_syn (sign, cD) (contextify (sign, cD) g) sp sq (ctx_of_tel tel))
+        assert false
+        (* let g = match t with *)
+        (*   | I.Box(g, _) -> g *)
+        (*   | _ -> raise (Error.Violation ("Syntactic constructor was used to split on a non boxed type")) *)
+        (* in *)
+        (* I.PConst (n, check_inacs_syn (sign, cD) (contextify (sign, cD) g) sp sq (ctx_of_tel tel)) *)
      | _ -> raise (Error.Violation ("It should have been a constructor."))
      end
   | _ -> begin match t with
@@ -431,7 +432,8 @@ and check_inac_syn (sign, cD : signature * ctx) (cP : bctx) (p : pat) (q : pat) 
      begin match lookup_sign_entry n sign with
      | Constructor (_, tel, _) -> raise (Error.Error ("Used a data type constructor inside a syntactic pattern"))
      | SConstructor (_, tel, _) ->
-        I.PConst (n, check_inacs_syn (sign, cD) cP sp sq (ctx_of_tel tel))
+        assert false
+        (* I.PConst (n, check_inacs_syn (sign, cD) cP sp sq (ctx_of_tel tel)) *)
      | _ -> raise (Error.Violation ("It should have been a constructor."))
      end
   | PLam (xs, p), PLam (ys, q) ->

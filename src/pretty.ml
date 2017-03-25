@@ -299,7 +299,7 @@ let rec fmt_pat_decls (sign, cG) pps = function
 let rec fmt_sdecl sign pps (n, stel, (tn, es)) =
   Fmt.pf pps "| %a : %a"
          def n
-         (fmt_tel (sign, [])) (stel, App(Const tn, es))
+         (fmt_stel (sign, []) BNil) (stel, App(Const tn, es))
 
 
 let rec fmt_sdecls sign pps = function
@@ -381,7 +381,7 @@ let fmt_program sign pps = function
      Fmt.pf pps "%a %a : %a %a@,%a"
             keyword "syn"
             const n
-            (fmt_tel (sign, [])) (tel, Star)
+            (fmt_stel (sign, []) BNil) (tel, Star)
             keyword "where"
             (fmt_sdecls sign) ds
 

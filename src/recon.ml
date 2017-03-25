@@ -227,7 +227,8 @@ and check_pi (sign, cG) tel t =
      end
 
 and check_syn_type (sign, cG) cP (e : A.exp) : I.exp =
-  Debug.print (fun () -> "Checking syntactic type " ^ AP.print_exp e ^ "\nin context " ^ print_ctx cG);
+  Debug.print (fun () -> "Checking syntactic type " ^ AP.print_exp e
+                         ^ "\nin context " ^ print_ctx cG);
   Debug.indent ();
   let res =
     match e with
@@ -242,16 +243,16 @@ and check_syn_type (sign, cG) cP (e : A.exp) : I.exp =
       in
       let tel', cP' = check_stel_type cP tel in
       I.SPi (tel', check_syn_type (sign, cG) cP' e')
-    | A.Pi (tel, e') ->
-      let rec check_tel_type cG = function
-        | [] -> []
-        | (i, x, s) :: tel ->
-          let s' = check_syn_type (sign, cG) cP s in
-          (i, x, s') :: (check_tel_type ((x, s') :: cG) tel)
-      in
-      let tel' = check_tel_type cG tel in
-      let e'' = check_syn_type (sign, cG) cP e' in
-      I.Pi(tel', e'')
+    (* | A.Pi (tel, e') -> *)
+    (*   let rec check_tel_type cG = function *)
+    (*     | [] -> [] *)
+    (*     | (i, x, s) :: tel -> *)
+    (*       let s' = check_syn_type (sign, cG) cP s in *)
+    (*       (i, x, s') :: (check_tel_type ((x, s') :: cG) tel) *)
+    (*   in *)
+    (*   let tel' = check_tel_type cG tel in *)
+    (*   let e'' = check_syn_type (sign, cG) cP e' in *)
+    (*   I.Pi(tel', e'') *)
     | A.Const n -> if lookup_syn_def n sign = [] then I.Const n
       else raise (Error.Error ("Type " ^ n ^ " is not fully applied."))
     | A.App (A.Const n, es) ->
@@ -452,12 +453,12 @@ let rec check_tel (sign, cG) u tel =
      (i, x, s')::tel', u'
 
 
-let rec check_syn_tel (sign, cG) tel =
-  match tel with
-  | [] -> []
-  | (i, x, s) :: tel' ->
-    let s' = check_syn_type (sign, cG) BNil s in
-    (i, x, s') :: (check_syn_tel (sign, (x, s') :: cG) tel')
+(* let rec check_syn_tel (sign, cG) tel = *)
+(*   match tel with *)
+(*   | [] -> [] *)
+(*   | (i, x, s) :: tel' -> *)
+(*     let s' = check_syn_type (sign, cG) BNil s in *)
+(*     (i, x, s') :: (check_syn_tel (sign, (x, s') :: cG) tel') *)
 
 let rec check_stel (sign, cG) cP tel =
   match tel with

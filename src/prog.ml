@@ -44,11 +44,11 @@ let rec tc_constructors (sign , cG : signature * ctx) (u : I.universe) (tel : I.
      let sign', ds' = tc_constructors (sign, cG) u tel ds in
      se::sign', d'::ds'
 
-let tc_syn_constructor (sign , cG : signature * ctx) (tel : I.tel)
-                       (n , tel', (n', es) : def_name * tel * dsig) : signature_entry * I.decl =
+let tc_syn_constructor (sign , cG : signature * ctx) (tel : I.stel)
+                       (n , tel', (n', es) : def_name * stel * dsig) : signature_entry * I.sdecl =
   Debug.print_string ("Typechecking syntax constructor: " ^ n) ;
-  let tel'' = check_syn_tel (sign, cG) tel' in
-  let check' = check_syn (sign, (ctx_of_tel tel'') @ cG) BNil in
+  let tel'' = check_stel (sign, cG) BNil tel' in
+  let check' = check_syn (sign, cG) (bctx_of_stel BNil tel'') in
   let rec check_indices es tel =
     match es, tel with
     | [], [] -> []
@@ -62,8 +62,8 @@ let tc_syn_constructor (sign , cG : signature * ctx) (tel : I.tel)
   let es' = check_indices es tel in
   SConstructor (n, tel'', (n', es')), (n, tel'', (n', es'))
 
-let rec tc_syn_constructors (sign , cG : signature * ctx) (tel : I.tel)
-                        (ds : decls) : signature * I.decls =
+let rec tc_syn_constructors (sign , cG : signature * ctx) (tel : I.stel)
+                        (ds : sdecls) : signature * I.sdecls =
   match ds with
   | [] -> sign, []
   | d::ds ->
@@ -88,7 +88,7 @@ let tc_program (sign : signature) : program -> signature * I.program = function
   | Syn (n, tel, ds) ->
     Debug.print_string ("Typechecking syn declaration: " ^ n);
     Debug.indent ();
-    let tel' = check_syn_tel (sign, []) tel in
+    let tel' = check_stel (sign, []) BNil tel in
     let sign' = SynDef (n, tel') :: sign in
     let sign'', ds' = tc_syn_constructors (sign', []) tel' ds in
     Debug.deindent ();

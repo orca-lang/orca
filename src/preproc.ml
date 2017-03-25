@@ -268,7 +268,8 @@ and pproc_app (s : sign) (cG : ctx) (cP : bctx) (e : E.exp) : A.exp * A.exp list
   | _ -> pproc_exp s cG cP e, []
 
 let pproc_decl s cG (n, e) (d : def_name) =
-  Debug.print (fun () -> "Preprocessing declaration " ^ n ^ "\nCreating telescope out of " ^ EP.print_exp e);
+  Debug.print (fun () -> "Preprocessing declaration " ^ n
+                         ^ "\nCreating telescope out of " ^ EP.print_exp e);
   Debug.indent ();
   let tel, e' = pproc_tel s cG [] e in
   let (d', args) = match e' with
@@ -282,7 +283,7 @@ let pproc_decl s cG (n, e) (d : def_name) =
   else
     raise (Error.Error_loc (loc e, "Return type of constructor " ^ n ^ " should be " ^ d))
 
-let pproc_sdecl s cG (n, e) (is_syntax : bool) (d : def_name) =
+let pproc_sdecl s cG (n, e) (d : def_name) =
   let tel, e' = pproc_stel s cG [] e in
   let (d', args) = match e' with
     | A.App (A.Const n', ds) -> n', ds
@@ -435,13 +436,13 @@ let pre_process s = function
      (* let s'', ds' = List.fold_left (fun (s, dos) d -> let ss, dd = pproc_codecl s cG d n in ss, (dd :: dos)) (s', []) ds in *)
      (* s'', A.Codata (n, ps', is, u, ds') *)
   | E.Syn (n, e, ds) ->
-    let tel, e' = pproc_tel s [] [] e in
+    let tel, e' = pproc_stel s [] [] e in
     let _ = match e' with
       | A.Star -> ()
       | _ -> raise (Error.Error_loc (loc e, "Syntax definition for " ^ n ^ " should have kind * instead of " ^ AP.print_exp e'))
     in
      let s' = add_name_sign s n in
-     let s'', ds' = List.fold_left (fun (s, dos) d -> let ss, dd = pproc_decl s [] d n in ss, (dd :: dos)) (s', []) ds in
+     let s'', ds' = List.fold_left (fun (s, dos) d -> let ss, dd = pproc_sdecl s [] d n in ss, (dd :: dos)) (s', []) ds in
      s'', A.Syn (n, tel, ds')
   | E.DefPM (n, e, ds) ->
      let s' = add_name_sign s n in

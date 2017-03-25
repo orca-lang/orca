@@ -8,10 +8,10 @@ type signature_entry
   = Definition of def_name * tel * exp * exp (* the name, the type, and the definition *)
   (* name, parameters, constructed type *)
   | Constructor of def_name * tel * dsig
-  | SConstructor of def_name * tel * dsig
+  | SConstructor of def_name * stel * dsig
   (* name, parameters, indices, resulting universe *)
   | DataDef of def_name * tel * tel * universe
-  | SynDef of def_name * tel
+  | SynDef of def_name * stel
   | Program of def_name * tel * exp * pat_decls
 
 type signature = signature_entry list
@@ -32,7 +32,7 @@ let rec lookup_sign_entry (n : def_name) (sign : signature) : signature_entry =
     with Not_found ->
       raise (Error.Violation ("Unable to find " ^ n ^ " in the signature"))
 
-let lookup_syn_def (n : def_name) (sign : signature) : tel =
+let lookup_syn_def (n : def_name) (sign : signature) : stel =
   match lookup_sign_entry n sign with
   | SynDef (_, tel) -> tel
   | _ -> raise (Error.Error ("Constant " ^ n ^ " not a syntactic type"))
@@ -40,6 +40,10 @@ let lookup_syn_def (n : def_name) (sign : signature) : tel =
 let lookup_cons_entry (c : def_name) (sign : signature) (mg : exp option) : tel * dsig =
   match lookup_sign_entry c sign, mg with
   | Constructor (_, tel, dsig), None -> tel, dsig
+  | _ -> raise (Error.Error ("Constant " ^ c ^ " was expected to be a constructor."))
+
+let lookup_syn_cons_entry (c : def_name) (sign : signature) (mg : exp option) : stel * dsig =
+  match lookup_sign_entry c sign, mg with
   | SConstructor (_, tel, dsig), Some g ->
     let rec box n = function
       | Var x when n = 0 -> Var x
@@ -68,6 +72,7 @@ let lookup_cons_entry (c : def_name) (sign : signature) (mg : exp option) : tel 
     List.map (fun (i, x, s) -> i, x, Box (g, box 0 s)) tel, dsig
   | _ -> raise (Error.Error ("Constant " ^ c ^ " was expected to be a constructor."))
 
+
 let lookup_sign sign n =
   (* (\* We generate a new context variable to allow it to be unified with *)
   (*    any context from the environment. *\) *)
@@ -84,7 +89,7 @@ let lookup_sign sign n =
   | SynDef (_, tel) ->
      if tel = []
      then Star
-     else (Pi (tel, Star))
+     else (SPi (tel, Star))
   | Constructor (_, is, (n', pes)) ->
      let t =
        if pes = [] then
@@ -105,7 +110,7 @@ let lookup_sign sign n =
          App (Const n', pes)
      in
      let t' =
-       if is = [] then t else Pi (is, t)
+       if is = [] then t else SPi (is, t)
      in
      Debug.print (fun () -> "Looked up constructor " ^ n ^ " which has type " ^ print_exp t');
      t'
@@ -234,9 +239,9 @@ let rec bctx_of_lam_stel (fs : string list) (tel : stel) (cP : bctx) : bctx * st
        BSnoc (cP , f, t), tel''
     | _, [] -> raise (Error.Error ("Too many variables declared in lambda"))
 
-let bctx_of_stel tel =
+let bctx_of_stel cP tel =
   let rec make = function
-    | [] -> BNil
+    | [] -> cP
     | (_, x, s)::tel' -> BSnoc (make tel', x, s)
   in
   make (List.rev tel)

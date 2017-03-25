@@ -146,6 +146,11 @@ module Apx = struct
                   (List.map (fun (n, tel, dsig) -> "(" ^ n ^ " " ^ print_tel tel
                                                    ^ " " ^ print_dsig dsig ^ ")") decls)
 
+  let print_sdecls (decls : sdecls) : string =
+    String.concat "\n"
+                  (List.map (fun (n, tel, dsig) -> "(" ^ n ^ " " ^ print_stel tel
+                                                   ^ " " ^ print_dsig dsig ^ ")") decls)
+
   let print_codecls (decls : codecls) : string =
     String.concat "\n"
                   (List.map (fun (n, tel, dsig, e) -> "(" ^ n ^ " " ^ print_tel tel
@@ -176,7 +181,7 @@ module Apx = struct
     | Codata (n, ps, is, u, decls) ->
        "(data " ^ n ^ " (" ^ print_params ps ^ ") (" ^ print_params is ^ ") " ^ print_universe u  ^ "\n" ^ print_codecls decls ^ ")"
 
-    | Syn (n, tel, decls) -> "(syn " ^ n ^ " " ^ print_tel tel ^ "\n" ^ print_decls decls ^ ")"
+    | Syn (n, tel, decls) -> "(syn " ^ n ^ " " ^ print_stel tel ^ "\n" ^ print_sdecls decls ^ ")"
     | DefPM (n, tel, e, decls) -> "(def " ^ n ^ " (" ^ print_tel tel ^ ") " ^ print_exp e ^ "\n" ^ print_def_decls decls ^ ")"
     | Def (n, e1, e2) -> "(def " ^ n ^ " " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
   end
@@ -255,6 +260,11 @@ module Int = struct
                   (List.map (fun (n, tel, dsig) -> "(" ^ n ^ " " ^ print_tel tel
                                                    ^ " " ^ print_dsig dsig ^ ")") decls)
 
+  let print_sdecls (decls : sdecls) : string =
+    String.concat "\n"
+                  (List.map (fun (n, tel, dsig) -> "(" ^ n ^ " " ^ print_stel tel
+                                                   ^ " " ^ print_dsig dsig ^ ")") decls)
+
   let print_codecls (decls : codecls) : string =
     String.concat "\n"
                   (List.map (fun (n, tel, dsig, e) -> "(" ^ n ^ " " ^ print_tel tel
@@ -286,7 +296,7 @@ module Int = struct
     | Codata (n, ps, is, u, decls) ->
        "(data " ^ n ^ " (" ^ print_params ps ^ ") (" ^ print_params is ^ ") " ^ print_universe u  ^ "\n" ^ print_codecls decls ^ ")"
 
-    | Syn (n, tel, decls) -> "(syn " ^ n ^ " " ^ print_tel tel ^ "\n" ^ print_decls decls ^ ")"
+    | Syn (n, tel, decls) -> "(syn " ^ n ^ " " ^ print_stel tel ^ "\n" ^ print_sdecls decls ^ ")"
     | DefPM (n, tel, e, decls) -> "(def " ^ n ^ " (" ^ print_tel tel ^ ") " ^ print_exp e ^ "\n" ^ print_def_decls decls ^ ")"
     | Def (n, e1, e2) -> "(def " ^ n ^ " " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
   end
