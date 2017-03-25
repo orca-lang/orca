@@ -23,25 +23,17 @@ let is_syntax = function
   | A.Nil -> true
   | _ -> false
 
-let lookup x cG =
-  begin
-    try List.assoc x cG
-    with Not_found ->
-      raise (Error.Violation
-               ("Unbound var after preprocessing, this cannot happen. (Var: " ^ print_name x ^ ")"))
-  end
-
 let is_ctx (sign, cG) = function
   | I.Nil
   | I.Snoc _ -> true
-  | I.Var g when lookup g cG = I.Ctx -> true
+  | I.Var g when lookup_ctx_fail cG g = I.Ctx -> true
   | _ -> false
 
 let rec contextify (sign, cG) (g : I.exp) =
   match Whnf.whnf sign g with
   | I.Nil -> BNil
   | I.Var x ->
-    begin match lookup x cG with
+    begin match lookup_ctx_fail cG  x with
     | I.Ctx -> CtxVar x
     | _ -> raise (Error.Violation ("Tried to contextify non context variable " ^ print_name x))
     end
@@ -89,7 +81,7 @@ let rec infer (sign, cG : signature * ctx) (e : A.exp) : I.exp * I.exp =
        check (sign, cG) e t', t'
     | A.Const n ->
        I.Const n, lookup_sign sign n
-    | A.Var n -> I.Var n, lookup n cG
+    | A.Var n -> I.Var n, lookup_ctx_fail cG n
     | A.App (h, sp) ->
       begin match infer (sign, cG) h with
        | h', I.Pi (tel, t) ->
@@ -252,10 +244,10 @@ and check_syn_type (sign, cG) cP (e : A.exp) : I.exp =
       let tel' = check_tel_type cG tel in
       let e'' = check_syn_type (sign, cG) cP e' in
       I.Pi(tel', e'')
-    | A.Const n -> if lookup_syn_def n sign = [] then I.Const n
+    | A.Const n -> if lookup_syn_def sign n = [] then I.Const n
       else raise (Error.Error ("Type " ^ n ^ " is not fully applied."))
     | A.App (A.Const n, es) ->
-      let tel = lookup_syn_def n sign in
+      let tel = lookup_syn_def sign n in
       begin try
           I.App (I.Const n, List.map2 (fun e (_, x, t) -> check_syn (sign, cG) cP e t) es tel)
         with Invalid_argument _ -> raise (Error.Error ("Type " ^ n ^ " is not fully applied."))
@@ -271,7 +263,7 @@ and check_ctx (sign, cG) g =
     I.Snoc (g', x, check_syn_type (sign, cG) cP' e)
   | A.Nil -> I.Nil
   | A.Var x ->
-    begin match lookup x cG with
+    begin match lookup_ctx_fail cG x with
     | I.Ctx -> I.Var x
     | _ -> raise (Error.Error ("Variable " ^ print_name x ^ " was expected to be a context variable."))
     end
@@ -355,10 +347,10 @@ and infer_syn (sign, cG) cP (e : A.exp) =
       end
     | A.Var x ->
       Debug.print (fun () -> "Variable " ^ print_name x ^ " is being looked up in context " ^ print_ctx cG);
-      check_box (sign, cG) cP (I.Var x) (lookup x cG)
+      check_box (sign, cG) cP (I.Var x) (lookup_ctx_fail cG x)
     | A.Const n -> check_box (sign, cG) cP (I.Const n) (lookup_sign sign n)
     | A.BVar i ->
-       let t = lookup_bound i cP in
+       let t = lookup_bound cP i in
        Debug.print (fun () -> "Looking bound variable " ^ string_of_int i ^ " resulted in type " ^ IP.print_exp t
                               ^ "\n Context is " ^ print_bctx cP);
        I.BVar i, t

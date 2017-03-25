@@ -30,9 +30,10 @@ type bctx = E.name list            (* The context for bound variables *)
 
 let add_name_bvars c n : bctx = n @ c
 
-let rec lookup n = function
+let rec lookup cG n =
+  match cG with
   | (n', nn) :: _ when n = n' -> Some nn
-  | _ :: xs -> lookup n xs
+  | _ :: xs -> lookup xs n
   | [] -> None
 
 let index n cP =
@@ -48,7 +49,7 @@ let index n cP =
 let find_name (sign : sign) (cG : ctx) (cP : bctx) (n, pos : E.name * src_pos) : A.exp =
   match index n cP with
   | Some i -> A.BVar i
-  | None -> match lookup n cG with
+  | None -> match lookup cG n with
             | Some n -> A.Var n
             | None ->
                if List.mem n sign
@@ -67,7 +68,7 @@ let lookup_bound_name x cP =
 let find_name_pat (sign : sign) (cG : ctx) (cP : bctx) (n : E.name) : A.pat =
   match index n cP with
   | Some i -> A.PBVar i
-  | None -> match lookup n cG with
+  | None -> match lookup cG n with
             | Some n -> A.PVar n
             | None ->
                if List.mem n sign
@@ -92,7 +93,7 @@ let collect_pat_ctx (s : sign) (cG : ctx) (cP : bctx) (n : E.name) : ctx =
           cG
         else
           begin
-            match lookup n cG with
+            match lookup cG n with
             | Some _ -> raise (Error.Error ("Repeated variable " ^ n ^ " in pattern spine"))
             | None -> fst(add_name_ctx cG n)
           end

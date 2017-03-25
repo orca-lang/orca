@@ -160,7 +160,7 @@ and whnf (sign : signature) (e : exp) : exp =
 
     | Const n ->
       Debug.print (fun () -> "Found constant : " ^ n);
-       begin match lookup_sign_def n sign with
+       begin match lookup_sign_def sign n with
        | D e -> Debug.print (fun () -> "Definition of " ^ n ^ " is " ^ print_exp e); whnf sign e
        | _ -> Const n
        end
@@ -173,7 +173,7 @@ and whnf (sign : signature) (e : exp) : exp =
         whnf sign (simul_subst sigma e) (* Beta reduction *)
       | Const n ->
         Debug.print (fun () -> "Head of application was a constant " ^ print_exp (Const n));
-        begin match lookup_sign_def n sign with
+        begin match lookup_sign_def sign n with
         | D e -> whnf sign (App (e, sp))
         | P cls ->
           begin match reduce_with_clauses sign sp cls with
