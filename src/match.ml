@@ -181,7 +181,7 @@ let split_const (sign : signature) (p1 : pats) (c, ps : def_name * pats)
     raise (Error.Error ("Pattern matching on syntactic constructors not implemented yet."))
 
   else
-    let thetatel, (n', sp) = lookup_cons_entry c sign maybe_g in
+    let thetatel, (n', sp) = lookup_cons_entry sign c in
     Debug.print (fun () -> "thetatel = " ^ IP.print_tel thetatel);
     if n = n'
     then
@@ -220,7 +220,7 @@ let split_clos (sign : signature) (p1 : pats) (n, s : name * pat_subst) (cD1 : c
       | _, CEmpty -> I.Nil
       | _, CDot(s, y) ->
         let cP = contextify (sign, cD1 @ cD2) g in
-        I.Snoc(get_domain g s, "_", lookup_bound y cP)
+        I.Snoc(get_domain g s, "_", lookup_bound cP y)
       | _, CShift 0 -> g
       | I.Snoc(g, _, _), CShift m -> get_domain g (CShift (m-1))
       | _, CShift m -> raise (Error.Error ("When checking pattern " ^ print_name n ^ "[" ^ print_pat_subst s
@@ -271,12 +271,12 @@ let split_set sign (x : name) (cG : ctx) : ctx_map =
   let cG2, t, cG1 = f cG in
   match Whnf.whnf sign t with
   | I.App(I.Const n, sp) ->
-     let constrs = lookup_constructors n sign in
+     let constrs = lookup_constructors sign n in
      let rec split_constrs constrs =
        begin match constrs with
        | [] -> []
        | c :: constrs' ->
-          let thetatel, (n', sp) = lookup_cons_entry c sign None in
+          let thetatel, (n', sp) = lookup_cons_entry sign c in
           let ps = (inac_ctx cG2) @ [PConst (c, inac_ctx (ctx_of_tel thetatel))] @ (inac_ctx cG1) in
           let sigma =
             try
@@ -392,7 +392,7 @@ and check_inac (sign, cD : signature * ctx) (p : pat) (q : pat) (t : I.exp) : I.
   | PVar x, PVar y when x = y -> I.PVar x
   | PPar x, PPar y when x = y -> I.PPar x
   | PConst (n, sp), PConst (n', sq) when n = n' ->
-     begin match lookup_sign_entry n sign with
+     begin match lookup_sign_entry sign n with
      | Constructor (_, tel, _) -> I.PConst (n, check_inacs (sign, cD) sp sq (ctx_of_tel tel))
      | SConstructor (_, tel, _) ->
         assert false
@@ -434,7 +434,7 @@ and check_inac_syn (sign, cD : signature * ctx) (cP : bctx) (p : pat) (q : pat) 
   | PVar x, PVar y when x = y -> I.PVar x
   | PPar x, PPar y when x = y -> I.PPar x
   | PConst (n, sp), PConst (n', sq) when n = n' ->
-     begin match lookup_sign_entry n sign with
+     begin match lookup_sign_entry sign n with
      | Constructor (_, tel, _) -> raise (Error.Error ("Used a data type constructor inside a syntactic pattern"))
      | SConstructor (_, tel, _) ->
         assert false

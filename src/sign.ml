@@ -24,7 +24,7 @@ let signature_entry_name = function
     | SConstructor (n', _, _)
     | Constructor (n', _, _) -> n'
 
-let rec lookup_sign_entry (n : def_name) (sign : signature) : signature_entry =
+let rec lookup_sign_entry (sign : signature) (n : def_name) : signature_entry =
   let el en = signature_entry_name en = n
   in
     try
@@ -32,23 +32,26 @@ let rec lookup_sign_entry (n : def_name) (sign : signature) : signature_entry =
     with Not_found ->
       raise (Error.Violation ("Unable to find " ^ n ^ " in the signature"))
 
+
 let is_syn_con (sign : signature) (n : def_name) =
-  match lookup_sign_entry n sign with
+  match lookup_sign_entry sign n with
   | SConstructor _ -> true
   | _ -> false
 
-let lookup_syn_def (n : def_name) (sign : signature) : stel =
-  match lookup_sign_entry n sign with
+let lookup_syn_def (sign : signature) (n : def_name) : stel =
+  match lookup_sign_entry sign n with
   | SynDef (_, tel) -> tel
   | _ -> raise (Error.Error ("Constant " ^ n ^ " not a syntactic type"))
 
-let lookup_cons_entry (c : def_name) (sign : signature) (mg : exp option) : tel * dsig =
-  match lookup_sign_entry c sign, mg with
-  | Constructor (_, tel, dsig), None -> tel, dsig
+let lookup_cons_entry (sign : signature) (c : def_name) : tel * dsig =
+  match lookup_sign_entry sign c with
+  | Constructor (_, tel, dsig) -> tel, dsig
   | _ -> raise (Error.Error ("Constant " ^ c ^ " was expected to be a constructor.(1)"))
 
-let lookup_syn_cons_entry (c : def_name) (sign : signature) (mg : exp option) : stel * dsig =
-  match lookup_sign_entry c sign, mg with
+
+(* TODO should mg not be optional *)
+let lookup_syn_cons_entry (sign : signature) (c : def_name) (mg : exp option) : stel * dsig =
+  match lookup_sign_entry sign c, mg with
   | SConstructor (_, tel, dsig), Some g ->
     let rec box n = function
       | Var x when n = 0 -> Var x
@@ -79,10 +82,7 @@ let lookup_syn_cons_entry (c : def_name) (sign : signature) (mg : exp option) : 
 
 
 let lookup_sign sign n =
-  (* (\* We generate a new context variable to allow it to be unified with *)
-  (*    any context from the environment. *\) *)
-  (* let flex_box e = Box (Var (gen_floating_name ()) , e) in *)
-  match lookup_sign_entry n sign with
+  match lookup_sign_entry sign n with
   | Definition (_, [], t, _) -> t
   | Definition (_, tel, t, _) -> Pi(tel, t)
 
@@ -128,8 +128,8 @@ type lookup_result
   | P of pat_decls              (* A definition with pattern matching *)
   | N                           (* A non-reducible constant *)
 
-let lookup_sign_def n sign =
-  match lookup_sign_entry n sign with
+let lookup_sign_def sign n =
+  match lookup_sign_entry sign n with
   | Definition (_, _, _, e) -> D e
   | Constructor _ -> N
   | DataDef _ -> N
@@ -138,7 +138,7 @@ let lookup_sign_def n sign =
   | Program (_, _, _, ds) -> P ds
 
 (* returns all the constructors of type n *)
-let lookup_constructors n sign =
+let lookup_constructors sign n =
   let constructs_n = function
     | Constructor(_, _, (n',_)) -> n = n'
     | _ -> false
@@ -147,7 +147,7 @@ let lookup_constructors n sign =
 
 (* Given the name of a type and a spine, return the parameter, the indices *)
 let split_idx_param (sign : signature) (n : def_name) (es : exp list) : exp list * exp list =
-  match lookup_sign_entry n sign with
+  match lookup_sign_entry sign n with
   | DataDef (_, ps, is, _) ->
      Debug.print (fun () -> "Splitting parameters " ^ print_exps es ^ " against " ^ print_tel ps);
      let rec split = function
@@ -199,6 +199,13 @@ let lookup_ctx cG n =
   with
     Not_found -> None
 
+let lookup_ctx_fail cG n =
+  match lookup_ctx cG n with
+  | None -> raise (Error.Violation
+                     ("Unbound var after preprocessing, this cannot happen. (Var: "
+                      ^ print_name n ^ ")"))
+  | Some t -> t
+
 let rec rename_ctx_using_subst (cG : ctx) (sigma : subst) =
   match cG with
   | [] -> []
@@ -218,23 +225,23 @@ let rec append_bctx cP cP' =
   | CtxVar _ -> raise (Error.Violation "Appended a bctx terminating with a CtxVar to another bctx")
   | BSnoc (cP, x, e) -> BSnoc (append_bctx cP cP', x, e)
 
-let lookup_bound_name x cP =
-  let rec lookup i cP =
+let lookup_bound_name cP x =
+  let rec lookup cP i =
     match cP with
     | BSnoc (_, x', t) when x = x' -> i, Clos(t, Shift (i+1))
-    | BSnoc (cP', _, _) -> lookup (i+1) cP'
-    | _ -> raise (Error.Error ("Bound variable had index larger than bound context"))
+    | BSnoc (cP', _, _) -> lookup cP' (i+1)
+    | _ -> raise (Error.Error ("Bound variable " ^ x ^ " not found in bound context"))
   in
-  lookup 0 cP
+  lookup cP 0
 
-let lookup_bound x cP =
-  let rec lookup i cP =
+let lookup_bound cP x =
+  let rec lookup cP i =
     match cP with
     | BSnoc (_, _, t) when i = 0 -> Clos(t, Shift (x+1))
-    | BSnoc (cP', _, _) -> lookup (i-1) cP'
+    | BSnoc (cP', _, _) -> lookup cP' (i-1)
     | _ -> raise (Error.Error ("Bound variable had index larger than bound context"))
   in
-  lookup x cP
+  lookup cP x
 
 let rec bctx_of_lam_stel (fs : string list) (tel : stel) (cP : bctx) : bctx * stel=
     match fs, tel with
