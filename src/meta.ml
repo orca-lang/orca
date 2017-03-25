@@ -287,7 +287,7 @@ let rec subst_of_pats (sigma : pats) (tel : tel) : subst =
 let rec syn_subst_spi (sigma : exp) (tel : stel) (t : exp) : stel * exp =
   match tel with
   | [] -> [], Clos (t, sigma)
-  | (i, n, tt as te)::tel' ->
+  | (i, n, tt)::tel' ->
      (* MMMM is the direction of the compostion the right one? *)
      let tel'', t' = syn_subst_spi (Comp (sigma, Shift 1)) tel' t in
      (i, n, Clos(tt, sigma))::tel'', t'
