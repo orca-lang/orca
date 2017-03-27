@@ -50,20 +50,21 @@ let rec exp_of_pat_subst : pat_subst -> I.exp = function
   | CEmpty -> I.EmptyS
   | CDot (s, i) -> I.Dot(exp_of_pat_subst s, I.BVar i)
 
-let rec exp_of_pat : pat -> I.exp = function
+let rec exp_of_pat sign : pat -> I.exp = function
   | PVar n -> I.Var n
   | PPar n -> I.Var n           (* MMMMM *)
   | PBVar i -> I.BVar i
   | IInac e -> e
   | UInac e -> raise (Error.Violation "We hope to never see you again (this message, not the user)")
-  | PLam (fs, p) -> I.Lam (fs, exp_of_pat p)
-  | PConst (n, ps) -> I.App (I.Const n, List.map exp_of_pat ps)
+  | PLam (fs, p) -> I.Lam (fs, exp_of_pat sign p)
+  | PConst (n, ps) when is_syn_con sign n -> I.AppL (I.Const n, List.map (exp_of_pat sign) ps)
+  | PConst (n, ps) -> I.App (I.Const n, List.map (exp_of_pat sign) ps)
   | PClos (n, s) -> I.Clos (I.Var n, exp_of_pat_subst s)
   | PEmptyS -> I.EmptyS
   | PShift i -> I.Shift i
-  | PDot (p1, p2) -> I.Dot (exp_of_pat p1, exp_of_pat p2)
+  | PDot (p1, p2) -> I.Dot (exp_of_pat sign p1, exp_of_pat sign p2)
   | PNil -> I.Nil
-  | PSnoc (p1, x, p2) -> I.Snoc (exp_of_pat p1, x, exp_of_pat p2)
+  | PSnoc (p1, x, p2) -> I.Snoc (exp_of_pat sign p1, x, exp_of_pat sign p2)
   | PUnder -> raise (Error.Violation "We'd be very surprised if this were to happen.")
   | PWildcard -> raise (Error.Violation "We'd also be very surprised if this were to happen.")
 
@@ -74,17 +75,17 @@ type psubst = single_psubst list
 
 let print_psubst c = "[" ^ (String.concat "," (List.map (fun (x, e) -> print_name x ^ " := " ^ print_pat e) c)) ^ "]"
 
-let rec psubst ((x, p') as s) (p : pat) :  pat =
+let rec psubst sign ((x, p') as s) (p : pat) :  pat =
   match p with
   | PVar n when n = x -> p'
   | PVar n -> PVar n
   | PPar n when n = x -> p'   (* MMMMM *)
   | PPar n -> PPar n
   | PBVar i -> PBVar i
-  | IInac e -> IInac (subst (x, exp_of_pat p') e)
+  | IInac e -> IInac (subst (x, exp_of_pat sign p') e)
   | UInac e -> raise (Error.Violation "We hope to never see you again (this message, not the user)")
-  | PLam (f, p) -> PLam(f, psubst s p)
-  | PConst (n, ps) -> PConst(n, List.map (psubst s) ps)
+  | PLam (f, p) -> PLam(f, psubst sign s p)
+  | PConst (n, ps) -> PConst(n, List.map (psubst sign s) ps)
   | PClos (n, s) when n = x ->
      begin match p' with
      | PVar n' -> PClos (n', s)
@@ -93,25 +94,25 @@ let rec psubst ((x, p') as s) (p : pat) :  pat =
   | PClos (n, s) -> PClos (n, s)
   | PEmptyS -> PEmptyS
   | PShift i -> PShift i
-  | PDot (p1, p2) -> PDot (psubst s p1, psubst s p2)
+  | PDot (p1, p2) -> PDot (psubst sign s p1, psubst sign s p2)
   | PNil -> PNil
-  | PSnoc (p1, x, p2) -> PSnoc (psubst s p1, x, psubst s p2)
+  | PSnoc (p1, x, p2) -> PSnoc (psubst sign s p1, x, psubst sign s p2)
   | PUnder -> PUnder
   | PWildcard -> PWildcard
 
-let rec compose_single_with_psubst s = function
+let rec compose_single_with_psubst sign s = function
   | [] -> []
-  | (y, t') :: sigma -> (y, psubst s t') :: (compose_single_with_psubst s sigma)
+  | (y, t') :: sigma -> (y, psubst sign s t') :: (compose_single_with_psubst sign s sigma)
 
 let pats_of_psubst : psubst -> pats = List.map snd
 
-let simul_psubst sigma p =
-  List.fold_left (fun p s -> psubst s p) p sigma
+let simul_psubst sign sigma p =
+  List.fold_left (fun p s -> psubst sign s p) p sigma
 
-let simul_psubst_on_list sigma ps =
-  List.map (simul_psubst sigma) ps
+let simul_psubst_on_list sign sigma ps =
+  List.map (simul_psubst sign sigma) ps
 
-let compose_psubst sigma delta = List.map (fun (x, t) -> x, simul_psubst sigma t) delta
+let compose_psubst sign sigma delta = List.map (fun (x, t) -> x, simul_psubst sign sigma t) delta
 
 let psubst_of_ctx : ctx -> psubst = List.map (fun (x, _) -> x, PVar x)
 

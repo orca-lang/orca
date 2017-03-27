@@ -40,12 +40,12 @@ let print_unification_problem = function
 
 exception Unification_failure of unification_problem
 
-let rec occur_check n e =
-  let f e = occur_check n e in
-  match e with
+let rec occur_check sign n e =
+  let f e = occur_check sign n e in
+  match Whnf.whnf sign e with
   | Var n' -> n = n'
-  | Pi (tel, t) -> occur_check_tel n tel || occur_check n t
-  | SPi (tel, t) -> occur_check_stel n tel || occur_check n t
+  | Pi (tel, t) -> occur_check_tel sign n tel || occur_check sign n t
+  | SPi (tel, t) -> occur_check_stel sign n tel || occur_check sign n t
   | Box (g, e) -> f g || f e
   | Fn (xs, e) when List.mem n xs -> f e
   | Lam (_, e) -> f e
@@ -55,18 +55,18 @@ let rec occur_check n e =
   | Annot (e1, e2) -> f e1 || f e2
   | AppL (e, es)
   | App (e, es) ->
-     f e || List.fold_left (||) false (List.map (occur_check n) es)
+     f e || List.fold_left (||) false (List.map (occur_check sign n) es)
   | _ -> false
-and occur_check_tel n tel =
+and occur_check_tel sign n tel =
   match tel with
   | [] -> false
   | (_, n', e)::tel when n <> n' ->
-     occur_check n e || occur_check_tel n tel
-  | (_, _, e):: _ -> occur_check n e
-and occur_check_stel n tel =
+     occur_check sign n e || occur_check_tel sign n tel
+  | (_, _, e):: _ -> occur_check sign n e
+and occur_check_stel sign n tel =
   match tel with
   | [] -> false
-  | (_, _, e):: _ ->  occur_check n e
+  | (_, _, e):: _ ->  occur_check sign n e
 
 let print_subst sigma = "[" ^ String.concat ", " (List.map (fun (x, e) -> print_exp e ^ "/" ^ print_name x) sigma) ^ "]"
 
@@ -102,13 +102,13 @@ let rec unify_flex (sign, cG) flex e1 e2 =
       | Var n, Var n' when n = n' -> cG, []
 
       | Var n, _ when is_flex n ->
-         if not (occur_check n e2) then
+         if not (occur_check sign n e2) then
            ctx_subst (n, e2) (rem n cG), [n, e2]
          else
            raise (Unification_failure (Occur_check (n, e2)))
       | _, Var n when is_flex n ->
-         if not (occur_check n e1) then
-           ctx_subst (n, e1) (rem n cG), [n, e1]
+         if not (occur_check sign n e1) then
+           ctx_subst (n, e1) (rem n cG), [n,e1]
          else
            raise (Unification_failure (Occur_check (n, e1)))
       | BVar i, BVar i' when i = i' -> cG, []
@@ -165,16 +165,18 @@ let rec unify_flex (sign, cG) flex e1 e2 =
        let cD', sigma'' = (unify_flex_spi (sign, cD) flex tel1' t1 tel2' t2) in
        cD', sigma' @ sigma''
 
-let get_flex_vars cG e1 e2 = fv cG e1 @ fv cG e2
+let get_flex_vars cG e1 e2 = Util.unique (fv cG e1 @ fv cG e2)
 
 let unify (sign, cG) e1 e2 =
   let flex_vars = get_flex_vars cG e1 e2 in
+  Debug.begin_verbose ();
   Debug.print(fun () -> "Flexible unify\ne1 = " ^ print_exp e1
                         ^ "\ne2 = " ^ print_exp e2
                         ^ "\nwith flexible variables= " ^ print_names flex_vars
                         ^ "\nin context Γ = " ^ print_ctx cG
                         ^ ".");
   let cG', sigma = unify_flex (sign, cG) flex_vars e1 e2 in
+  Debug.end_verbose ();
   let remaining_vars = fv_subst cG' sigma in
   if remaining_vars = []
   then cG', sigma

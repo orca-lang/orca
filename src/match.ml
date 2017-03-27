@@ -9,7 +9,7 @@ module A = Syntax.Apx
 module AP = Print.Apx
 module I = Syntax.Int
 module IP = Print.Int
-module M = Meta
+open Meta
 
 type ctx_map = pats
 
@@ -26,17 +26,17 @@ let rec rename_ctx_using_pats (cG : ctx) (ps : pats) =
   | _ -> raise (Error.Violation "rename_ctx_using_pats. Both arguments should have same length")
 
 
-let rec subst_of_ctx_map (sigma : ctx_map) (tel : I.tel) : M.subst =
+let rec subst_of_ctx_map sign (sigma : ctx_map) (tel : I.tel) : subst =
   match sigma, tel with
   | [], [] -> []
-  | p :: ps, (_, n, t) :: tel' -> (n, exp_of_pat p) :: (subst_of_ctx_map ps tel')
+  | p :: ps, (_, n, t) :: tel' -> (n, Procpat.exp_of_pat sign p) :: (subst_of_ctx_map sign ps tel')
   | _ -> raise (Error.Violation "subst_of_ctx_map got lists of different lengths")
 
-let compose_maps (sigma : ctx_map) (cD : ctx) (delta : ctx_map) : ctx_map =
+let compose_maps sign (sigma : ctx_map) (cD : ctx) (delta : ctx_map) : ctx_map =
   let delta_names = List.map2 (fun (x, _) p -> x, p) cD delta in
   Debug.print(fun () -> "Composing maps\nsigma = " ^ print_pats sigma
       ^ "\ndelta = " ^ print_pats delta ^ "\ndelta_names" ^ print_psubst delta_names);
-  List.map (simul_psubst delta_names) sigma
+  List.map (simul_psubst sign delta_names) sigma
 
 let rec matching (p : pat) (q : pat) : pats =
   match p, q with
@@ -72,12 +72,13 @@ let inac_subst = List.map (fun (x, e) -> x, IInac e)
 let split_flex_unify (sign : signature) (p1 : pats) (thetatel : I.tel) (ps : pats)
                      (cD1 : ctx) (vs : I.exp list) (ws : I.exp list) =
   let sigma, cT = rename_ctx_using_pats (ctx_of_tel thetatel) ps in
+  Debug.begin_verbose ();
   Debug.print (fun () -> "Creating set of flexible variables\np1 = " ^ print_pats p1
     ^ "\nps = " ^ print_pats ps ^ "\ncD1 = " ^ print_ctx cD1 ^ "\ncT = " ^ print_ctx cT);
   let flex = flexible (p1 @ ps) (cD1 @ cT) in
   Debug.print (fun () -> "Flexibles variables are " ^ print_names flex);
-  let vs = List.map (M.simul_subst sigma) vs in
-  let ws = List.map (M.simul_subst sigma) ws in
+  let vs = List.map (simul_subst sigma) vs in
+  let ws = List.map (simul_subst sigma) ws in
   let cD', delta =
     Debug.print (fun () -> "Split unifies vs = " ^ IP.print_exps vs ^ ", ws = " ^ IP.print_exps ws);
     try
@@ -93,21 +94,22 @@ let split_flex_unify (sign : signature) (p1 : pats) (thetatel : I.tel) (ps : pat
   Debug.print (fun () -> "cT = " ^ print_ctx cT ^ "\ncT' = " ^ print_ctx cT');
   let pdelta = inac_subst delta in
   Debug.print (fun () -> "pdelta = " ^ print_psubst pdelta);
+  Debug.end_verbose ();
   cD', cT, delta, pdelta, cT'
 
-let compute_split_map (ss:M.single_subst) (pss:single_psubst) (cD1:ctx) (x:name)
-    (cD2:ctx) (delta : M.subst) (pdelta : psubst) (cD':ctx) : ctx * ctx_map =
+let compute_split_map sign (ss:single_subst) (pss:single_psubst) (cD1:ctx) (x:name)
+    (cD2:ctx) (delta : subst) (pdelta : psubst) (cD':ctx) : ctx * ctx_map =
   Debug.indent ();
   Debug.print (fun () -> "ss = " ^ IP.print_subst [ss]);
   Debug.print (fun () -> "pss = " ^ print_psubst [pss]);
   Debug.print (fun () -> "cD' = " ^ print_ctx cD');
   let id_cD' = psubst_of_ctx cD1 in
-  let delta' = M.compose_single_with_subst ss (delta @ [x, I.Var x]) in
+  let delta' = compose_single_with_subst ss (delta @ [x, I.Var x]) in
   Debug.print (fun () -> "delta' = " ^ IP.print_subst delta');
-  let pdelta = compose_psubst pdelta id_cD' in
+  let pdelta = compose_psubst sign pdelta id_cD' in
   Debug.print (fun () -> "pdelta = " ^ print_psubst pdelta);
   let pdelta_shift = pdelta @ [x, PVar x] in
-  let pdelta' = compose_single_with_psubst pss pdelta_shift in
+  let pdelta' = compose_single_with_psubst sign pss pdelta_shift in
   Debug.print (fun () -> "pdelta' = " ^ print_psubst pdelta');
   let cD'', delta'' = cD' @ (simul_subst_on_ctx delta' cD2),
     (pats_of_psubst (shift_psubst_by_ctx pdelta' cD2)) in
@@ -136,9 +138,14 @@ let split_lam (sign : signature) (p1 : pats) (xs, p : string list * pat) (cD1 : 
               (x, t : name * I.exp) (cD2 : ctx) : ctx * ctx_map =
   Debug.indent ();
   let g, tel, t = match Whnf.whnf sign t with
-    | I.Box(g, I.SPi (tel, t)) -> g, tel, t
-    | t -> raise (Error.Error ("Syntactic abstraction was define in a pattern against"
-        ^ " type which was not syntactic function type in a box. Found " ^ IP.print_exp t))
+    | I.Box(g, t) ->
+       begin match Whnf.whnf sign t with
+       | I.SPi (tel, t) -> g, tel, t
+       | _ -> raise (Error.Error ("Lambda abstraction was used in a pattern that did not have "
+                                  ^ "syntactic function type but instead had type " ^ IP.print_exp t))
+       end
+    | t -> raise (Error.Error ("Lambda abstraction was used in a pattern that did not have boxed type but instead had type "
+                               ^ IP.print_exp t))
   in
   Debug.print (fun () -> "Split SPi(" ^ IP.print_stel tel ^ ", " ^ IP.print_exp t ^ ")");
   let g', tel0, tel' = theta_of_lam' g xs tel in
@@ -152,12 +159,12 @@ let split_lam (sign : signature) (p1 : pats) (xs, p : string list * pat) (cD1 : 
     | _ -> raise (Error.Violation ("Split_lam obtained more than one parameter out of td (" ^ print_ctx td ^ ")"))
   in
   let ss = x, I.Lam (xs, e) in
-  let p' = match simul_psubst_on_list pdelta (pvar_list_of_ctx cT) with
+  let p' = match simul_psubst_on_list sign pdelta (pvar_list_of_ctx cT) with
     | [p'] -> p'
     | _ -> raise (Error.Violation ("Split_lam obtained more than one parameter out of substituting in cT"))
   in
   let pss = x, PLam (xs, p') in
-  let res = compute_split_map ss pss cD1 x cD2 delta pdelta cD' in
+  let res = compute_split_map sign ss pss cD1 x cD2 delta pdelta cD' in
   Debug.deindent (); res
 
 let split_const (sign : signature) (p1 : pats) (c, ps : def_name * pats)
@@ -168,8 +175,16 @@ let split_const (sign : signature) (p1 : pats) (c, ps : def_name * pats)
     match Whnf.whnf sign t with
     | I.App(I.Const n, sp) -> None, n, sp
     | I.Const n -> None, n, []
-    | I.Box(g, I.Const n) -> Some g, n, []
-    | I.Box(g, I.App (I.Const n, sp)) -> Some g, n, sp
+    | I.Box(g, t) ->
+       begin match Whnf.whnf sign t with
+       | I.Const n -> Some g, n, []
+       | I.AppL (h, sp) ->
+          begin match Whnf.whnf sign h with
+          | I.Const n -> Some g, n, sp
+          | e -> raise (Error.Error ("Expected constructor application. Got " ^ IP.print_exp e))
+          end
+       | e -> raise (Error.Error ("Expected constructor application. Got " ^ IP.print_exp e))
+       end
     | e -> raise (Error.Error ("Expected constructor application. Got " ^ IP.print_exp e))
   in
   let us, vs = split_idx_param sign n sp in
@@ -177,22 +192,25 @@ let split_const (sign : signature) (p1 : pats) (c, ps : def_name * pats)
                          ^ " resulted in parameters " ^ IP.print_exps us
                          ^ " and indices " ^ IP.print_exps vs);
 
-  if is_syn_con sign c then
-    raise (Error.Error ("Pattern matching on syntactic constructors not implemented yet."))
-
+  let thetatel, (n', sp) = if is_syn_con sign c then
+                             match maybe_g with
+                             | Some g -> lookup_syn_cons_entry sign c g
+                             | None -> raise (Error.Error "Syntactic constructor was used in pattern that was not of boxed type")
+                           else lookup_cons_entry sign c in
+  Debug.print (fun () -> "thetatel = " ^ IP.print_tel thetatel);
+  if n = n'
+  then
+    let us', ws = split_idx_param sign n sp in
+    let cD', cT, delta, pdelta, td = split_flex_unify sign p1 thetatel ps cD1 vs ws in
+    let ss = if is_syn_con sign c then
+               x, I.AppL (I.Const c, var_list_of_ctx td)
+             else
+               x, I.App (I.Const c, var_list_of_ctx td) in
+    let pss = x, PConst (c, simul_psubst_on_list sign pdelta (pvar_list_of_ctx cT)) in
+    let res = compute_split_map sign ss pss cD1 x cD2 delta pdelta cD' in
+    Debug.deindent (); res
   else
-    let thetatel, (n', sp) = lookup_cons_entry sign c in
-    Debug.print (fun () -> "thetatel = " ^ IP.print_tel thetatel);
-    if n = n'
-    then
-      let us', ws = split_idx_param sign n sp in
-      let cD', cT, delta, pdelta, td = split_flex_unify sign p1 thetatel ps cD1 vs ws in
-      let ss = x, I.App (I.Const c, var_list_of_ctx td) in
-      let pss = x, PConst (c, simul_psubst_on_list pdelta (pvar_list_of_ctx cT)) in
-      let res = compute_split_map ss pss cD1 x cD2 delta pdelta cD' in
-      Debug.deindent (); res
-    else
-      raise (Error.Error ("Get a grip!, wrong constructor. n = \"" ^ n ^ "\"; n' = \"" ^ n' ^ "\""))
+    raise (Error.Error ("Get a grip!, wrong constructor. n = \"" ^ n ^ "\"; n' = \"" ^ n' ^ "\""))
 
 let check_ppar (sign : signature) (p1 : pats) (n : name) (cD1 : ctx)
     (x, t : name * I.exp) (cD2 : ctx) : ctx * ctx_map =
@@ -202,7 +220,7 @@ let check_ppar (sign : signature) (p1 : pats) (n : name) (cD1 : ctx)
     | t -> raise (Error.Error ("Parameter variables can only be used against a boxed type. Found " ^ IP.print_exp t))
   in
 
-  compute_split_map (x, I.Var n) (x, PPar n) cD1 x cD2 [] [] (cD1 @ [n, I.Box (g, t)])
+  compute_split_map sign (x, I.Var n) (x, PPar n) cD1 x cD2 [] [] (cD1 @ [n, I.Box (g, t)])
   (* (\* let cD' = cD1 @ [n, Box (g, t)] @ (simul_subst_on_ctx [x, Var n] cD2) in *\) *)
   (* let delta =  *)
 
@@ -235,7 +253,7 @@ let split_clos (sign : signature) (p1 : pats) (n, s : name * pat_subst) (cD1 : c
     | CDot(s, i) -> I.Dot(subst_of_pat_subst s, I.BVar i)
   in
   match Whnf.apply_inv t s with
-  | Some t -> compute_split_map (x, I.Clos(I.Var n, subst_of_pat_subst s)) (x, PClos(n, s))
+  | Some t -> compute_split_map sign (x, I.Clos(I.Var n, subst_of_pat_subst s)) (x, PClos(n, s))
                                 cD1 x cD2 [] [] (cD1 @ [n, I.Box (get_domain g s, t)])
   | None -> raise (Error.Error ("Cannot check pattern matching clause " ^ print_pat (PClos (n, s))
                                ^ " because it was not possible to compute an inverse substitution for " ^ print_pat_subst s))
@@ -304,7 +322,7 @@ let refine (sign : signature) (p : pats) (cD : ctx) (sigma : ctx_map) : pats * c
   let p' = matchings delta p in
   Debug.print (fun () -> "Calling matchings with delta = " ^ print_pats delta
                          ^ "\np = " ^ print_pats p ^ "\nresulting in " ^ print_pats p' ^ ".");
-  let sd = compose_maps sigma cD delta in
+  let sd = compose_maps sign sigma cD delta in
   Debug.deindent ();
   p' , cD', sd
 
@@ -317,7 +335,7 @@ let check_pats (sign : signature) (p : pats) (cG : ctx) : ctx * ctx_map =
   let rec unify_names p cG =
     match p, cG with
     | [], [] -> []
-    | PVar x :: p', (y, t) :: cG' when x <> y -> (x, t) :: (M.compose_single_with_subst (y, I.Var x) (unify_names p' cG'))
+    | PVar x :: p', (y, t) :: cG' when x <> y -> (x, t) :: (compose_single_with_subst (y, I.Var x) (unify_names p' cG'))
     | _ :: p', s :: cG' -> s :: (unify_names p' cG')
     | _ -> raise (Error.Violation "Length error in unify names")
   in
@@ -349,19 +367,20 @@ let rec check_inacs (sign, cD : signature * ctx) (p : pats) (sigma : ctx_map) (c
      begin match cG with
      | (x, t) :: cG' ->
         let p' = check_inac (sign, cD) p q t in
-        p' :: check_inacs (sign, cD) ps qs (ctx_subst (x, M.exp_of_pat p') cG')
+        p' :: check_inacs (sign, cD) ps qs (ctx_subst (x, exp_of_pat sign p') cG')
      | _ -> raise (Error.Error "The context ended unexpectedly.")
      end
   | [], [] -> []
   | _ -> raise (Error.Error "Size mismatch.")
 
-and check_inacs_syn (sign, cD : signature * ctx) (cP : bctx) (p : pats) (sigma : ctx_map) (cG : ctx) : I.pats =
+and check_inacs_syn (sign, cD : signature * ctx) (cP : bctx) (p : pats) (sigma : ctx_map) (tel : I.stel) : I.pats =
   match p, sigma with
   | p::ps, q::qs ->
-     begin match cG with
-     | (x, t) :: cG' ->
+     begin match tel with
+     | (_, _, t)::tel' ->
         let p' = check_inac_syn (sign, cD) cP p q t in
-        p' :: check_inacs_syn (sign, cD) cP ps qs (ctx_subst (x, M.exp_of_pat p') cG')
+        let tel'' = ss_syn_subst_stel (exp_of_pat sign p') tel' in
+        p' :: check_inacs_syn (sign, cD) cP ps qs tel''
      | _ -> raise (Error.Error "The context ended unexpectedly.")
      end
   | [], [] -> []
@@ -378,7 +397,7 @@ and check_inac (sign, cD : signature * ctx) (p : pat) (q : pat) (t : I.exp) : I.
                raise (Error.Error ("Inacessible pattern check failed with:\n" ^ Unify.print_unification_problem prob))
      in
      Debug.deindent ();
-     I.Innac (M.simul_subst sigma ep')
+     I.Innac (simul_subst sigma ep')
   | UInac ep, IInac eq ->
      Debug.indent ();
      let ep' = check (sign, cD) ep t in
@@ -387,20 +406,19 @@ and check_inac (sign, cD : signature * ctx) (p : pat) (q : pat) (t : I.exp) : I.
                raise (Error.Error ("Inacessible pattern check failed with:\n" ^ Unify.print_unification_problem prob))
      in
      Debug.deindent ();
-     I.Innac (M.simul_subst sigma ep')
+     I.Innac (simul_subst sigma ep')
   | IInac ep, _ -> raise (Error.Violation "Found internal inaccessible pattern in output. Cannot happen")
   | PVar x, PVar y when x = y -> I.PVar x
   | PPar x, PPar y when x = y -> I.PPar x
   | PConst (n, sp), PConst (n', sq) when n = n' ->
      begin match lookup_sign_entry sign n with
      | Constructor (_, tel, _) -> I.PConst (n, check_inacs (sign, cD) sp sq (ctx_of_tel tel))
-     | SConstructor (_, tel, _) ->
-        assert false
-        (* let g = match t with *)
-        (*   | I.Box(g, _) -> g *)
-        (*   | _ -> raise (Error.Violation ("Syntactic constructor was used to split on a non boxed type")) *)
-        (* in *)
-        (* I.PConst (n, check_inacs_syn (sign, cD) (contextify (sign, cD) g) sp sq (ctx_of_tel tel)) *)
+     | SConstructor (_, stel, _) ->
+        let g = match t with
+          | I.Box(g, _) -> g
+          | _ -> raise (Error.Violation ("Syntactic constructor was used to split on a non boxed type"))
+        in
+        I.PConst (n, check_inacs_syn (sign, cD) (contextify (sign, cD) g) sp sq stel)
      | _ -> raise (Error.Violation ("It should have been a constructor."))
      end
   | _ -> begin match t with
@@ -420,7 +438,7 @@ and check_inac_syn (sign, cD : signature * ctx) (cP : bctx) (p : pat) (q : pat) 
                raise (Error.Error ("Inacessible pattern check failed with:\n" ^ Unify.print_unification_problem prob))
      in
      Debug.deindent ();
-     I.Innac (M.simul_subst sigma ep')
+     I.Innac (simul_subst sigma ep')
   | UInac ep, IInac eq ->
      Debug.indent ();
      let ep' = check_syn (sign, cD) cP ep t in
@@ -429,7 +447,7 @@ and check_inac_syn (sign, cD : signature * ctx) (cP : bctx) (p : pat) (q : pat) 
                raise (Error.Error ("Inacessible pattern check failed with:\n" ^ Unify.print_unification_problem prob))
      in
      Debug.deindent ();
-     I.Innac (M.simul_subst sigma ep')
+     I.Innac (simul_subst sigma ep')
   | IInac ep, _ -> raise (Error.Violation "Found internal inaccessible pattern in output. Cannot happen")
   | PVar x, PVar y when x = y -> I.PVar x
   | PPar x, PPar y when x = y -> I.PPar x
@@ -437,8 +455,7 @@ and check_inac_syn (sign, cD : signature * ctx) (cP : bctx) (p : pat) (q : pat) 
      begin match lookup_sign_entry sign n with
      | Constructor (_, tel, _) -> raise (Error.Error ("Used a data type constructor inside a syntactic pattern"))
      | SConstructor (_, tel, _) ->
-        assert false
-        (* I.PConst (n, check_inacs_syn (sign, cD) cP sp sq (ctx_of_tel tel)) *)
+        I.PConst (n, check_inacs_syn (sign, cD) cP sp sq tel)
      | _ -> raise (Error.Violation ("It should have been a constructor."))
      end
   | PLam (xs, p), PLam (ys, q) ->
@@ -479,7 +496,7 @@ let check_clause (sign : signature) (f : def_name) (p : A.pats) (telG : I.tel) (
     Debug.print (fun () -> "LHS was checked:\n cD = " ^ print_ctx cD ^ "\n sigma = "^ IP.print_pats sigma ^ "\n telG = " ^ IP.print_tel telG);
     match rhs with
     | A.Just e ->
-      let t' = M.simul_subst (M.subst_of_pats sigma telG) t in
+      let t' = simul_subst (subst_of_pats sign sigma telG) t in
       Debug.print (fun () -> "Checking RHS " ^ AP.print_exp e ^ " against type " ^ IP.print_exp t' ^ "\nin context " ^ print_ctx cD);
       sigma, I.Just (check (sign, cD) e t')
     | A.Impossible x -> caseless sign cD x t; sigma, I.Impossible x

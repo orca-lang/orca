@@ -1,7 +1,6 @@
 open Syntax
 open Syntax.Int
 open Print.Int
-open Meta
 open Name
 
 type signature_entry
@@ -46,39 +45,25 @@ let lookup_syn_def (sign : signature) (n : def_name) : stel =
 let lookup_cons_entry (sign : signature) (c : def_name) : tel * dsig =
   match lookup_sign_entry sign c with
   | Constructor (_, tel, dsig) -> tel, dsig
-  | _ -> raise (Error.Error ("Constant " ^ c ^ " was expected to be a constructor.(1)"))
+  | _ -> raise (Error.Error ("Constant " ^ c ^ " was expected to be a constructor."))
 
-
-(* TODO should mg not be optional *)
-let lookup_syn_cons_entry (sign : signature) (c : def_name) (mg : exp option) : stel * dsig =
-  match lookup_sign_entry sign c, mg with
-  | SConstructor (_, tel, dsig), Some g ->
-    let rec box n = function
-      | Var x when n = 0 -> Var x
-      | Var x -> Clos (Var x, Shift n)
-      | SPi(tel, t) ->
-        let tel', t' = box_spi n tel t in
-        SPi(tel', t')
-      | Pi(tel, t) ->
-        Pi (List.map (fun (i, x, s) -> i, x,  box n s) tel, box n t)
-      | Const x -> Const x
-      | Fn (xs, e) -> Fn (xs, box n e)
-      | App (e, es) -> App (box n e, List.map (box n) es)
-      | AppL (e, es) -> AppL (box n e, List.map (box n) es)
-      | Lam (xs, e) -> Lam (xs, box (n+(List.length xs)) e)
-      | BVar i -> BVar i
-      | Hole x -> Hole x
-      | Annot (e1, e2) -> Annot (box n e1, box n e2)
-      | _ -> raise (Error.Violation ("Found reference to substitution or context in definition of syntactic constructor "
-                                     ^ c))
-    and box_spi n tel t = match tel with
-      | [] -> [], box n t
-      | (i, x, s) :: tel ->
-        let tel', t' = box_spi (n+1) tel t in
-        (i, x, box n s) :: tel', t'
+let lookup_syn_cons_entry (sign : signature) (c : def_name) (g : exp) : tel * dsig =
+  match lookup_sign_entry sign c with
+  | SConstructor (_, tel, (n, es)) ->
+    let rec abstract tel sl =
+      match tel with
+      | [] -> [], sl
+      | (i, x, s)::tel' ->
+         let sigma = List.fold_right (fun x sigma -> Dot(sigma, x)) sl (Shift (List.length sl)) in
+         let xn = Name.gen_name x in
+         let sl' = Var xn :: sl in
+         let tel'', sl'' = abstract tel' sl'  in
+         (i, xn, Box(g, Clos (s, sigma)))::tel'', sl''
     in
-    List.map (fun (i, x, s) -> i, x, Box (g, box 0 s)) tel, dsig
-  | _ -> raise (Error.Error ("Constant " ^ c ^ " was expected to be a constructor.(2)"))
+    let tel', sl = abstract tel [] in
+    let sigma = List.fold_right (fun x sigma -> Dot(sigma, x)) sl (Shift (List.length sl)) in
+    tel', (n, List.map (fun e -> Clos (e, sigma)) es)
+  | _ -> raise (Error.Error ("Constant " ^ c ^ " was expected to be a syntactic constructor."))
 
 
 let lookup_sign sign n =
@@ -112,7 +97,7 @@ let lookup_sign sign n =
        if pes = [] then
          Const n'
        else
-         App (Const n', pes)
+         AppL (Const n', pes)
      in
      let t' =
        if is = [] then t else SPi (is, t)
@@ -168,51 +153,6 @@ type ctx = (name * exp) list
 
 let print_ctx c = "[" ^ (String.concat "," (List.map (fun (x, e) -> print_name x ^ ": " ^ print_exp e) c)) ^ "]"
 
-let ctx_of_tel : tel -> ctx = List.map (fun (_, x, s) -> x, s)
-
-let exp_list_of_ctx : ctx -> exp list = List.map snd
-
-let subst_of_ctx : ctx -> subst = List.map (fun (x, _) -> x, Var x)
-
-let name_list_of_ctx : ctx -> name list = List.map fst
-
-let var_list_of_ctx : ctx -> exp list = List.map (fun (x, _) -> Var x)
-
-let rec ctx_subst s = function
-  | (x, t) :: cG -> (x, subst s t) :: (ctx_subst s cG)
-  | [] -> []
-
-let shift_subst_by_ctx sigma cG =
-  let sigma' = sigma @ (List.map (fun (x, _) -> x, Var x) cG) in
-  Debug.print (fun () -> "Shift called with sigma = " ^ print_subst sigma
-                         ^ "\ncG = " ^ print_ctx cG
-                         ^ "\nresulting in " ^ print_subst sigma'
-                         ^ ".");
-  sigma'
-
-let simul_subst_on_ctx sigma =
-    List.map (fun (x, e) -> x, simul_subst sigma e)
-
-let lookup_ctx cG n =
-  try
-    Some (List.assoc n cG)
-  with
-    Not_found -> None
-
-let lookup_ctx_fail cG n =
-  match lookup_ctx cG n with
-  | None -> raise (Error.Violation
-                     ("Unbound var after preprocessing, this cannot happen. (Var: "
-                      ^ print_name n ^ ")"))
-  | Some t -> t
-
-let rec rename_ctx_using_subst (cG : ctx) (sigma : subst) =
-  match cG with
-  | [] -> []
-  | (x, t) :: cG' ->
-     match lookup_ctx sigma x with
-     | Some (Var y) -> (y, t) :: (rename_ctx_using_subst cG' sigma)
-     | _ -> (x, t) :: (rename_ctx_using_subst cG' sigma)
 
 type bctx =
 | BNil
@@ -297,7 +237,6 @@ let rec beautify_bound_names xs cP =
   | x::xs ->
     let x' = beautify_bound_name x cP in
     x'::beautify_bound_names xs (BSnoc (cP, x, Star)) (* star is a dummy type *)
-
 
 let rec beautify_idx i cP =
   if not (do_beautify ()) then None

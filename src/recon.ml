@@ -87,12 +87,9 @@ let rec infer (sign, cG : signature * ctx) (e : A.exp) : I.exp * I.exp =
        | h', I.Pi (tel, t) ->
           let sp', t' = check_spine (sign, cG) sp tel t in
           I.App (h', sp'), t'
-
-
        | _, (I.SPi _ as t) ->
          raise (Error.Error ("The left hand side (" ^ AP.print_exp h ^ ") was expected to be of extensional "
                              ^ "function type while it was found to be of intensional function type " ^ IP.print_exp t))
-
        | _, t -> raise (Error.Error ("The left hand side (" ^ AP.print_exp h ^ ") of the application was of type "
                                   ^ IP.print_exp t ^ " which is not of function type"))
        end
@@ -235,22 +232,12 @@ and check_syn_type (sign, cG) cP (e : A.exp) : I.exp =
       in
       let tel', cP' = check_stel_type cP tel in
       I.SPi (tel', check_syn_type (sign, cG) cP' e')
-    (* | A.Pi (tel, e') -> *)
-    (*   let rec check_tel_type cG = function *)
-    (*     | [] -> [] *)
-    (*     | (i, x, s) :: tel -> *)
-    (*       let s' = check_syn_type (sign, cG) cP s in *)
-    (*       (i, x, s') :: (check_tel_type ((x, s') :: cG) tel) *)
-    (*   in *)
-    (*   let tel' = check_tel_type cG tel in *)
-    (*   let e'' = check_syn_type (sign, cG) cP e' in *)
-    (*   I.Pi(tel', e'') *)
     | A.Const n -> if lookup_syn_def sign n = [] then I.Const n
       else raise (Error.Error ("Type " ^ n ^ " is not fully applied."))
     | A.App (A.Const n, es) ->
       let tel = lookup_syn_def sign n in
       begin try
-          I.App (I.Const n, List.map2 (fun e (_, x, t) -> check_syn (sign, cG) cP e t) es tel)
+          I.AppL (I.Const n, List.map2 (fun e (_, x, t) -> check_syn (sign, cG) cP e t) es tel)
         with Invalid_argument _ -> raise (Error.Error ("Type " ^ n ^ " is not fully applied."))
       end
     | _ -> raise (Error.Error (AP.print_exp e ^ " is not a syntactic type."))
@@ -334,9 +321,13 @@ and infer_syn (sign, cG) cP (e : A.exp) =
     | A.App (e, es) ->
       begin match infer_syn (sign, cG) cP e with
       | e', I.SPi (tel, t) ->
-         let es', t' = check_syn_spine (sign, cG) cP es tel t in
+         let es', t' = check_spi_spine (sign, cG) cP es tel t in
          I.AppL (e', es'), t'
-      | _ -> raise (Error.Error "Term in function position is not of function type")
+      | e', I.Pi (tel, t) ->
+         let es', t' = check_syn_spine (sign, cG) cP es tel t in
+         I.App (e', es'), t'
+      | e', t -> raise (Error.Error ("Term " ^ AP.print_exp e
+                                     ^ " in function position is not of function type. Instead:\n" ^ IP.print_exp t))
       end
 
     | A.AppL (e, es) ->
@@ -375,7 +366,7 @@ and infer_syn (sign, cG) cP (e : A.exp) =
 
 and check_syn_spine (sign, cG) cP sp tel t =
   Debug.print (fun () -> "Checking syn spine:\nsp = " ^ AP.print_exps sp
-                         ^ "\ntel = " ^ IP.print_stel tel);
+                         ^ "\ntel = " ^ IP.print_tel tel);
   Debug.indent ();
   let res = match sp, tel with
     | e::sp', (_, x, s)::tel ->
@@ -387,42 +378,39 @@ and check_syn_spine (sign, cG) cP sp tel t =
       in
       Debug.print (fun () -> "Checking syn spine:\ne = " ^ AP.print_exp e
                              ^ "\ns = " ^ IP.print_exp s);
-
-      let tel', t' = syn_subst_spi (I.Dot(I.Shift 0, e')) tel t in
+      let tel', t' = subst_pi (x, e') tel t in
       let sp'', t'' = check_syn_spine (sign, cG) cP sp' tel' t' in
       e'::sp'', t''
-
-
   | [], [] -> [], t
   | _, [] ->
     begin
       match Whnf.whnf sign t with
-      | I.SPi (tel', t') -> check_syn_spine (sign, cG) cP sp tel' t'
+      | I.Pi (tel', t') -> check_syn_spine (sign, cG) cP sp tel' t'
       | _ -> raise (Error.Error ("Unconsumed application cannot check against type " ^ IP.print_exp t))
     end
-  | [], _ -> [], I.SPi (tel, t)
+  | [], _ -> [], I.Pi (tel, t)
   in
   Debug.deindent ();
   res
 
 and check_spi_spine (sign, cG) cP sp tel t =
-  match sp, tel with
-  | e::sp', (_, x, s)::tel ->
-    let e' = check_syn (sign, cG) cP e s in
-    let wrap t = I.Clos (t, (I.Dot (I.Shift 1, e'))) in
-    let tel' = List.map (fun (i, n, e) -> i, n, wrap e) tel in
-    let sp'', t' = check_spi_spine (sign, cG) cP sp' tel' (wrap t) in
-    e'::sp'', t'
-  | [], [] -> [], t
-  | _, [] ->
-    begin
-      match Whnf.whnf sign t with
-      (* Not sure if Pi's are allowed inside boxes *)
-      (* | Pi (tel', t') -> check_spine (sign, cG) sp tel' t' *)
-      | I.SPi (tel', t') -> check_spi_spine (sign, cG) cP sp tel' t
-      | _ -> raise (Error.Error ("Unconsumed application cannot check against type " ^ IP.print_exp t))
-    end
-  | [], _ -> [], I.SPi (tel, t)
+  let rec check_spine sp tel t sl =
+    let sigma = List.fold_right (fun x sigma -> I.Dot(sigma, x)) sl (I.Shift (List.length sl)) in
+    match sp, tel with
+    | e::sp', (_, x, s)::tel ->
+       let e' = check_syn (sign, cG) cP e (I.Clos (s, sigma)) in
+       let sp'', t' = check_spine sp' tel t (e' :: sl) in
+       e'::sp'', t'
+    | [], [] -> [], I.Clos(t, sigma)
+    | _, [] ->
+       begin
+         match Whnf.whnf sign (I.Clos (t, sigma)) with
+         | I.SPi (tel', t') -> check_spi_spine (sign, cG) cP sp tel' t
+         | _ -> raise (Error.Error ("Unconsumed application cannot check against type " ^ IP.print_exp t))
+       end
+    | [], _ -> [], I.SPi (tel, t)
+  in
+  check_spine sp tel t []
 
 and check_spi (sign, cG) cP (tel : A.stel) t =
   match tel with

@@ -54,7 +54,7 @@ let tc_syn_constructor (sign , cG : signature * ctx) (tel : I.stel)
     | [], [] -> []
     | e::es', (_, _, t)::tel' ->
        let e' = check' e t in
-       e' :: check_indices es' (List.map (fun (i, x, t) -> i, x, (I.Clos(t, I.Dot (I.Shift 1, e')))) tel')
+       e' :: check_indices es' (ss_syn_subst_stel e' tel')
     | _ -> raise (Error.Error ("Constructor " ^ n
              ^ " does not return a term of the fully applied type for " ^ n'))
   in

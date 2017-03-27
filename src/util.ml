@@ -8,3 +8,7 @@ let rec concat_n_times n s =
 
 (* Remove n from list l *)
 let (--) l n = List.filter ((<>) n) l
+
+let rec unique : 'a list -> 'a list = function
+  | [] -> []
+  | x::xs -> x::unique (xs -- x)

@@ -2,6 +2,9 @@
 
 open Util
 open Name
+open Sign
+open Print
+open Print.Int
 open Syntax
 open Syntax.Int
 
@@ -260,34 +263,92 @@ let rec exp_of_pat_subst : pat_subst -> exp = function
   | CEmpty -> EmptyS
   | CDot (s, i) -> Dot(exp_of_pat_subst s, BVar i)
 
-let rec exp_of_pat : pat -> exp = function
+let rec exp_of_pat sign : pat -> exp = function
   | PVar n -> Var n
   | PPar n -> Var n           (* MMMMM *)
   | PBVar i -> BVar i
   | Innac e -> e
-  | PLam (fs, p) -> Lam (fs, exp_of_pat p)
-  | PConst (n, ps) -> App (Const n, List.map exp_of_pat ps)
+  | PLam (fs, p) -> Lam (fs, exp_of_pat sign p)
+  | PConst (n, ps) when Sign.is_syn_con sign n ->
+     AppL (Const n, List.map (exp_of_pat sign) ps)
+  | PConst (n, ps) ->
+     App (Const n, List.map (exp_of_pat sign) ps)
   | PClos (n, s) -> Clos (Var n, exp_of_pat_subst s)
   | PEmptyS -> EmptyS
   | PShift i -> Shift i
-  | PDot (p1, p2) -> Dot (exp_of_pat p1, exp_of_pat p2)
+  | PDot (p1, p2) -> Dot (exp_of_pat sign p1, exp_of_pat sign p2)
   | PNil -> Nil
-  | PSnoc (p1, x, p2) -> Snoc (exp_of_pat p1, x, exp_of_pat p2)
+  | PSnoc (p1, x, p2) -> Snoc (exp_of_pat sign p1, x, exp_of_pat sign p2)
   | PUnder -> raise (Error.Violation "We'd be very surprised if this were to happen.")
   | PWildcard -> raise (Error.Violation "We'd also be very surprised if this were to happen.")
 
-let rec subst_of_pats (sigma : pats) (tel : tel) : subst =
+let rec subst_of_pats sign (sigma : pats) (tel : tel) : subst =
   match sigma, tel with
   | [], [] -> []
-  | p :: ps, (_, n, t) :: tel' -> (n, exp_of_pat p) :: (subst_of_pats ps tel')
+  | p :: ps, (_, n, t) :: tel' -> (n, exp_of_pat sign p) :: (subst_of_pats sign ps tel')
   | _ -> raise (Error.Violation "subst_of_ctx_map got lists of different lengths")
 
 (* Applying syntactic substitutions *)
 
-let rec syn_subst_spi (sigma : exp) (tel : stel) (t : exp) : stel * exp =
+let rec syn_subst_stel (sigma : exp) (tel : stel) : stel * exp =
   match tel with
-  | [] -> [], Clos (t, sigma)
+  | [] -> [], sigma
   | (i, n, tt)::tel' ->
-     (* MMMM is the direction of the compostion the right one? *)
-     let tel'', t' = syn_subst_spi (Comp (sigma, Shift 1)) tel' t in
-     (i, n, Clos(tt, sigma))::tel'', t'
+     let tel'', sigma' = syn_subst_stel (ShiftS sigma) tel' in
+     (i, n, Clos(tt, sigma))::tel'', sigma'
+
+let rec ss_syn_subst_spi (e : exp) (tel : stel) : stel * exp =
+  syn_subst_stel (Dot (Shift 1, e)) tel
+
+let rec ss_syn_subst_stel (e : exp) (tel : stel) : stel =
+  fst (ss_syn_subst_spi e tel)
+
+let rec syn_subst_spi (sigma : exp) (tel : stel) (t : exp) : stel * exp =
+  let tel', sigma' = syn_subst_stel sigma tel in
+  tel', Clos(t, sigma')
+
+  let ctx_of_tel : tel -> ctx = List.map (fun (_, x, s) -> x, s)
+
+let exp_list_of_ctx : ctx -> exp list = List.map snd
+
+let subst_of_ctx : ctx -> subst = List.map (fun (x, _) -> x, Var x)
+
+let name_list_of_ctx : ctx -> name list = List.map fst
+
+let var_list_of_ctx : ctx -> exp list = List.map (fun (x, _) -> Var x)
+
+let rec ctx_subst s = function
+  | (x, t) :: cG -> (x, subst s t) :: (ctx_subst s cG)
+  | [] -> []
+
+let shift_subst_by_ctx sigma cG =
+  let sigma' = sigma @ (List.map (fun (x, _) -> x, Var x) cG) in
+  Debug.print (fun () -> "Shift called with sigma = " ^ print_subst sigma
+                         ^ "\ncG = " ^ print_ctx cG
+                         ^ "\nresulting in " ^ print_subst sigma'
+                         ^ ".");
+  sigma'
+
+let simul_subst_on_ctx sigma =
+    List.map (fun (x, e) -> x, simul_subst sigma e)
+
+let lookup_ctx cG n =
+  try
+    Some (List.assoc n cG)
+  with
+    Not_found -> None
+
+let lookup_ctx_fail cG n =
+  match lookup_ctx cG n with
+  | None -> raise (Error.Violation
+                     ("Unbound var after preprocessing, this cannot happen. (Var: "
+                      ^ print_name n ^ ")"))
+  | Some t -> t
+
+let rec rename_ctx_using_subst (cG : ctx) (sigma : subst) =
+  match cG with
+  | [] -> []
+  | (x, t) :: cG' ->
+     match lookup_ctx sigma x with
+     | Some (Var y) -> (y, t) :: (rename_ctx_using_subst cG' sigma)
+     | _ -> (x, t) :: (rename_ctx_using_subst cG' sigma)

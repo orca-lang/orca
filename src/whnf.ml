@@ -49,10 +49,13 @@ let apply_inv e s =
     | Clos (e, s'), _ -> Clos(e, apply_inv s' s)
 
     | EmptyS,_ -> EmptyS
-    | Shift _, _
+    | Shift n, CShift m when n >= m -> Shift (n - m)
+    | Shift n, CShift _ -> raise (Error.Error "Shift too long")
+    | Shift n, CEmpty -> EmptyS
+    | Shift n, CDot(_,_) -> assert false
 
-    | Dot _, _
-    | Comp _, _
+    | Dot (s, e), s' -> Dot (apply_inv s s', apply_inv e s')
+    | Comp _, _-> assert false
     | ShiftS _, _-> assert false
 
   in
@@ -155,6 +158,10 @@ and whnf (sign : signature) (e : exp) : exp =
        whnf sign (App(h, sp @ sp'))
     | App(h, []) ->
        whnf sign h
+    | AppL(AppL(h, sp), sp') ->
+       whnf sign (AppL(h, sp @ sp'))
+    | AppL(h, []) ->
+       whnf sign h
     | Pi (tel, Pi (tel', t)) -> whnf sign (Pi (tel @ tel', t))
     | SPi (tel, SPi (tel', t)) -> whnf sign (SPi (tel @ tel', t))
 
@@ -199,7 +206,6 @@ and rewrite (sign : signature) (e : exp) : exp =
   let dmsg msg e' = Debug.print (fun () -> "Rewriting rule: " ^ msg ^ "\ne = " ^ print_exp e ^ "\ne' = " ^ print_exp e'); e' in
   (* Debug.print (fun () -> "Rewriting " ^ print_exp e); *)
   Debug.indent ();
-  Debug.begin_verbose();
   let res = match e with
 
   (* Syntactic rewriting rules *)
@@ -249,7 +255,7 @@ and rewrite (sign : signature) (e : exp) : exp =
   | Clos (BVar n, ShiftS s) when n > 0 -> w (dmsg "RVarLift 1" (Clos(BVar (n-1), Comp(Shift 1, s))))
 
   (* RVarLift 2 *)
-  | Clos (BVar n, Comp(s2, ShiftS s1)) when n > 0 -> w (dmsg "RVarLift 2" (Clos(BVar (n-1), Comp (s1, Comp(Shift 1, s2)))))
+  | Clos (BVar n, Comp(s2, ShiftS s1)) when n > 0 -> w (dmsg "RVarLift 2" (Clos(BVar (n-1), Comp (Comp(s2, Shift 1), s1))))
 
   (* AssEnv *)
   | Comp(s1, Comp(s2, s3)) -> w (dmsg "AssEnv" (Comp(Comp(s1, s2), s3)))
@@ -283,24 +289,23 @@ and rewrite (sign : signature) (e : exp) : exp =
   (* Congruence rules *)
   | Clos (Const n, _) -> w (dmsg "CongClosConst" (Const n))
   | Clos (Clos (e, s1), s2) -> w (dmsg "CongClosClos" (Clos (e, Comp(s2, s1))))
-  | Clos (App(e, es), s) -> w (dmsg "CongClosApp" (App(Clos(e, s), List.map (fun e-> Clos(e, s)) es)))
   | Clos (AppL(e, es), s) -> w (dmsg "CongClosAppL" (AppL(Clos(e, s), List.map (fun e-> Clos(e, s)) es)))
   | Clos (Lam (xs, e), s) -> (dmsg "CongClosLam" (Lam (xs, Clos (e, List.fold_left (fun s _ -> ShiftS s) s xs))))
   | Clos (Set n, s) -> (dmsg "CongClosSet" (Set n))
   | Clos (Star, s) -> (dmsg "CongClosStar" Star)
-  | Clos (Pi(tel, t), s) ->
-     let tel' = List.map (fun (i, x, e) -> i, x, Clos (e, s)) tel in
-     (dmsg "CongClosPi" (Pi(tel', Clos (t, s))))
+  (* | Clos (Pi(tel, t), s) -> *)
+  (*    let tel' = List.map (fun (i, x, e) -> i, x, Clos (e, s)) tel in *)
+  (*    (dmsg "CongClosPi" (Pi(tel', Clos (t, s)))) *)
   | Clos (SPi(tel, t), s) ->
      let tel', s = cong_stel tel s in
     (dmsg "CongClosSPi" (SPi (tel', Clos (t, s))))
-  | Clos (Fn (x, e), s) -> (dmsg "CongClosFn" (Fn (x, Clos(e, s))))
-  | Clos (Annot (e, t), s) -> (dmsg "CongClosAnnot" (Annot (Clos(e,s), Clos(t, s))))
+  (* | Clos (Fn (x, e), s) -> (dmsg "CongClosFn" (Fn (x, Clos(e, s)))) *)
+  (* | Clos (Annot (e, t), s) -> (dmsg "CongClosAnnot" (Annot (Clos(e,s), Clos(t, s)))) *)
 
  (* Contexts bind their own variables *)
-  | Clos (Ctx, s) -> Ctx
-  | Clos (Snoc (g, x, t), s) -> Snoc (g, x, t)
-  | Clos (Nil, s) -> Nil
+  (* | Clos (Ctx, s) -> Ctx *)
+  (* | Clos (Snoc (g, x, t), s) -> Snoc (g, x, t) *)
+  (* | Clos (Nil, s) -> Nil *)
 
   (* Not quite weak head normalisation *)
   | Clos (e, s) -> let s' = w s in
@@ -358,6 +363,11 @@ and rewrite (sign : signature) (e : exp) : exp =
 
   in
   Debug.deindent ();
-  Debug.end_verbose();
   (* Debug.print (fun () -> "===> " ^ print_exp res); *)
+  res
+
+let whnf sign e =
+  Debug.begin_verbose ();
+  let res = whnf sign e in
+  Debug.end_verbose ();
   res
