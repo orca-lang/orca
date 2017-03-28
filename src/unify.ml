@@ -212,12 +212,14 @@ and unify_flex_pi (sign, cG as ctxs: signature * ctx) cD cP (flex : name list) (
   | tel1, [] -> unify_flex ctxs cD cP flex (Pi (tel1, t1)) t2 (Set 0)
   | [], tel2 -> unify_flex ctxs cD cP flex t1 (Pi (tel2, t2)) (Set 0)
   | (_, n1, e1)::tel1, (_, n2, e2)::tel2 ->
-     let cD', sigma' = unify_flex ctxs cD cP flex e1 e2 (Set 0) in
-     let sigma = (n1, Var n2) :: sigma'  in
-     let tel1' = simul_subst_in_tel sigma tel1 in
-     let tel2' = simul_subst_in_tel sigma tel2 in
-     let cD'', sigma'' = unify_flex_pi (sign, (n2, e2) :: cG) cD' cP flex tel1' t1 tel2' t2 in
-     cD'', sigma @ sigma''
+    let cD', sigma' = unify_flex ctxs cD cP flex e1 e2 (Set 0) in
+    let sigma = (n1, Var n2) :: sigma'  in
+    let tel1' = simul_subst_in_tel sigma tel1 in
+    let tel2' = simul_subst_in_tel sigma tel2 in
+    let t1' = simul_subst sigma t1 in
+    let t2' = simul_subst sigma t2 in
+    let cD'', sigma'' = unify_flex_pi (sign, (n2, e2) :: cG) cD' cP flex tel1' t1' tel2' t2' in
+    cD'', sigma'' @ sigma'
 
 and unify_flex_spi (sign, cG as ctxs: signature * ctx) cD cP (flex : name list) (tel1 : stel) (t1 : exp) (tel2 : stel) (t2 : exp) =
   let simul_subst_in_tel sigma tel =
@@ -231,8 +233,8 @@ and unify_flex_spi (sign, cG as ctxs: signature * ctx) cD cP (flex : name list) 
      let cD, sigma' = unify_flex ctxs cD cP flex e1 e2 Star in
      let tel1' = simul_subst_in_tel sigma' tel1 in
      let tel2' = simul_subst_in_tel sigma' tel2 in
-     let cD', sigma'' = (unify_flex_spi (sign, cD) cD cP flex tel1' t1 tel2' t2) in
-     cD', sigma' @ sigma''
+     let cD', sigma'' = (unify_flex_spi (sign, cG) cD cP flex tel1' t1 tel2' t2) in
+     cD', sigma'' @ sigma'
 
 let get_flex_vars cG e1 e2 = Util.unique (fv cG e1 @ fv cG e2)
 
@@ -245,6 +247,7 @@ let unify (sign, cG) e1 e2 t =
                         ^ "\nin context Γ = " ^ print_ctx cG
                         ^ ".");
   let cG', sigma = unify_flex (sign, cG) cG BNil flex_vars e1 e2 t in
+  Debug.print(fun () -> "cG' = " ^ print_ctx cG' ^ "\nsigma = " ^ print_subst sigma);
   Debug.end_verbose ();
   let remaining_vars = fv_subst cG' sigma in
   if remaining_vars = []
