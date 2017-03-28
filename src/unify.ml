@@ -202,6 +202,7 @@ and unify_heads (sign, cG) cD cP flex e1 e2 es1 es2 =
   | BVar i as e1, BVar i' when i = i' ->
      unify_many cG es1 es2 (get_type_params (infer_head_type (sign, cG) cP e1))
   | Clos(e1, e1'), Clos(e2, e2') ->
+     assert false
   | e1, e2 -> raise (Error.Violation ("Heads failed to unify\ne1 = " ^ print_exp e1 ^ "\ne2 = " ^ print_exp e2))
 
 and unify_flex_many (sign, cG) cD cP flex es1 es2 ts =
@@ -218,7 +219,6 @@ and unify_flex_many (sign, cG) cD cP flex es1 es2 ts =
        unify_all (cD', sigma') es1 es2 ts
     | _ -> raise (Unification_failure (Unequal_number_params (es1, es2)))
   in
-
   unify_all (cD, []) es1 es2 ts
 
 
