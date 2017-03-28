@@ -61,10 +61,6 @@ let rec infer (sign, cG : signature * ctx) (e : A.exp) : I.exp * I.exp =
        | h', I.Pi (tel, t) ->
           let sp', t' = check_spine (sign, cG) sp tel t in
           I.App (h', sp'), t'
-<<<<<<< HEAD
-=======
-
->>>>>>> Working on the unification
        | _, (I.SPi _ as t) ->
          raise (Error.Error ("The left hand side (" ^ AP.print_exp h ^ ") was expected to be of extensional "
                              ^ "function type while it was found to be of intensional function type " ^ IP.print_exp t))

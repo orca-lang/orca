@@ -83,6 +83,7 @@ let split_flex_unify (sign : signature) (p1 : pats) (thetatel : I.tel) (ps : pat
     Debug.print (fun () -> "Split unifies vs = " ^ IP.print_exps vs ^ ", ws = " ^ IP.print_exps ws);
     try
       let cG = cD1 @ cT in
+      Debug.print (fun () -> "Flex unify uses cG = " ^ print_ctx cG ^ " and flex = " ^ print_names flex);
       Unify.unify_flex_many (sign, cG) cG BNil flex vs ws ts
     with
       Unify.Unification_failure prob ->
@@ -101,6 +102,7 @@ let split_flex_unify (sign : signature) (p1 : pats) (thetatel : I.tel) (ps : pat
 let compute_split_map sign (ss:single_subst) (pss:single_psubst) (cD1:ctx) (x:name)
     (cD2:ctx) (delta : subst) (pdelta : psubst) (cD':ctx) : ctx * ctx_map =
   Debug.indent ();
+  Debug.begin_verbose ();
   Debug.print (fun () -> "ss = " ^ IP.print_subst [ss]);
   Debug.print (fun () -> "pss = " ^ print_psubst [pss]);
   Debug.print (fun () -> "cD' = " ^ print_ctx cD');
@@ -116,6 +118,7 @@ let compute_split_map sign (ss:single_subst) (pss:single_psubst) (cD1:ctx) (x:na
     (pats_of_psubst (shift_psubst_by_ctx pdelta' cD2)) in
   Debug.print (fun () -> "Split! \ncD2 = " ^ print_ctx cD2 ^ "\ndelta' = " ^ print_psubst pdelta'
                          ^ "\n delta'' = " ^ print_pats delta'' ^ "\n cD'' = " ^ print_ctx cD'');
+  Debug.end_verbose ();
   Debug.deindent ();
   cD'', delta''
 
@@ -182,11 +185,11 @@ let split_const (sign : signature) (p1 : pats) (c, ps : def_name * pats)
        | I.AppL (h, sp) ->
           begin match Whnf.whnf sign h with
           | I.Const n -> Some g, n, sp
-          | e -> raise (Error.Error ("Expected constructor application. Got " ^ IP.print_exp e))
+          | e -> raise (Error.Error ("Expected constructor application1. Got " ^ IP.print_exp e))
           end
-       | e -> raise (Error.Error ("Expected constructor application. Got " ^ IP.print_exp e))
+       | e -> raise (Error.Error ("Expected constructor application2. Got " ^ IP.print_exp e))
        end
-    | e -> raise (Error.Error ("Expected constructor application. Got " ^ IP.print_exp e))
+    | e -> raise (Error.Error ("Expected constructor application3. Got " ^ IP.print_exp e))
   in
   let us, vs, ts = split_idx_param sign n sp in
   Debug.print (fun () -> "For " ^ n ^ " the split of " ^ IP.print_exps sp

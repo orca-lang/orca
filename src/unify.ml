@@ -186,20 +186,21 @@ and unify_heads (sign, cG) cD cP flex e1 e2 es1 es2 =
   | _ -> raise (Error.Violation "Heads failed to unify")
 
 and unify_flex_many (sign, cG) cD cP flex es1 es2 ts =
-  let unify_each (cG', sigma1) e1 e2 t =
-    let cD', sigma' = unify_flex (sign, cG') cD cP flex (simul_subst sigma1 e1) (simul_subst sigma1 e2) t in
+  let unify_each (cD, sigma1) e1 e2 t =
+    let cD', sigma' = unify_flex (sign, cG) cD cP flex (simul_subst sigma1 e1) (simul_subst sigma1 e2) t in
     cD', sigma' @ sigma1
   in
-  let rec unify_all (cD', sigma) es1 es2 ts =
+  let rec unify_all (cD, sigma) es1 es2 ts =
     match es1, es2, ts with
-    | [], [], [] -> cD', sigma
+    | [], [], [] -> cD, sigma
     | e1::es1, e2::es2, t::ts ->
-       let cD'', sigma' = unify_each (cD', sigma) e1 e2 t in
-       unify_all (cD'', sigma') es1 es2 ts
+      let cD', sigma' = unify_each (cD, sigma) e1 e2 t in
+      Debug.print (fun () -> "Flex many got cD' = " ^ print_ctx cD');
+       unify_all (cD', sigma') es1 es2 ts
     | _ -> raise (Unification_failure (Unequal_number_params (es1, es2)))
   in
 
-  unify_all (cG, []) es1 es2 ts
+  unify_all (cD, []) es1 es2 ts
 
 
 and unify_flex_pi (sign, cG as ctxs: signature * ctx) cD cP (flex : name list) (tel1 : tel) (t1 : exp) (tel2 : tel) (t2 : exp) =
@@ -207,7 +208,7 @@ and unify_flex_pi (sign, cG as ctxs: signature * ctx) cD cP (flex : name list) (
     List.map (fun (i, n, e) -> i, n, simul_subst sigma e) tel
   in
   match tel1, tel2 with
-  | [], [] -> unify_flex ctxs cD cP flex t1 t2 (Set 0) (* the 0 is because we really don't care which unive *)
+  | [], [] -> unify_flex ctxs cD cP flex t1 t2 (Set 0) (* the 0 is because we really don't care which universe *)
   | tel1, [] -> unify_flex ctxs cD cP flex (Pi (tel1, t1)) t2 (Set 0)
   | [], tel2 -> unify_flex ctxs cD cP flex t1 (Pi (tel2, t2)) (Set 0)
   | (_, n1, e1)::tel1, (_, n2, e2)::tel2 ->

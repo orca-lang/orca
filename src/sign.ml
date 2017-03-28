@@ -132,7 +132,7 @@ let lookup_constructors sign n =
 
 (* Given the name of a type and a spine, return the parameter, the indices *)
 let split_idx_param (sign : signature) (n : def_name) (es : exp list) : exp list * exp list * exp list =
-  match lookup_sign_entry n sign with
+  match lookup_sign_entry sign n with
   | DataDef (_, ps, is, _) ->
      Debug.print (fun () -> "Splitting parameters " ^ print_exps es ^ " against " ^ print_tel ps);
      let rec split = function
@@ -143,6 +143,7 @@ let split_idx_param (sign : signature) (n : def_name) (es : exp list) : exp list
        | _ -> raise (Error.Violation "Ran out of parameters.")
      in
      let vs, us = split (es, ps) in
+     Debug.print (fun () -> "Resulting split is\nvs = " ^ print_exps vs ^ "\nus = " ^ print_exps us);
      vs, us, List.map (fun (_, _,t) -> t) is
   | SynDef (_, ts) ->
     [], es, List.map (fun (_, _,t) -> t) ts

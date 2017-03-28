@@ -373,7 +373,5 @@ and rewrite (sign : signature) (e : exp) : exp =
   res
 
 let whnf sign e =
-  Debug.begin_verbose ();
   let res = whnf sign e in
-  Debug.end_verbose ();
   res

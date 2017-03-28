@@ -2,7 +2,7 @@ open Syntax.Int
 open Print.Int
 open Name
 open Sign
-
+open Meta
 
 let rec contextify (sign, cG) (g : exp) =
   match Whnf.whnf sign g with
