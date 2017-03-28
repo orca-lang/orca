@@ -75,6 +75,27 @@ type ctx_weakening
   | LeftWeakening of int
   | RightWeakening of int
 
+let rec infer_head_type (sign, cG) cP e =
+  let rec get_app_tp tel es t =
+    match tel, es with
+    | [], [] -> t
+    | tel, [] -> Pi(tel, t)
+    | (_, n, _)::tel, e::es ->
+      let tel', t' = subst_pi (n, e) tel t in
+      get_app_tp tel' es t'
+    | _ -> raise (Error.Violation ("Application not consumed when pi type expired"))
+  in
+  match Whnf.whnf sign e with
+  | Var x -> lookup_ctx_fail cG x
+  | Const n -> lookup_sign sign n
+  | BVar i -> lookup_bound cP i
+  | App(h, es) ->
+    begin match infer_head_type (sign, cG) cP h with
+    | Pi(tel, t) -> get_app_tp tel es t
+    | _ -> raise (Error.Violation ("Wrong type on welltyped application"))
+    end
+  | e -> raise (Error.Violation ("Unexpected term in head position: " ^ print_exp e))
+
 (* cG is context to make types work, cD is initial context and is the
    one we remove unified variables from for the purpose of pattern matching *)
 let rec unify_flex (sign, cG) cD cP flex e1 e2 t =
@@ -125,12 +146,16 @@ let rec unify_flex (sign, cG) cD cP flex e1 e2 t =
          else
            raise (Unification_failure (Occur_check (n, e1)))
       | BVar i, BVar i', _ when i = i' -> cD, []
-      | Clos(e1, e2), Clos(e1', e2'), _ ->
-         assert false (* unify_many cG [e1;e2] [e1';e2'] *)
+      | Clos(e1, e2), Clos(e1', e2'), t ->
+        let cD', sigma = unify_flex cG cD cP e1 e1' t in
+        begin match infer_head_type (sign, cG) cP (simul_subst sigma e1) with
+        | Box(g, t) -> let cD'', sigma' = unify_flex cG cD' cP e2 e2' g in
+                       cD'', sigma' @ sigma
+        | _ -> raise (Error.Violation "Closure was applied on term not of boxed type")
+        end
       | EmptyS, EmptyS, _ -> cD, []
       | Shift n, Shift n', _ -> cD, [] (* TODO new unification on contexts allowing weakening *)
-      | Dot(e1, e2), Dot(e1', e2'), _ ->
-         assert false (* unify_many cG [e1;e2] [e1';e2'] *)
+      | Dot(e1, e2), Dot(e1', e2'), (Snoc(g, _, t)) -> unify_many cG [e1;e2] [e1';e2'] [g ; t]
       | Comp (e1, e2), Comp(e1', e2'), _ ->
          assert false (* unify_many cG [e1;e2] [e1';e2'] *)
 
@@ -147,43 +172,37 @@ let rec unify_flex (sign, cG) cD cP flex e1 e2 t =
 and unify_heads (sign, cG) cD cP flex e1 e2 es1 es2 =
   let is_flex n = List.mem n flex in
   let unify_many cG e1 e2 = unify_flex_many (sign, cG) cD cP flex e1 e2 in
-  let infer_head_type = function
-    | Var x -> lookup_ctx_fail cG x
-    | Const n -> lookup_sign sign n
-    | BVar i -> lookup_bound cP i
-    | _ -> raise (Error.Violation "Unexpected term in head position")
-  in
   let get_type_params = function
     | Pi(tel, _) -> List.map (fun (_,_,t) -> t) tel
     | SPi(tel, _) -> List.map (fun (_,_,t) -> t) tel
     | _ -> []
   in
   let rem n cG = List.filter (fun (x, _) -> x <> n) cG in
-  match e1, e2 with
+  match Whnf.whnf sign e1, Whnf.whnf sign e2 with
   (* Cases with unification variables *)
   | Var x, Var y when is_flex x && is_flex y ->
      raise (Error.Violation "How did we even get here?")
-  | Var x, Var y when x = y ->
-     unify_many cG es1 es2 (get_type_params (infer_head_type e1))
+  | Var x as e1, Var y when x = y ->
+     unify_many cG es1 es2 (get_type_params (infer_head_type (sign, cG) cP e1))
   | Var x, e2 when is_flex x ->
      let sub = x, e2 in
-     let ts = List.map (subst sub) (get_type_params (infer_head_type e2)) in
+     let ts = List.map (subst sub) (get_type_params (infer_head_type (sign, cG) cP e2)) in
      let es1' = List.map (subst sub) es1 in
      let es2' = List.map (subst sub) es2 in
      let cD', sigma = unify_many (ctx_subst sub (rem x cG)) es1' es2' ts in
      (rem x cD'), sub::sigma
   | e1, Var y when is_flex y ->
      let sub = y, e1 in
-     let ts = List.map (subst sub) (get_type_params (infer_head_type e1)) in
+     let ts = List.map (subst sub) (get_type_params (infer_head_type (sign, cG) cP e1)) in
      let _, sigma = unify_many (ctx_subst sub (rem y cG)) es1 es2 ts in
      (rem y cD), sub::sigma
   (* Cases  with rigid heads *)
-  | Const n, Const n' when n = n' ->
-     unify_many cG es1 es2 (get_type_params (infer_head_type e1))
-  | BVar i, BVar i' when i = i' ->
-     unify_many cG es1 es2 (get_type_params (infer_head_type e1))
-
-  | _ -> raise (Error.Violation "Heads failed to unify")
+  | Const n as e1, Const n' when n = n' ->
+     unify_many cG es1 es2 (get_type_params (infer_head_type (sign, cG) cP e1))
+  | BVar i as e1, BVar i' when i = i' ->
+     unify_many cG es1 es2 (get_type_params (infer_head_type (sign, cG) cP e1))
+  | Clos(e1, e1'), Clos(e2, e2') ->
+  | e1, e2 -> raise (Error.Violation ("Heads failed to unify\ne1 = " ^ print_exp e1 ^ "\ne2 = " ^ print_exp e2))
 
 and unify_flex_many (sign, cG) cD cP flex es1 es2 ts =
   let unify_each (cD, sigma1) e1 e2 t =
