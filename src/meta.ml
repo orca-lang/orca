@@ -184,7 +184,7 @@ let refresh_free_vars (rep : (name * name) list) e =
 type single_subst = name * exp
 type subst = single_subst list
 
-let fv_subst cG sigma = List.concat (List.map (fun (n, e) -> fv cG e -- n) sigma)
+let fv_subst cG sigma = List.concat (List.map (fun (_, e) -> fv cG e) sigma)
 
 let rec subst (x, es : single_subst) (e : exp) :  exp =
   let f e = subst (x, es) e in
