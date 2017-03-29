@@ -90,6 +90,11 @@ let rec match_pat sign p e =
      match_pats sign ps sp
   | PConst (n, _), App(Const n', _) ->
      raise (Matching_failure (p, e))
+  | PConst (n, ps), AppL(Const n', sp) when n = n' ->
+     match_pats sign ps sp
+  | PConst (n, _), AppL(Const n', _) ->
+     raise (Matching_failure (p, e))
+
   | _ when check_stuck e -> raise Stuck
   | _ -> raise (Matching_failure (p, e))
 
