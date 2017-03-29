@@ -216,12 +216,16 @@ and rewrite (sign : signature) (e : exp) : exp =
   (* Syntactic rewriting rules *)
 
   (* Beta reduction *)
-    | AppL(Lam (_, e1), es) ->
-      let rec f es = match es with
-        | [] -> Shift 0
-        | e :: es -> Dot (f es, e)
-      in
-      w (dmsg "beta reduction" (Clos(e1, f es)))
+    | AppL(e, es) ->
+      begin match w e with
+      | Lam (_, e1) ->
+        let rec f es = match es with
+          | [] -> Shift 0
+          | e :: es -> Dot (f es, e)
+        in
+        w (dmsg "beta reduction" (Clos(e1, f es)))
+      | e -> AppL(e, es)
+      end
 
   (* IdL *)
   | Comp(Shift 0, s) -> w (dmsg "IdL" s)
