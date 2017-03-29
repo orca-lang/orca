@@ -107,7 +107,6 @@ let lookup_sign sign n =
 
   | Program (_,tel,t, _) -> if tel = [] then t else Pi (tel, t)
 
-
 type lookup_result
   = D of exp                    (* A definition without pattern matching *)
   | P of pat_decls              (* A definition with pattern matching *)
@@ -130,29 +129,11 @@ let lookup_constructors sign n =
   in
   List.map signature_entry_name (List.filter constructs_n sign)
 
-(* Given the name of a type and a spine, return the parameter, the indices *)
-let split_idx_param (sign : signature) (n : def_name) (es : exp list) : exp list * exp list =
-  match lookup_sign_entry sign n with
-  | DataDef (_, ps, is, _) ->
-     Debug.print (fun () -> "Splitting parameters " ^ print_exps es ^ " against " ^ print_tel ps);
-     let rec split = function
-       | e::es, _::ps ->
-          let es1, es2 = split (es, ps) in
-          e::es1, es2
-       | es, [] -> [], es
-       | _ -> raise (Error.Violation "Ran out of parameters.")
-     in
-     split (es, ps)
-  | SynDef _ ->
-    [], es
-  | _ -> raise (Error.Error ("split_idx_param expected a datatype."))
-
 let rec print_signature sign = "[" ^ String.concat "; " (List.map signature_entry_name sign) ^ "]"
 
 type ctx = (name * exp) list
 
 let print_ctx c = "[" ^ (String.concat "," (List.map (fun (x, e) -> print_name x ^ ": " ^ print_exp e) c)) ^ "]"
-
 
 type bctx =
 | BNil

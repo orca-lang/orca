@@ -185,4 +185,4 @@ let unify (sign, cG) e1 e2 =
 
 let unify_many (sign, cG) es1 es2 =
   let flex = List.fold_left2 (fun ns e e' -> ns @ get_flex_vars cG e e') [] es1 es2 in
-  unify_flex_many sign flex es1 es2
+  unify_flex_many (sign, cG) flex es1 es2

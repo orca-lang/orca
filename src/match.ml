@@ -14,6 +14,28 @@ open Meta
 type ctx_map = pats
 
 
+(* Given the name of a type and a spine, return the parameter, the indices *)
+let split_idx_param (sign : signature) (cG : ctx) (n : def_name) (es1 : I.exp list)
+    (es2 : I.exp list) : ctx * I.exp list * I.exp list * I.exp list =
+  match lookup_sign_entry sign n with
+  | DataDef (_, ps, is, _) ->
+     Debug.print (fun () -> "Splitting parameters " ^ IP.print_exps es1 ^ " against " ^ IP.print_tel ps);
+     let rec split = function
+       | e::es, _::ps ->
+          let es1, es2 = split (es, ps) in
+          e::es1, es2
+       | es, [] -> [], es
+       | _ -> raise (Error.Violation "Ran out of parameters.")
+     in
+     let us1, vs1 = split (es1, ps) in
+     let us2, vs2 = split (es2, ps) in
+     let cD, sigma = Unify.unify_many (sign, cG) us1 us2 in
+     cD, (List.map (simul_subst sigma) us1), (List.map (simul_subst sigma) vs1), (List.map (simul_subst sigma) vs2)
+  | SynDef _ ->
+    cG, [], es1, es2
+  | _ -> raise (Error.Error ("split_idx_param expected a datatype."))
+
+
 let rec rename_ctx_using_pats (cG : ctx) (ps : pats) =
   match cG, ps with
   | [], [] -> [], []
@@ -187,12 +209,7 @@ let split_const (sign : signature) (p1 : pats) (c, ps : def_name * pats)
        end
     | e -> raise (Error.Error ("Expected constructor application. Got " ^ IP.print_exp e))
   in
-  let us, vs = split_idx_param sign n sp in
-  Debug.print (fun () -> "For " ^ n ^ " the split of " ^ IP.print_exps sp
-                         ^ " resulted in parameters " ^ IP.print_exps us
-                         ^ " and indices " ^ IP.print_exps vs);
-
-  let thetatel, (n', sp) = if is_syn_con sign c then
+  let thetatel, (n', sp') = if is_syn_con sign c then
                              match maybe_g with
                              | Some g -> lookup_syn_cons_entry sign c g
                              | None -> raise (Error.Error "Syntactic constructor was used in pattern that was not of boxed type")
@@ -200,7 +217,7 @@ let split_const (sign : signature) (p1 : pats) (c, ps : def_name * pats)
   Debug.print (fun () -> "thetatel = " ^ IP.print_tel thetatel);
   if n = n'
   then
-    let us', ws = split_idx_param sign n sp in
+    let cD1, us, vs, ws = split_idx_param sign cD1 n sp sp' in
     let cD', cT, delta, pdelta, td = split_flex_unify sign p1 thetatel ps cD1 vs ws in
     let ss = if is_syn_con sign c then
                x, I.AppL (I.Const c, var_list_of_ctx td)
