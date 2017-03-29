@@ -1,0 +1,27 @@
+syn tm where
+| app: tm ->> tm ->> tm
+| lam: (tm ->> tm) ->> tm
+| one : tm
+
+syn tp where
+| unit : tp
+| arr : tp ->> tp ->> tp
+
+syn oft : tm ->> tp ->> * where
+| t-unit: oft one unit
+| t-app: (f: tm) ->> (e : tm) ->> (s: tp) ->> (t: tp)
+         ->> oft f (arr s t) ->> oft e s ->> oft (app f e) t
+| t-lam: (s:tp) ->> (t:tp) ->> (e:tm ->> tm)
+         ->> ((x:tm) ->> oft x s ->> oft (e ' x) t) ->> oft (lam e) (arr s t)
+
+data eq (A : set) (y : A) : A -> set where
+| refl : eq A y y
+
+thm proj_eq_arr : (S1 : |- tp) -> (S2 : |- tp) -> (T1 : |- tp) -> (T2 : |- tp) -> eq (|- tp) (arr S1 T1) (arr S2 T2) -> eq (|- tp) T1 T2 where
+| s .s t .t refl => refl
+
+thm uniqueness : (g : ctx) -> (M : (g |- tm)) (S T : |- tp) -> (g |- oft M S[^]) -> (g |- oft M T[^]) -> eq (|- tp) S T where
+| g one unit unit t-unit t-unit => refl
+| g (app M N) T1 T2 (t-app .M .N S1[^] .(T1[^]) D1 E1) (t-app .M .N S2[^] .(T2[^]) D2 E2) =>
+  proj_eq_arr S1 S2 T1 T2 (uniqueness g M (arr S1 T1) (arr S2 T2) D1 D2)
+| g (<: x) S T d1 d2 => ?
