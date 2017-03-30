@@ -47,7 +47,7 @@ and print_pats ps = String.concat " " (List.map (fun p -> "(" ^ print_pat p ^ ")
 
 let rec exp_of_pat_subst : pat_subst -> I.exp = function
   | CShift n -> I.Shift n
-  | CEmpty -> I.EmptyS
+  | CEmpty -> I.Empty
   | CDot (s, i) -> I.Dot(exp_of_pat_subst s, I.BVar i)
 
 let rec exp_of_pat sign : pat -> I.exp = function
@@ -59,12 +59,16 @@ let rec exp_of_pat sign : pat -> I.exp = function
   | PLam (fs, p) -> I.Lam (fs, exp_of_pat sign p)
   | PConst (n, ps) when is_syn_con sign n -> I.AppL (I.Const n, List.map (exp_of_pat sign) ps)
   | PConst (n, ps) -> I.App (I.Const n, List.map (exp_of_pat sign) ps)
-  | PClos (n, s) -> I.Clos (I.Var n, exp_of_pat_subst s)
-  | PEmptyS -> I.EmptyS
+  | PClos (n, s) -> I.Clos (I.Var n, exp_of_pat_subst s, assert false)
+  | PEmptyS -> I.Empty
   | PShift i -> I.Shift i
   | PDot (p1, p2) -> I.Dot (exp_of_pat sign p1, exp_of_pat sign p2)
-  | PNil -> I.Nil
-  | PSnoc (p1, x, p2) -> I.Snoc (exp_of_pat sign p1, x, exp_of_pat sign p2)
+  | PNil -> I.BCtx I.Nil
+  | PSnoc (p1, x, p2) ->
+     begin match exp_of_pat sign p1 with
+     | I.BCtx cP -> I.BCtx (I.Snoc (cP, x, exp_of_pat sign p2))
+     | _ -> raise (Error.Violation "It's a violation!... who knows...")
+     end
   | PUnder -> raise (Error.Violation "We'd be very surprised if this were to happen.")
   | PWildcard -> raise (Error.Violation "We'd also be very surprised if this were to happen.")
 

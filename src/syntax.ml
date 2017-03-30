@@ -151,7 +151,8 @@ module Int = struct
     | Star (* Universe of syntax *)
     | Pi of tel * exp  (* A pi type *)
     | SPi of stel * exp (* A syntactic type *)
-    | Box of exp * exp
+    | Box of bctx * exp
+    | TermBox of bctx * exp
     | Ctx (* of exp *) (* Let's think about it *)
     | Const of def_name (* The name of a constant *)
     | Dest of def_name
@@ -161,16 +162,20 @@ module Int = struct
     | Lam of string list * exp
     | AppL of exp * exp list
     | BVar of index
-    | Clos of exp * exp
-    | EmptyS
-    | Shift of int
-    | Dot of exp * exp
-    | Comp of exp * exp
-    | ShiftS of exp (* consider shifting by more than one, to improve efficiency *)
-    | Snoc of exp * string * exp
-    | Nil
+    | Clos of exp * exp * bctx
+    | BCtx of bctx
     | Annot of exp * exp
     | Hole of name
+    | Empty
+    | Dot of exp * exp
+    | Comp of exp * bctx * exp
+    | Shift of int
+    | ShiftS of int * exp
+
+  and bctx
+    = Nil
+    | CtxVar of name
+    | Snoc of bctx * string * exp
 
    and tel_entry = icit * name * exp
    and tel = tel_entry list
@@ -178,21 +183,27 @@ module Int = struct
    and stel_entry = icit * string * exp
    and stel = stel_entry list
 
+  let idSub = Shift 0
+
   type pat =
     | PVar of name
     | PBVar of index
     | Innac of exp
     | PLam of string list * pat
     | PConst of def_name * pat list
-    | PClos of name * pat_subst
-    | PEmptyS
+    | PClos of name * pat_subst * bctx
+    | PBCtx of pat_bctx
+    | PEmpty
     | PShift of int
     | PDot of pat * pat
-    | PNil
-    | PSnoc of pat * string * pat
     | PPar of name
     | PUnder
     | PWildcard
+
+  and pat_bctx =
+    | PNil
+    | PSnoc of pat_bctx * string * pat
+    | PCtxVar of name
 
   type pats = pat list
   (* name of the constructed type, the type parameters, and the indices *)

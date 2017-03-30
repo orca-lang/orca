@@ -10,6 +10,7 @@ module AP = Print.Apx
 module I = Syntax.Int
 module IP = Print.Int
 open Meta
+open MetaSub
 
 type ctx_map = pats
 
@@ -145,7 +146,7 @@ let rec theta_of_lam cP xs tel =
   | [], _ -> cP, [], tel
   | x::xs, (i,y,t)::tel' ->
      let cP', tel0, tel'' = theta_of_lam cP xs tel' in
-     BSnoc(cP', x, t), (i, y, t)::tel0, tel''
+     I.Snoc(cP', x, t), (i, y, t)::tel0, tel''
   | _ -> raise (Error.Error ("Something went wrong as always"))
 
 let rec theta_of_lam' g xs tel =
@@ -243,35 +244,31 @@ let check_ppar (sign : signature) (p1 : pats) (n : name) (cD1 : ctx)
 
 let split_clos (sign : signature) (p1 : pats) (n, s : name * pat_subst) (cD1 : ctx)
     (x, t : name * I.exp) (cD2 : ctx) : ctx * ctx_map =
-  let g, t = match Whnf.whnf sign t with
-    | I.Box(g, t) -> g, t
+  let cP, t = match Whnf.whnf sign t with
+    | I.Box(cP, t) -> cP, t
     | t -> raise (Error.Error ("Substitution on a pattern variable can "
                                ^ "only be used against a boxed type. Found "
                                ^ IP.print_exp t))
   in
-  let rec get_domain g s =
-    if is_ctx (sign, cD1) g then
-      match g, s with
+  let rec get_domain cP s =
+      match cP, s with
       | _, CEmpty -> I.Nil
       | _, CDot(s, y) ->
-        let cP = contextify (sign, cD1 @ cD2) g in
-        I.Snoc(get_domain g s, "_", lookup_bound cP y)
-      | _, CShift 0 -> g
+         I.Snoc(get_domain cP s, "_", lookup_bound cP y)
+      | _, CShift 0 -> cP
       | I.Snoc(g, _, _), CShift m -> get_domain g (CShift (m-1))
       | _, CShift m -> raise (Error.Error ("When checking pattern " ^ print_name n ^ "[" ^ print_pat_subst s
-                                           ^ "], expected context " ^ IP.print_exp g ^ " to have at least "
+                                           ^ "], expected context " ^ IP.print_bctx cP ^ " to have at least "
                                            ^ string_of_int m ^ " variable" ^ if m > 1 then "s" else "" ^ " to shift over."))
-    else
-      raise (Error.Violation ("This should be a context " ^ IP.print_exp g))
   in
   let rec subst_of_pat_subst = function
     | CShift n -> I.Shift n
-    | CEmpty -> I.EmptyS
+    | CEmpty -> I.Empty
     | CDot(s, i) -> I.Dot(subst_of_pat_subst s, I.BVar i)
   in
   match Whnf.apply_inv t s with
-  | Some t -> compute_split_map sign (x, I.Clos(I.Var n, subst_of_pat_subst s)) (x, PClos(n, s))
-                                cD1 x cD2 [] [] (cD1 @ [n, I.Box (get_domain g s, t)])
+  | Some t -> compute_split_map sign (x, I.Clos(I.Var n, subst_of_pat_subst s, assert false)) (x, PClos(n, s))
+                                cD1 x cD2 [] [] (cD1 @ [n, I.Box (get_domain cP s, t)])
   | None -> raise (Error.Error ("Cannot check pattern matching clause " ^ print_pat (PClos (n, s))
                                ^ " because it was not possible to compute an inverse substitution for " ^ print_pat_subst s))
 
@@ -390,13 +387,13 @@ let rec check_inacs (sign, cD : signature * ctx) (p : pats) (sigma : ctx_map) (c
   | [], [] -> []
   | _ -> raise (Error.Error "Size mismatch.")
 
-and check_inacs_syn (sign, cD : signature * ctx) (cP : bctx) (p : pats) (sigma : ctx_map) (tel : I.stel) : I.pats =
+and check_inacs_syn (sign, cD : signature * ctx) (cP : I.bctx) (p : pats) (sigma : ctx_map) (tel : I.stel) : I.pats =
   match p, sigma with
   | p::ps, q::qs ->
      begin match tel with
      | (_, _, t)::tel' ->
         let p' = check_inac_syn (sign, cD) cP p q t in
-        let tel'' = ss_syn_subst_stel (exp_of_pat sign p') tel' in
+        let tel'' = assert false in  (* ss_syn_subst_stel (exp_of_pat sign p') tel' in *)
         p' :: check_inacs_syn (sign, cD) cP ps qs tel''
      | _ -> raise (Error.Error "The context ended unexpectedly.")
      end
@@ -431,20 +428,20 @@ and check_inac (sign, cD : signature * ctx) (p : pat) (q : pat) (t : I.exp) : I.
      begin match lookup_sign_entry sign n with
      | Constructor (_, tel, _) -> I.PConst (n, check_inacs (sign, cD) sp sq (ctx_of_tel tel))
      | SConstructor (_, stel, _) ->
-        let g = match t with
-          | I.Box(g, _) -> g
+        let cP = match t with
+          | I.Box(cP, _) -> cP
           | _ -> raise (Error.Violation ("Syntactic constructor was used to split on a non boxed type"))
         in
-        I.PConst (n, check_inacs_syn (sign, cD) (contextify (sign, cD) g) sp sq stel)
+        I.PConst (n, check_inacs_syn (sign, cD) cP sp sq stel)
      | _ -> raise (Error.Violation ("It should have been a constructor."))
      end
   | _ -> begin match t with
-         | I.Box (g, t') -> check_inac_syn (sign, cD) (contextify (sign, cD) g) p q t'
-         | _ -> raise (Error.Error ("Syntactic pattern was used against a non boxed type: " ^ Pretty.print_exp (sign, cD) BNil t))
+         | I.Box (cP, t') -> check_inac_syn (sign, cD) cP p q t'
+         | _ -> raise (Error.Error ("Syntactic pattern was used against a non boxed type: " ^ Pretty.print_exp (sign, cD) I.Nil t))
          end
 
 
-and check_inac_syn (sign, cD : signature * ctx) (cP : bctx) (p : pat) (q : pat) (t : I.exp) : I.pat =
+and check_inac_syn (sign, cD : signature * ctx) (cP : I.bctx) (p : pat) (q : pat) (t : I.exp) : I.pat =
   match p, q with
   | UInac ep, UInac eq ->
      Debug.indent ();
@@ -487,7 +484,7 @@ and check_inac_syn (sign, cD : signature * ctx) (cP : bctx) (p : pat) (q : pat) 
        I.PLam (xs, check_inac_syn (sign, cD) cP' p q (if tel' = [] then t else I.SPi (tel', t)))
      else
        raise (Error.Violation "Match - check_inac - PLam binding sizes differ. Who knows why?")
-  | PClos (n, s), PClos (n', s') when n = n' -> I.PClos(n, s)
+  | PClos (n, s), PClos (n', s') when n = n' -> I.PClos(n, s, assert false)
 
   (* In the syntax cases, we might need to grow cP *)
   | p, q -> raise (Error.Error ("Pattern matching on syntax is not yet supported.\np = " ^ print_pat p ^ "\nq = " ^ print_pat q))

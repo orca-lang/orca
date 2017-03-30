@@ -6,12 +6,12 @@ open Sign
 open Name
 
 type unification_problem
-   = Different_constuctors of def_name * def_name
-   | Occur_check of name  * exp
-   | Expressions_dont_unify of name list * exp * exp
-   | Universes_dont_match of int * int
-   | Unequal_number_params of  exp list * exp list
-   | Unification_didnt_solve_all_problems of exp * exp * ctx * name list * ctx
+  = Different_constuctors of def_name * def_name
+  | Occur_check of name  * exp
+  | Expressions_dont_unify of name list * exp * exp
+  | Universes_dont_match of int * int
+  | Unequal_number_params of  exp list * exp list
+  | Unification_didnt_solve_all_problems of exp * exp * ctx * name list * ctx
 
 let print_unification_problem = function
   | Different_constuctors (n, n') ->
@@ -21,8 +21,8 @@ let print_unification_problem = function
   | Expressions_dont_unify (flex, e1, e2) ->
      "Expressions\ne1 = " ^ print_exp e1
      ^ "\ne2 = " ^ print_exp e2
-    ^ "\nDo not unify given flexible variable" ^ (if List.length flex > 1 then "s" else "")
-        ^ ": " ^ String.concat ", " (List.map print_name flex)
+     ^ "\nDo not unify given flexible variable" ^ (if List.length flex > 1 then "s" else "")
+     ^ ": " ^ String.concat ", " (List.map print_name flex)
   | Universes_dont_match (n, n') ->
      "Universe " ^ string_of_int n
      ^ " and universe " ^ string_of_int n'
@@ -46,17 +46,24 @@ let rec occur_check sign n e =
   | Var n' -> n = n'
   | Pi (tel, t) -> occur_check_tel sign n tel || occur_check sign n t
   | SPi (tel, t) -> occur_check_stel sign n tel || occur_check sign n t
-  | Box (g, e) -> f g || f e
+  | Box (cP, e) -> occur_check_bctx sign n cP || f e
   | Fn (xs, e) when List.mem n xs -> f e
   | Lam (_, e) -> f e
-  | Clos (e1, e2)
-  | Snoc (e1, _, e2)
+  | Clos (e1, e2, cP) ->
+     f e1 || f e2 || occur_check_bctx sign n cP
   | Dot (e1, e2)
-  | Annot (e1, e2) -> f e1 || f e2
+    | Annot (e1, e2) -> f e1 || f e2
   | AppL (e, es)
-  | App (e, es) ->
+    | App (e, es) ->
      f e || List.fold_left (||) false (List.map (occur_check sign n) es)
   | _ -> false
+
+and occur_check_bctx sign n cP =
+  match cP with
+  | Nil -> false
+  | Snoc (cP, _, e) -> occur_check_bctx sign n cP || occur_check sign n e
+  | CtxVar n' -> n = n'
+
 and occur_check_tel sign n tel =
   match tel with
   | [] -> false
@@ -80,90 +87,96 @@ let rec unify_flex (sign, cG) flex e1 e2 =
   let is_flex n = List.mem n flex in
   let e1', e2' =  Whnf.whnf sign e1, Whnf.whnf sign e2 in
   Debug.print(fun () -> "Unifying expressions\ne1 = " ^ print_exp e1
-    ^ "\ne2 = " ^ print_exp e2 ^ "\ne1' = " ^ print_exp e1' ^ "\ne2' = " ^ print_exp e2');
-    match e1', e2' with
-      | Set n , Set n' when n = n' -> cG, []
-      | Set n, Set n' -> raise (Unification_failure (Universes_dont_match (n, n')))
-      | Pi (tel, t), Pi(tel', t') -> unify_pi tel t tel' t'
-      | SPi (tel, t), SPi(tel', t') -> unify_spi tel t tel' t'
-      | Box(g, e), Box(g', e') -> unify_many cG [g; e] [g'; e']
-      | Fn(ns, e), Fn(ns', e') ->
-         let sigma = List.map2 (fun n n' -> (n, Var n')) ns ns' in
-         unify_flex (simul_subst sigma e) (simul_subst sigma e')
-      | Lam(_,e), Lam(_, e') -> unify_flex e e'
-      | App(e, es1), App(e', es2) -> unify_many cG (e::es1) (e'::es2)
-      | AppL(e1, es), AppL(e1', es') -> unify_many cG (e1::es) (e1'::es')
-      | Const n, Const n' ->
-         if n = n' then
-           cG, []
-         else
-           raise (Unification_failure (Different_constuctors (n, n')))
+                        ^ "\ne2 = " ^ print_exp e2 ^ "\ne1' = " ^ print_exp e1' ^ "\ne2' = " ^ print_exp e2');
+  match e1', e2' with
+  | Set n , Set n' when n = n' -> cG, []
+  | Set n, Set n' -> raise (Unification_failure (Universes_dont_match (n, n')))
+  | Pi (tel, t), Pi(tel', t') -> unify_pi tel t tel' t'
+  | SPi (tel, t), SPi(tel', t') -> unify_spi tel t tel' t'
+  | Box(g, e), Box(g', e') ->
+     (* unify_many cG [g; e] [g'; e'] *)
+     assert false
+  | Fn(ns, e), Fn(ns', e') ->
+     let sigma = List.map2 (fun n n' -> (n, Var n')) ns ns' in
+     unify_flex (simul_subst sigma e) (simul_subst sigma e')
+  | Lam(_,e), Lam(_, e') -> unify_flex e e'
+  | App(e, es1), App(e', es2) -> unify_many cG (e::es1) (e'::es2)
+  | AppL(e1, es), AppL(e1', es') -> unify_many cG (e1::es) (e1'::es')
+  | Const n, Const n' ->
+     if n = n' then
+       cG, []
+     else
+       raise (Unification_failure (Different_constuctors (n, n')))
 
-      | Var n, Var n' when n = n' -> cG, []
+  | Var n, Var n' when n = n' -> cG, []
 
-      | Var n, _ when is_flex n ->
-         if not (occur_check sign n e2) then
-           ctx_subst (n, e2) (rem n cG), [n, e2]
-         else
-           raise (Unification_failure (Occur_check (n, e2)))
-      | _, Var n when is_flex n ->
-         if not (occur_check sign n e1) then
-           ctx_subst (n, e1) (rem n cG), [n,e1]
-         else
-           raise (Unification_failure (Occur_check (n, e1)))
-      | BVar i, BVar i' when i = i' -> cG, []
-      | Clos(e1, e2), Clos(e1', e2') -> unify_many cG [e1;e2] [e1';e2']
-      | EmptyS, EmptyS -> cG, []
-      | Shift n, Shift n' -> cG, []
-      | Dot(e1, e2), Dot(e1', e2') -> unify_many cG [e1;e2] [e1';e2']
-      | Comp (e1, e2), Comp(e1', e2') -> unify_many cG [e1;e2] [e1';e2']
-      | Snoc(e1, _, e2), Snoc(e1', _, e2') -> unify_many cG [e1;e2] [e1';e2']
-      | Nil, Nil -> cG, []
-      | Annot(e1, e2), Annot(e1', e2') -> unify_many cG [e1;e2] [e1';e2']
-      | Ctx, Ctx -> cG, []
-      | _, _ ->
-         raise (Unification_failure(Expressions_dont_unify (flex, e1', e2')))
+  | Var n, _ when is_flex n ->
+     if not (occur_check sign n e2) then
+       ctx_subst (n, e2) (rem n cG), [n, e2]
+     else
+       raise (Unification_failure (Occur_check (n, e2)))
+  | _, Var n when is_flex n ->
+     if not (occur_check sign n e1) then
+       ctx_subst (n, e1) (rem n cG), [n,e1]
+     else
+       raise (Unification_failure (Occur_check (n, e1)))
+  | BVar i, BVar i' when i = i' -> cG, []
+  | Clos(e1, e2, _), Clos(e1', e2', _) -> (* unify_many cG [e1;e2] [e1';e2'] *) assert false
+  | Empty, Empty -> cG, []
+  | Shift n, Shift n' -> cG, []
+  | Dot(e1, e2), Dot(e1', e2') -> unify_many cG [e1;e2] [e1';e2']
+  | Comp (e1, cP, e2), Comp(e1', cP', e2') -> (* unify_many cG [e1;e2] [e1';e2'] *) assert false
+  | Annot(e1, e2), Annot(e1', e2') -> unify_many cG [e1;e2] [e1';e2']
+  | Ctx, Ctx -> cG, []
+  | BCtx cP, BCtx cP' -> assert false
+  | _, _ ->
+     raise (Unification_failure(Expressions_dont_unify (flex, e1', e2')))
 
-  and unify_flex_many (sign, cG) flex es1 es2 =
-    let unify_each (cD, sigma1) e1 e2 =
-      let cD', sigma' = unify_flex (sign, cD) flex (simul_subst sigma1 e1) (simul_subst sigma1 e2) in
-      cD', sigma' @ sigma1
-    in
-    if List.length es1 = List.length es2
-    then
-      List.fold_left2 unify_each (cG, []) es1 es2
-    else raise (Unification_failure (Unequal_number_params (es1, es2)))
+and unify_flex_bctx = function
+  | Nil -> assert false
+  | Snoc _ -> assert false
+  | CtxVar _ -> assert false
 
-  and unify_flex_pi (sign, cG as ctxs: signature * ctx) (flex : name list) (tel1 : tel) (t1 : exp) (tel2 : tel) (t2 : exp) =
-    let simul_subst_in_tel sigma tel =
-      List.map (fun (i, n, e) -> i, n, simul_subst sigma e) tel
-    in
-    match tel1, tel2 with
-    | [], [] -> unify_flex ctxs flex t1 t2
-    | tel1, [] -> unify_flex ctxs flex (Pi (tel1, t1)) t2
-    | [], tel2 -> unify_flex ctxs flex t1 (Pi (tel2, t2))
-    | (_, n1, e1)::tel1, (_, n2, e2)::tel2 ->
-       let cD, sigma' = unify_flex ctxs flex e1 e2 in
-       let sigma = (n1, Var n2) :: sigma'  in
-       let tel1' = simul_subst_in_tel sigma tel1 in
-       let tel2' = simul_subst_in_tel sigma tel2 in
-       let cD', sigma'' = (unify_flex_pi (sign, (n2, e2) :: cD) flex tel1' t1 tel2' t2) in
-       cD', sigma @ sigma''
+and unify_flex_many (sign, cG) flex es1 es2 =
+  let unify_each (cD, sigma1) e1 e2 =
+    let cD', sigma' = unify_flex (sign, cD) flex (simul_subst sigma1 e1) (simul_subst sigma1 e2) in
+    cD', sigma' @ sigma1
+  in
+  if List.length es1 = List.length es2
+  then
+    List.fold_left2 unify_each (cG, []) es1 es2
+  else raise (Unification_failure (Unequal_number_params (es1, es2)))
 
-   and unify_flex_spi (sign, cG as ctxs: signature * ctx) (flex : name list) (tel1 : stel) (t1 : exp) (tel2 : stel) (t2 : exp) =
-    let simul_subst_in_tel sigma tel =
-      List.map (fun (i, n, e) -> i, n, simul_subst sigma e) tel
-    in
-    match tel1, tel2 with
-    | [], [] -> unify_flex ctxs flex t1 t2
-    | tel1, [] -> unify_flex ctxs flex (SPi (tel1, t1)) t2
-    | [], tel2 -> unify_flex ctxs flex t1 (SPi (tel2, t2))
-    | (_, n1, e1)::tel1, (_, n2, e2)::tel2 ->
-       let cD, sigma' = unify_flex ctxs flex e1 e2 in
-       let tel1' = simul_subst_in_tel sigma' tel1 in
-       let tel2' = simul_subst_in_tel sigma' tel2 in
-       let cD', sigma'' = (unify_flex_spi (sign, cD) flex tel1' t1 tel2' t2) in
-       cD', sigma' @ sigma''
+and unify_flex_pi (sign, cG as ctxs: signature * ctx) (flex : name list) (tel1 : tel) (t1 : exp) (tel2 : tel) (t2 : exp) =
+  let simul_subst_in_tel sigma tel =
+    List.map (fun (i, n, e) -> i, n, simul_subst sigma e) tel
+  in
+  match tel1, tel2 with
+  | [], [] -> unify_flex ctxs flex t1 t2
+  | tel1, [] -> unify_flex ctxs flex (Pi (tel1, t1)) t2
+  | [], tel2 -> unify_flex ctxs flex t1 (Pi (tel2, t2))
+  | (_, n1, e1)::tel1, (_, n2, e2)::tel2 ->
+     let cD, sigma' = unify_flex ctxs flex e1 e2 in
+     let sigma = (n1, Var n2) :: sigma'  in
+     let tel1' = simul_subst_in_tel sigma tel1 in
+     let tel2' = simul_subst_in_tel sigma tel2 in
+     let cD', sigma'' = (unify_flex_pi (sign, (n2, e2) :: cD) flex tel1' t1 tel2' t2) in
+     cD', sigma @ sigma''
+
+and unify_flex_spi (sign, cG as ctxs: signature * ctx) (flex : name list) (tel1 : stel) (t1 : exp) (tel2 : stel) (t2 : exp) =
+  let simul_subst_in_tel sigma tel =
+    List.map (fun (i, n, e) -> i, n, simul_subst sigma e) tel
+  in
+  match tel1, tel2 with
+  | [], [] -> unify_flex ctxs flex t1 t2
+  | tel1, [] -> unify_flex ctxs flex (SPi (tel1, t1)) t2
+  | [], tel2 -> unify_flex ctxs flex t1 (SPi (tel2, t2))
+  | (_, n1, e1)::tel1, (_, n2, e2)::tel2 ->
+     let cD, sigma' = unify_flex ctxs flex e1 e2 in
+     let tel1' = simul_subst_in_tel sigma' tel1 in
+     let tel2' = simul_subst_in_tel sigma' tel2 in
+     let cD', sigma'' = (unify_flex_spi (sign, cD) flex tel1' t1 tel2' t2) in
+     cD', sigma' @ sigma''
 
 let get_flex_vars cG e1 e2 = Util.unique (fv cG e1 @ fv cG e2)
 

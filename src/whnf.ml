@@ -2,6 +2,7 @@ open Syntax
 open Syntax.Int
 open Print.Int
 open Meta
+open MetaSub
 open Sign
 
 exception Matching_failure of pat * exp
@@ -33,6 +34,7 @@ let apply_inv e s =
     | SPi(tel, t'),_ ->
       SPi(List.map (fun (i,x,e) -> i, x, apply_inv e s) tel, apply_inv t' (add_id_cdot (List.length tel) s))
     | Box (g, e), _ -> raise Inv_fail
+    | TermBox (g, e), _ -> raise Inv_fail
     | Ctx, _ -> Ctx
     | Const c, _ -> Const c
     | Dest d, _ -> Dest d
@@ -43,15 +45,13 @@ let apply_inv e s =
     | AppL (e, es), _ -> AppL(apply_inv e s, List.map (fun e -> apply_inv e s) es)
     | Hole n, _ -> Hole n
     | Annot (e1, e2), _ -> Annot (apply_inv e1 s, apply_inv e2 s)
-    | Snoc _, _ -> e
-    | Nil, _ -> Nil
+    | BCtx cP, _ -> BCtx cP
+    | Clos (e, s', cP), _ -> Clos(e, apply_inv s' s, cP)
 
-    | Clos (e, s'), _ -> Clos(e, apply_inv s' s)
-
-    | EmptyS,_ -> EmptyS
+    | Empty, _ -> Empty
     | Shift n, CShift m when n >= m -> Shift (n - m)
     | Shift n, CShift _ -> raise (Error.Error "Shift too long")
-    | Shift n, CEmpty -> EmptyS
+    | Shift n, CEmpty -> Empty
     | Shift n, CDot(_,_) -> assert false
 
     | Dot (s, e), s' -> Dot (apply_inv s s', apply_inv e s')
@@ -62,16 +62,20 @@ let apply_inv e s =
   try Some (apply_inv e s)
   with Inv_fail -> None
 
-let rec cong_stel tel s =
-  match tel with
-  | [] -> [], s
-  | (i, x, e)::tel ->
-     let tel', s' = cong_stel tel (ShiftS s) in
-     (i, x, Clos(e, s)) :: tel', s'
+let cong_stel tel s cP =
+  let rec ninja tel i cP' =
+    match tel with
+    | [] -> [], i, cP'
+    | (icit, x, e)::tel ->
+       let tel', i', cP' = ninja tel (i+1) (Snoc(cP, x, e)) in
+       (icit, x, Clos(e, ShiftS (i+1, s), cP)) :: tel', i', cP'
+  in
+  let tel', i, cP' = ninja tel 0 cP in
+  tel', (ShiftS (i, s)), cP'
 
 let rec check_stuck = function
   | AppL(e, _)
-  | Clos(e, _) -> check_stuck e
+  | Clos(e, _, _) -> check_stuck e
   | Var _ -> true
   | _ -> false
 
@@ -223,91 +227,111 @@ and rewrite (sign : signature) (e : exp) : exp =
           | [] -> Shift 0
           | e :: es -> Dot (f es, e)
         in
-        w (dmsg "beta reduction" (Clos(e1, f es)))
+        w (dmsg "beta reduction" (Clos(e1, f es, assert false)))
       | e -> AppL(e, es)
       end
 
   (* IdL *)
-  | Comp(Shift 0, s) -> w (dmsg "IdL" s)
+  | Comp(Shift 0, _, s) -> w (dmsg "IdL" s)
 
   (* IdR *)
-  | Comp(s, Shift 0) -> w (dmsg "IdR" s)
+  | Comp(s, _, Shift 0) -> w (dmsg "IdR" s)
 
   (* LiftId *)
-  | ShiftS(Shift 0) -> (dmsg "LiftId" (Shift 0))
+  | ShiftS(n, Shift 0) -> (dmsg "LiftId" (Shift 0))
 
   (* Id *)
-  | Clos (e, Shift 0) -> w (dmsg "Id" e)
+  | Clos (e, Shift 0, _) -> w (dmsg "Id" e)
 
   (* Empty Subst *)
-  | Clos (e, EmptyS) -> w (dmsg "EmptyS" e)
+  | Clos (e, Empty, _) -> w (dmsg "Empty" e)
 
   (* VarShift 1 *)
-  | Clos(BVar n, Shift n') -> (dmsg "VarShift 1" (BVar (n + n')))
+  | Clos(BVar n, Shift n', _) -> (dmsg "VarShift 1" (BVar (n + n')))
 
   (* VarShift 2 *)
-  | Clos(BVar n, Comp(s, Shift n')) -> w (dmsg "VarShift 2" (Clos(BVar (n + n'), s)))
+  | Clos(BVar n, Comp(s, cP, Shift n'), _) -> w (dmsg "VarShift 2" (Clos(BVar (n + n'), s, cP)))
 
   (* FVarsCons *)
-  | Clos(BVar 0, Dot (s, e)) -> w (dmsg "FVarsCons" e)
+  | Clos(BVar 0, Dot (s, e), _) -> w (dmsg "FVarsCons" e)
 
   (* FVarLift 1 *)
-  | Clos(BVar 0, ShiftS s) -> (dmsg "FVarLift 1" (BVar 0))
+  | Clos(BVar i, ShiftS (n, s), _) when i < n -> (dmsg "FVarLift 1" (BVar 0))
 
   (* FVarLift 2 *)
-  | Clos(BVar 0, Comp(s2, ShiftS s1)) -> w (dmsg "FVarLift 2" (Clos(BVar 0, s2)))
+  | Clos(BVar i, Comp(s2, cP, ShiftS (n, s1)), _) when i < n -> w (dmsg "FVarLift 2" (Clos(BVar i, s2, cP)))
 
   (* RVarCons *)
-  | Clos (BVar n, Dot(s, _)) when n > 0 -> w (dmsg "RVarCons" (Clos(BVar (n-1), s)))
+  | Clos (BVar n, Dot(s, _), Snoc (cP, _, _)) when n > 0 -> w (dmsg "RVarCons" (Clos(BVar (n-1), s, cP)))
 
   (* RVarLift 1 *)
-  | Clos (BVar n, ShiftS s) when n > 0 -> w (dmsg "RVarLift 1" (Clos(BVar (n-1), Comp(Shift 1, s))))
+  | Clos (BVar n, ShiftS (m, s), cP) when n >= m ->
+     w (dmsg "RVarLift 1" (Clos(BVar (n-m), Comp(Shift m, keep_suffix cP m, s), drop_suffix cP m)))
 
   (* RVarLift 2 *)
-  | Clos (BVar n, Comp(s2, ShiftS s1)) when n > 0 -> w (dmsg "RVarLift 2" (Clos(BVar (n-1), Comp (Comp(s2, Shift 1), s1))))
+  | Clos (BVar n, Comp(s2, cP1, ShiftS (m, s1)), cP) when n >= m
+    -> w (dmsg "RVarLift 2" (Clos(BVar (n-m), Comp (Comp(s2, cP1, Shift m), drop_suffix cP1 m, s1), drop_suffix cP m)))
 
   (* AssEnv *)
-  | Comp(s1, Comp(s2, s3)) -> w (dmsg "AssEnv" (Comp(Comp(s1, s2), s3)))
+  | Comp(s1, cP1, Comp(s2, cP2, s3)) -> w (dmsg "AssEnv" (Comp(Comp(s1, cP1, s2), cP2, s3)))
 
   (* MapEnv *)
-  | Comp(s2, Dot(s1, e)) -> w (dmsg "MapEnv" (Dot(Comp(s2, s1), Clos(e, s2))))
+  | Comp(s2, cP, Dot(s1, e)) -> w (dmsg "MapEnv" (Dot(Comp(s2, cP, s1), Clos(e, s2, cP))))
 
   (* ShiftCons *)
-  | Comp(Dot(s, e), Shift n) -> w (dmsg "ShiftCons" (Comp(s, Shift (n-1))))
+  | Comp(Dot(s, e), Snoc (cP, _, _), Shift n) -> w (dmsg "ShiftCons" (Comp(s, cP, Shift (n-1))))
 
   (* ShiftLift 1 *)
-  | Comp(ShiftS s, Shift n) -> w (dmsg "ShiftLift 1" (Comp(Shift n, s)) (* MMMM *))
+  | Comp(ShiftS (m, s), cP, Shift n) when m < n ->
+     w (dmsg "ShiftLift 1a" (Comp (Comp(Shift m, assert false, s), drop_suffix cP m, Shift (n-m))))
+  | Comp(ShiftS (m, s), cP, Shift n) when m = n -> w (dmsg "ShiftLift 1b" (Comp(Shift n, assert false, s)))
+  | Comp(ShiftS (m, s), cP, Shift n) -> w (dmsg "ShiftLift 1c" (Comp(Shift n, assert false, ShiftS (m-n, s))))
 
   (* ShiftLift 2 *)
-  | Comp(Comp(s2, ShiftS s), Shift n) -> w (dmsg "ShiftLift 2" (Comp(Comp(Comp(s2, Shift 1), s) , Shift (n-1))))
+  | Comp(Comp(s2, cP1, ShiftS (m, s)), cP2, Shift n) when n > m ->
+     w (dmsg "ShiftLift 2a" (Comp(Comp(Comp(s2, cP1, Shift m), drop_suffix cP1 m, s), drop_suffix cP2 m, Shift (n-m))))
+  | Comp(Comp(s2, cP1, ShiftS (m, s)), cP2, Shift n) when n = m ->
+     w (dmsg "ShiftLift 2b" (Comp(Comp(s2, cP1, Shift m), drop_suffix cP1 m, s)))
+  | Comp(Comp(s2, cP1, ShiftS (m, s)), cP2, Shift n) -> assert false
+  (*    w (dmsg "ShiftLift 2c" (Comp(Comp(Comp(s2, cP1, Shift m), drop_suffix cP1 m, s), drop_suffix cP2 m, Shift (n-m)))) *)
 
   (* Lift 1 *)
-  | Comp(ShiftS s1, ShiftS s2) -> w (dmsg "Lift 1" (ShiftS(Comp (s1, s2))))
+  | Comp(ShiftS (n, s1), cP, ShiftS (m, s2)) when n = m -> w (dmsg "Lift 1" (ShiftS (n, Comp (s1, drop_suffix cP m, s2))))
+  | Comp(ShiftS (n, s1), cP, ShiftS (m, s2)) when n < m ->
+     w (dmsg "Lift 1" (ShiftS (n, Comp (s1, drop_suffix cP n, ShiftS (m-n, s2)))))
+  | Comp(ShiftS (n, s1), cP, ShiftS (m, s2)) -> w (dmsg "Lift 1" (ShiftS (m, Comp (ShiftS (n-m, s1), drop_suffix cP m, s2))))
 
   (* Lift 2 *)
-  | Comp(Comp(ShiftS s2,s3), s1) -> (dmsg "Lift 2" (Comp(s3, ShiftS(Comp(s2, s1)))))
+  | Comp(Comp (s1, cP1, ShiftS (n, s2)), cP2, ShiftS (m, s3)) when n = m ->
+     w (dmsg "Lift 2" (Comp (s1, cP1, ShiftS(n, Comp (s2, drop_suffix cP2 n, s3)))))
+  | Comp(Comp (s1, cP1, ShiftS (n, s2)), cP2, ShiftS (m, s3)) when n < m ->
+     w (dmsg "Lift 2" (Comp (s1, cP1, ShiftS(n, Comp (s2, drop_suffix cP2 n, ShiftS (m-n, s3))))))
+  | Comp(Comp (s1, cP1, ShiftS (n, s2)), cP2, ShiftS (m, s3)) ->
+     w (dmsg "Lift 2" (Comp (s1, cP1, ShiftS(m, Comp (ShiftS (n-m, s2), drop_suffix cP2 m, s3)))))
+
 
   (* LiftEnv *)
-  | Comp(Dot(s2,e), ShiftS s1) -> w (dmsg "LiftEnv" (Dot(Comp(s2, s1), e)))
+  | Comp(Dot(s2,e), Snoc(cP, _, _) , ShiftS (n, s1)) when n > 0 -> w (dmsg "LiftEnv" (Dot(Comp(s2, cP, (ShiftS (n-1, s1))), e)))
 
-  | Comp (Shift n, Shift m) -> (dmsg "ShiftAdd" (Shift (n+m)))
+  | Comp (Shift n, _, Shift m) -> (dmsg "ShiftAdd" (Shift (n+m)))
 
   (* Added rules for confluence *)
-  | Clos (e, Comp (s, EmptyS)) -> w (dmsg "CompEmpty" e)
+  | Clos (e, Comp (s, _, Empty), _) -> w (dmsg "CompEmpty" e)
 
   (* Congruence rules *)
-  | Clos (Const n, _) -> w (dmsg "CongClosConst" (Const n))
-  | Clos (Clos (e, s1), s2) -> w (dmsg "CongClosClos" (Clos (e, Comp(s2, s1))))
-  | Clos (AppL(e, es), s) -> w (dmsg "CongClosAppL" (AppL(Clos(e, s), List.map (fun e-> Clos(e, s)) es)))
-  | Clos (Lam (xs, e), s) -> (dmsg "CongClosLam" (Lam (xs, Clos (e, List.fold_left (fun s _ -> ShiftS s) s xs))))
-  | Clos (Set n, s) -> (dmsg "CongClosSet" (Set n))
-  | Clos (Star, s) -> (dmsg "CongClosStar" Star)
+  | Clos (Const n, _, _) -> w (dmsg "CongClosConst" (Const n))
+  | Clos (Clos (e, s1, cP1), s2, cP2) -> w (dmsg "CongClosClos" (Clos (e, Comp(s2, cP2, s1), cP1)))
+  | Clos (AppL(e, es), s, cP) -> w (dmsg "CongClosAppL" (AppL(Clos(e, s, cP), List.map (fun e-> Clos(e, s, cP)) es)))
+  | Clos (Lam (xs, e), s, cP) ->
+     (dmsg "CongClosLam" (Lam (xs, Clos (e, fst (List.fold_left (fun (s, i) _ -> ShiftS (i+1, s), i+1) (s, 0) xs), assert false))))
+  | Clos (Set n, s, _) -> (dmsg "CongClosSet" (Set n))
+  | Clos (Star, s, _) -> (dmsg "CongClosStar" Star)
   (* | Clos (Pi(tel, t), s) -> *)
   (*    let tel' = List.map (fun (i, x, e) -> i, x, Clos (e, s)) tel in *)
   (*    (dmsg "CongClosPi" (Pi(tel', Clos (t, s)))) *)
-  | Clos (SPi(tel, t), s) ->
-     let tel', s = cong_stel tel s in
-    (dmsg "CongClosSPi" (SPi (tel', Clos (t, s))))
+  | Clos (SPi(tel, t), s, cP) ->
+     let tel', s, cP' = cong_stel tel s cP in
+    (dmsg "CongClosSPi" (SPi (tel', Clos (t, s, cP'))))
   (* | Clos (Fn (x, e), s) -> (dmsg "CongClosFn" (Fn (x, Clos(e, s)))) *)
   (* | Clos (Annot (e, t), s) -> (dmsg "CongClosAnnot" (Annot (Clos(e,s), Clos(t, s)))) *)
 
@@ -317,17 +341,17 @@ and rewrite (sign : signature) (e : exp) : exp =
   (* | Clos (Nil, s) -> Nil *)
 
   (* Not quite weak head normalisation *)
-  | Clos (e, s) -> let s' = w s in
+  | Clos (e, s, cP) -> let s' = w s in
                    let e' = w e in
                    if s = s' && e' = e then
-                     Clos (e, s)
-                   else w (dmsg "DeepClosRew" (Clos (e', s')))
-  | Comp (e1, e2) ->
+                     Clos (e, s, cP)
+                   else w (dmsg "DeepClosRew" (Clos (e', s', cP)))
+  | Comp (e1, cP, e2) ->
     let e1' = w e1 in
     let e2' = w e2 in
     if e1 = e1' && e2 = e2' then
-      Comp (e1, e2)
-    else w (dmsg "DeepCompRew" (Comp (e1', e2')))
+      Comp (e1, cP, e2)
+    else w (dmsg "DeepCompRew" (Comp (e1', cP, e2')))
   | Dot(e, s) ->
     let e' = w e in
     let s' = w s in

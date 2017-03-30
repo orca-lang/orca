@@ -3,6 +3,7 @@ open Syntax
 open Syntax.Apx
 open Print.Apx
 open Meta
+open MetaSub
 open Match
 open Recon
 
@@ -47,19 +48,20 @@ let rec tc_constructors (sign , cG : signature * ctx) (u : I.universe) (tel : I.
 let tc_syn_constructor (sign , cG : signature * ctx) (tel : I.stel)
                        (n , tel', (n', es) : def_name * stel * dsig) : signature_entry * I.sdecl =
   Debug.print_string ("Typechecking syntax constructor: " ^ n) ;
-  let tel'' = check_stel (sign, cG) BNil tel' in
-  let check' = check_syn (sign, cG) (bctx_of_stel BNil tel'') in
-  let rec check_indices es tel =
+  let tel'' = check_stel (sign, cG) I.Nil tel' in
+  let cP = bctx_of_stel I.Nil tel'' in
+  let check' = check_syn (sign, cG) cP in
+  let rec check_indices es tel s =
     match es, tel with
     | [], [] -> []
     | e::es', (_, _, t)::tel' ->
-       let e' = check' e t in
-       e' :: check_indices es' (ss_syn_subst_stel e' tel')
+       let e' = check' e (I.Clos (t, s, cP)) in
+       e' :: check_indices es' tel' (I.Dot(s, e'))
     | _ -> raise (Error.Error ("Constructor " ^ n
              ^ " does not return a term of the fully applied type for " ^ n'))
   in
   Debug.print (fun () -> "Checking indices applied to " ^ n' ^ " at the tail of signature of " ^ n);
-  let es' = check_indices es tel in
+  let es' = check_indices es tel I.idSub in
   SConstructor (n, tel'', (n', es')), (n, tel'', (n', es'))
 
 let rec tc_syn_constructors (sign , cG : signature * ctx) (tel : I.stel)
@@ -88,7 +90,7 @@ let tc_program (sign : signature) : program -> signature * I.program = function
   | Syn (n, tel, ds) ->
     Debug.print_string ("Typechecking syn declaration: " ^ n);
     Debug.indent ();
-    let tel' = check_stel (sign, []) BNil tel in
+    let tel' = check_stel (sign, []) I.Nil tel in
     let sign' = SynDef (n, tel') :: sign in
     let sign'', ds' = tc_syn_constructors (sign', []) tel' ds in
     Debug.deindent ();

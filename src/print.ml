@@ -199,7 +199,8 @@ module Int = struct
     | Ctx -> "ctx"
     | Pi (tel, t) -> print_pi tel t
     | SPi (tel, t) -> print_spi tel t
-    | Box (ctx, e) -> "(" ^ print_exp ctx ^ " |- " ^ print_exp e ^ ")"
+    | Box (ctx, e) -> "(" ^ print_bctx ctx ^ " |- " ^ print_exp e ^ ")"
+    | TermBox (ctx, e) -> "(" ^ print_bctx ctx ^ " :> " ^ print_exp e ^ ")"
     | Fn (fs, e) -> "(fn " ^ (String.concat " " (List.map print_name fs)) ^ " " ^ print_exp e ^ ")"
     | Lam (fs, e) -> "(\\ " ^ String.concat " " fs ^ " " ^ print_exp e ^ ")"
     | App (e, es) -> "(" ^ print_exp e ^ " " ^ String.concat " " (List.map print_exp es) ^ ")"
@@ -208,16 +209,25 @@ module Int = struct
     | Dest n -> n
     | Var n -> Name.print_name n
     | BVar i -> "i" ^ string_of_int i
-    | Clos (e1, e2) -> "(" ^ print_exp e1 ^ " [" ^ print_exp e2 ^ "])"
-    | EmptyS -> "^"
-    | Shift n -> "^" ^ string_of_int n
-    | ShiftS e -> "(^^ " ^ print_exp e ^ ")"
-    | Comp (e1, e2) -> "(" ^ print_exp e1 ^ " o " ^ print_exp e2 ^ ")"
-    | Dot (e1, e2) -> "(" ^ print_exp e1 ^ " ; " ^ print_exp e2 ^ ")"
-    | Snoc (e1, x, e2) -> "(" ^ print_exp e1 ^ ", " ^ x ^ " : " ^ print_exp e2 ^ ")"
-    | Nil -> "0"
+    | Clos (e, s, cP) -> "(" ^ print_exp e ^ " [" ^ print_exp s ^ " : " ^ print_bctx cP ^ "])"
+    | BCtx cP -> print_bctx cP
     | Annot (e1, e2) -> "(" ^ print_exp e1 ^ " : " ^ print_exp e2 ^ ")"
     | Hole s -> "?" ^ print_name s
+    | Empty -> "^"
+    | Shift n -> "^" ^ string_of_int n
+    | ShiftS (n, s) -> "(^^" ^ string_of_int n ^ " " ^ print_exp s ^ ")"
+    | Comp (e1, cP, e2) -> "(" ^ print_exp e1 ^ " o" ^ print_bctx cP ^ " " ^ print_exp e2 ^ ")"
+    | Dot (s, e) -> "(" ^ print_exp s ^ " ; " ^ print_exp e ^ ")"
+
+  and print_bctx cP =
+    let rec print = function
+    | Snoc (cP, x, e2) -> "(" ^ print  cP ^ ", " ^ x ^ " : " ^ print_exp e2 ^ ")"
+    | Nil -> "0"
+    | CtxVar n -> print_name n
+    in
+    "{" ^ print cP ^ "}"
+
+
   and print_pi tel t = match tel with
     | [] -> print_exp t
     | (_, x, e) :: tel when is_name_floating x ->
@@ -236,14 +246,19 @@ module Int = struct
     | Innac e -> "." ^ print_exp e
     | PLam (fs, p) -> "(\ " ^ String.concat " " fs ^ " " ^ print_pat p ^ ")"
     | PConst (n, ps) -> "(" ^ n ^ " " ^ (String.concat " " (List.map (fun p -> "(" ^ print_pat p ^ ")") ps)) ^ ")"
-    | PClos (n, s) -> print_name n ^ "[" ^ print_pat_subst s ^ "]"
-    | PEmptyS -> "^"
+    | PClos (n, s, cP) -> print_name n ^ "[" ^ print_pat_subst s ^ " : " ^ print_bctx cP ^ "]"
+    | PBCtx cP -> print_pat_bctx cP
+    | PEmpty -> "^"
     | PShift i -> "^ " ^ string_of_int i
     | PDot (p1, p2) -> "(" ^ print_pat p1 ^ " ; " ^ print_pat p2 ^ ")"
-    | PNil -> "0"
-    | PSnoc (p1, x, p2) -> "(" ^ print_pat p1 ^ " , " ^ x ^ ":" ^ print_pat p1 ^ ")"
     | PUnder -> "_"
     | PWildcard -> "._"
+
+  and print_pat_bctx = function
+    | PNil -> "0"
+    | PSnoc (cP, x, p) -> "(" ^ print_pat_bctx cP ^ " , " ^ x ^ ":" ^ print_pat p ^ ")"
+    | PCtxVar n -> print_name n
+
 
   let print_tel (tel : tel) : string =
     String.concat ", " (List.map (fun (_, x, e) -> "(" ^ print_name x
