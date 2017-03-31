@@ -189,8 +189,6 @@ and fmt_bctx (sign, cG) pps = function
            (fmt_exp (sign, cG) cP) e
   | CtxVar n -> comp_var cG pps n
 
-
-
 let rec fmt_pat_subst pps = function
   | CShift 0 ->
      Fmt.pf pps "id"
@@ -201,7 +199,6 @@ let rec fmt_pat_subst pps = function
      Fmt.pf pps "%a; i%a"
             fmt_pat_subst sigma
             bound_var i
-
 
 let rec fmt_pat (sign, cG) cP pps = function
   | PVar n -> comp_var cG pps n
@@ -265,8 +262,6 @@ let rec fmt_pat (sign, cG) cP pps = function
 and fmt_pats (sign, cG) pps pats=
   Fmt.pf pps "%a"
          (list ~sep:nbsp (fmt_pat (sign, cG) Nil)) pats
-
-
 
 let fmt_universe pps = function
   | 0 -> Fmt.pf pps "set"
@@ -371,7 +366,6 @@ let fmt_program sign pps = function
             (fmt_exp (sign, []) Nil) t
             keyword "where"
             (fmt_pat_decls (sign, [])) pats
-
 
   | DefPM (n, tel, t, pats) ->
      Fmt.pf pps "%a %a : %a %a@,%a"
