@@ -24,33 +24,16 @@ let is_syntax = function
   | A.Nil -> true
   | _ -> false
 
-(* let rec contextify (sign, cG) (g : I.exp) = *)
-(*   match Whnf.whnf sign g with *)
-(*   | I.Nil -> BNil *)
-(*   | I.Var x -> *)
-(*     begin match lookup_ctx_fail cG  x with *)
-(*     | I.Ctx -> CtxVar x *)
-(*     | _ -> raise (Error.Violation ("Tried to contextify non context variable " ^ print_name x)) *)
-(*     end *)
-(*   | I.Snoc (g', x, e) -> *)
-(*     let cP = contextify (sign, cG) g' in *)
-(*     (\* is_syn_type (sign, cG) cP e; *\) *)
-(*     BSnoc (cP, x, e) *)
-(*   | _ -> raise (Error.Error ("Expected context, obtained " ^ IP.print_exp g)) *)
-
-let unify_ctx (sign, cG) e cP cP' = assert false
+let unify_ctx (sign, cG) e cP cP' =
   (* Debug.print(fun () -> "Unifying contexts.\ng  = " ^ IP.print_exp g ^ "\ng' = " ^ IP.print_exp g' ^ "\n with ctx " ^ print_ctx cG); *)
   (* let cD, sigma = *)
-  (*   try *)
-  (*     Unify.unify (sign, cG) cP cP' *)
-  (*   with *)
-  (*     Unify.Unification_failure problem -> *)
-  (*       Debug.print (fun () -> Unify.print_unification_problem problem); *)
-  (*       raise (Error.Error (IP.print_exp e ^ " is defined in bound context " ^ IP.print_exp g *)
-  (*                           ^ " but it was expected to be in bound context " ^ IP.print_exp g')) *)
-  (* in *)
-  (* cD, sigma *)
-
+    try
+      Unify.unify_bctx (sign, cG) cP cP'
+    with
+      Unify.Unification_failure problem ->
+        Debug.print (fun () -> Unify.print_unification_problem problem);
+        raise (Error.Error (IP.print_exp e ^ " is defined in bound context " ^ IP.print_bctx cP
+                            ^ " but it was expected to be in bound context " ^ IP.print_bctx cP'))
 
 let check_box (sign, cG) cP e = function
   | I.Box (g, t) ->
@@ -147,7 +130,7 @@ and check (sign , cG : signature * ctx) (e : A.exp) (t : I.exp) : I.exp =
            Unify.unify (sign, cG) t t' in
          Debug.print (fun () -> "Unification for " ^ IP.print_exp t ^ " with " ^
                                   IP.print_exp t' ^ " succeeded with substitution "
-                                  ^ Unify.print_subst sigma ^ ".");
+                                  ^ print_subst sigma ^ ".");
          simul_subst sigma e
        with
        | Unify.Unification_failure prob ->
@@ -258,9 +241,9 @@ and check_syn (sign, cG) cP (e : A.exp) (t : I.exp) =
       end
     | _, I.Ctx -> I.BCtx(check_ctx (sign, cG) e)
     | A.EmptyS, I.BCtx I.Nil -> I.Empty
-    | A.Shift n, I.BCtx cP ->
-      let cP' = drop_suffix cP n in
-      let _ = try assert false (* Unify.unify (sign, cG) g g' *)
+    | A.Shift n, I.BCtx cP' ->
+      let cP'' = drop_suffix cP' n in
+      let _ = try Unify.unify_bctx (sign, cG) cP cP''
         with Unify.Unification_failure prob ->
           raise (Error.Error ("Expected context: " ^ IP.print_bctx cP ^ " shifted by " ^ string_of_int n
                               ^ " position" ^ (if n > 1 then "s" else "")
@@ -378,23 +361,23 @@ and check_syn_spine (sign, cG) cP sp tel t =
   res
 
 and check_spi_spine (sign, cG) cP sp tel t =
-  let rec check_spine sp tel t sl =
+  let rec check_spine sp tel t sl cP' =
     let sigma = List.fold_right (fun x sigma -> I.Dot(sigma, x)) sl (I.Shift (List.length sl)) in
     match sp, tel with
     | e::sp', (_, x, s)::tel ->
-       let e' = check_syn (sign, cG) cP e (I.Clos (s, sigma, assert false)) in
-       let sp'', t' = check_spine sp' tel t (e' :: sl) in
+       let e' = check_syn (sign, cG) cP e (I.Clos (s, sigma, cP')) in
+       let sp'', t' = check_spine sp' tel t (e' :: sl) (I.Snoc(cP', x, s)) in
        e'::sp'', t'
-    | [], [] -> [], I.Clos(t, sigma, assert false)
+    | [], [] -> [], I.Clos(t, sigma, cP')
     | _, [] ->
        begin
-         match Whnf.whnf sign (I.Clos (t, sigma, assert false)) with
+         match Whnf.whnf sign (I.Clos (t, sigma, cP')) with
          | I.SPi (tel', t') -> check_spi_spine (sign, cG) cP sp tel' t
          | _ -> raise (Error.Error ("Unconsumed application cannot check against type " ^ IP.print_exp t))
        end
     | [], _ -> [], I.SPi (tel, t)
   in
-  check_spine sp tel t []
+  check_spine sp tel t [] cP
 
 and check_spi (sign, cG) cP (tel : A.stel) t =
   match tel with

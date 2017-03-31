@@ -75,27 +75,34 @@ and occur_check_stel sign n tel =
   | [] -> false
   | (_, _, e):: _ ->  occur_check sign n e
 
-let print_subst sigma = "[" ^ String.concat ", " (List.map (fun (x, e) -> print_exp e ^ "/" ^ print_name x) sigma) ^ "]"
+let rem n cG = let cG' = List.filter (fun (x, _) -> x <> n) cG in
+               Debug.print ~verbose:true  (fun () -> "Removing " ^ print_name n
+                                      ^ " from context " ^ print_ctx cG
+                                      ^ " yielding " ^ print_ctx cG'); cG'
+
 
 let rec unify_flex (sign, cG) flex e1 e2 =
-  let rem n cG = let cG' = List.filter (fun (x, _) -> x <> n) cG in
-                 Debug.print (fun () -> "Removing " ^ print_name n ^ " from context " ^ print_ctx cG ^ " yielding " ^ print_ctx cG'); cG' in
   let unify_flex = unify_flex (sign, cG) flex in
   let unify_many cG e1 e2 = unify_flex_many (sign, cG) flex e1 e2 in
   let unify_pi = unify_flex_pi (sign, cG) flex in
   let unify_spi = unify_flex_spi (sign, cG) flex in
   let is_flex n = List.mem n flex in
   let e1', e2' =  Whnf.whnf sign e1, Whnf.whnf sign e2 in
-  Debug.print(fun () -> "Unifying expressions\ne1 = " ^ print_exp e1
+  Debug.print ~verbose:true (fun () -> "Unifying expressions\ne1 = " ^ print_exp e1
                         ^ "\ne2 = " ^ print_exp e2 ^ "\ne1' = " ^ print_exp e1' ^ "\ne2' = " ^ print_exp e2');
   match e1', e2' with
   | Set n , Set n' when n = n' -> cG, []
   | Set n, Set n' -> raise (Unification_failure (Universes_dont_match (n, n')))
   | Pi (tel, t), Pi(tel', t') -> unify_pi tel t tel' t'
   | SPi (tel, t), SPi(tel', t') -> unify_spi tel t tel' t'
-  | Box(g, e), Box(g', e') ->
-     (* unify_many cG [g; e] [g'; e'] *)
-     assert false
+  | Box(cP, e), Box(cP', e') ->
+     let cG', sigma = unify_flex_bctx (sign, cG) flex cP cP' in
+     let cG'', sigma' = unify_flex (simul_subst sigma e) (simul_subst sigma e') in
+     cG'', sigma' @ sigma
+  | TermBox(cP, e), Box(cP', e') ->
+     let cG', sigma = unify_flex_bctx (sign, cG) flex cP cP' in
+     let cG'', sigma' = unify_flex (simul_subst sigma e) (simul_subst sigma e') in
+     cG'', sigma' @ sigma
   | Fn(ns, e), Fn(ns', e') ->
      let sigma = List.map2 (fun n n' -> (n, Var n')) ns ns' in
      unify_flex (simul_subst sigma e) (simul_subst sigma e')
@@ -121,7 +128,17 @@ let rec unify_flex (sign, cG) flex e1 e2 =
      else
        raise (Unification_failure (Occur_check (n, e1)))
   | BVar i, BVar i' when i = i' -> cG, []
-  | Clos(e1, e2, _), Clos(e1', e2', _) -> (* unify_many cG [e1;e2] [e1';e2'] *) assert false
+  | Clos(Var n, s1, cP1), Clos(Var m, s2, cP2) when n = m ->
+     let _ = try unify_flex_bctx (sign, cG) flex cP1 cP2
+             with Unification_failure e -> raise (Error.Violation ("Une petite robe noire"))
+     in
+     unify_flex s1 s2
+  | Clos(Var n, s1, cP1), Clos(Var m, s2, cP2) when is_flex n -> assert false
+  | Clos(Var n, s1, cP1), Clos(Var m, s2, cP2) when is_flex m -> assert false
+  | Clos(e1, e2, _), Clos(e1', e2', _) ->
+     Debug.print ~verbose:true  (fun () -> "e1 = " ^ print_exp e1 ^ "\ne2 = " ^ print_exp e2
+                            ^ "\ne1' = " ^ print_exp e1' ^ "\ne2' = " ^ print_exp e2');
+     (* unify_many cG [e1;e2] [e1';e2'] *) assert false
   | Empty, Empty -> cG, []
   | Shift n, Shift n' -> cG, []
   | Dot(e1, e2), Dot(e1', e2') -> unify_many cG [e1;e2] [e1';e2']
@@ -132,10 +149,28 @@ let rec unify_flex (sign, cG) flex e1 e2 =
   | _, _ ->
      raise (Unification_failure(Expressions_dont_unify (flex, e1', e2')))
 
-and unify_flex_bctx = function
-  | Nil -> assert false
-  | Snoc _ -> assert false
-  | CtxVar _ -> assert false
+and unify_flex_bctx (sign, cG) flex cP1 cP2 =
+  let is_flex n = List.mem n flex in
+  match cP1, cP2 with
+  | Nil, Nil -> cG, []
+  | Snoc(cP1', _, t1), Snoc(cP2', _, t2) ->
+     let cG', sigma = unify_flex_bctx (sign, cG) flex cP1' cP2' in
+     let cG'', sigma' = unify_flex (sign, cG') flex (simul_subst sigma t1)(simul_subst sigma t2) in
+     cG'', sigma' @ sigma
+
+  | CtxVar n, CtxVar n' when n = n' -> cG, []
+  | CtxVar n, _ when is_flex n ->
+     if not (occur_check_bctx sign n cP2) then
+       ctx_subst (n, BCtx cP2) (rem n cG), [n, BCtx cP2]
+     else
+       raise (Unification_failure (Occur_check (n, BCtx cP2)))
+  | _, CtxVar n when is_flex n ->
+     if not (occur_check_bctx sign n cP1) then
+       ctx_subst (n, BCtx cP1) (rem n cG), [n, BCtx cP1]
+     else
+       raise (Unification_failure (Occur_check (n, BCtx cP1)))
+
+  | _ -> raise (Unification_failure (Expressions_dont_unify (flex, BCtx cP1, BCtx cP2)))
 
 and unify_flex_many (sign, cG) flex es1 es2 =
   let unify_each (cD, sigma1) e1 e2 =
@@ -179,17 +214,16 @@ and unify_flex_spi (sign, cG as ctxs: signature * ctx) (flex : name list) (tel1 
      cD', sigma' @ sigma''
 
 let get_flex_vars cG e1 e2 = Util.unique (fv cG e1 @ fv cG e2)
+let get_flex_vars_bctx cG e1 e2 = Util.unique (fv_ctx cG e1 @ fv_ctx cG e2)
 
 let unify (sign, cG) e1 e2 =
   let flex_vars = get_flex_vars cG e1 e2 in
-  Debug.begin_verbose ();
-  Debug.print(fun () -> "Flexible unify\ne1 = " ^ print_exp e1
+  Debug.print ~verbose:true (fun () -> "Flexible unify\ne1 = " ^ print_exp e1
                         ^ "\ne2 = " ^ print_exp e2
                         ^ "\nwith flexible variables= " ^ print_names flex_vars
                         ^ "\nin context Γ = " ^ print_ctx cG
                         ^ ".");
   let cG', sigma = unify_flex (sign, cG) flex_vars e1 e2 in
-  Debug.end_verbose ();
   let remaining_vars = fv_subst cG' sigma in
   if remaining_vars = []
   then cG', sigma
@@ -198,4 +232,18 @@ let unify (sign, cG) e1 e2 =
 
 let unify_many (sign, cG) es1 es2 =
   let flex = List.fold_left2 (fun ns e e' -> ns @ get_flex_vars cG e e') [] es1 es2 in
-  unify_flex_many (sign, cG) flex es1 es2
+  let res = unify_flex_many (sign, cG) flex es1 es2 in
+  res
+
+let unify_bctx (sign, cG) cP1 cP2 =
+  let flex = get_flex_vars_bctx cG cP1 cP2 in
+  let res = unify_flex_bctx (sign, cG) flex cP1 cP2 in
+  res
+
+let unify_flex (sign, cG) flex e1 e2 =
+  let res = unify_flex (sign, cG) flex e1 e2 in
+  res
+
+let unify_flex_many (sign, cG) flex es1 es2 =
+  let res = unify_flex_many (sign, cG) flex es1 es2 in
+  res

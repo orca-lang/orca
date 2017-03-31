@@ -51,17 +51,17 @@ let tc_syn_constructor (sign , cG : signature * ctx) (tel : I.stel)
   let tel'' = check_stel (sign, cG) I.Nil tel' in
   let cP = bctx_of_stel I.Nil tel'' in
   let check' = check_syn (sign, cG) cP in
-  let rec check_indices es tel s =
+  let rec check_indices es tel cP' s =
     match es, tel with
     | [], [] -> []
-    | e::es', (_, _, t)::tel' ->
-       let e' = check' e (I.Clos (t, s, cP)) in
-       e' :: check_indices es' tel' (I.Dot(s, e'))
+    | e::es', (_, x, t)::tel' ->
+       let e' = check' e (I.Clos (t, s, cP')) in
+       e' :: check_indices es' tel' (I.Snoc(cP', x, t)) (I.Dot(s, e'))
     | _ -> raise (Error.Error ("Constructor " ^ n
              ^ " does not return a term of the fully applied type for " ^ n'))
   in
   Debug.print (fun () -> "Checking indices applied to " ^ n' ^ " at the tail of signature of " ^ n);
-  let es' = check_indices es tel I.idSub in
+  let es' = check_indices es tel cP I.idSub in
   SConstructor (n, tel'', (n', es')), (n, tel'', (n', es'))
 
 let rec tc_syn_constructors (sign , cG : signature * ctx) (tel : I.stel)
@@ -73,7 +73,8 @@ let rec tc_syn_constructors (sign , cG : signature * ctx) (tel : I.stel)
      let sign', ds' = tc_syn_constructors (sign, cG) tel ds in
      se::sign', d'::ds'
 
-let tc_program (sign : signature) : program -> signature * I.program = function
+let tc_program (sign : signature) : program -> signature * I.program =
+  function
   | Data (n, ps, is, u, ds) ->
     Debug.print_string ("Typechecking data declaration: " ^ n ^ "\nps = "
                         ^ print_tel ps ^ "\nis = " ^ print_tel is);

@@ -263,7 +263,8 @@ and subst_bctx (x, es : single_subst) cP =
   | CtxVar n when x = n ->
      begin match es with
      | BCtx cP -> refresh_bctx [] cP
-     | _ -> raise (Error.Violation "I don't believe you!")
+     | Var y -> CtxVar y
+     | e -> raise (Error.Violation ("I don't believe you! " ^ print_exp e))
      end
   | CtxVar n -> CtxVar n
 
@@ -381,3 +382,5 @@ let rec rename_ctx_using_subst (cG : ctx) (sigma : subst) =
      match lookup_ctx sigma x with
      | Some (Var y) -> (y, t) :: (rename_ctx_using_subst cG' sigma)
      | _ -> (x, t) :: (rename_ctx_using_subst cG' sigma)
+
+let print_subst sigma = "[" ^ String.concat ", " (List.map (fun (x, e) -> print_exp e ^ "/" ^ print_name x) sigma) ^ "]"

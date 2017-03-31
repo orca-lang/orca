@@ -232,10 +232,10 @@ module Int = struct
     | [] -> print_exp t
     | (_, x, e) :: tel when is_name_floating x ->
        "(" ^ print_exp e ^ " -> " ^ print_pi tel t ^ ")"
-    | (_, x, e) :: tel -> "(" ^ print_name x ^ " : " ^ print_exp e ^ ") -> " ^ print_pi tel t ^ ")"
+    | (_, x, e) :: tel -> "(" ^ print_name x ^ " : " ^ print_exp e ^ ") -> " ^ print_pi tel t
   and print_spi tel t = match tel with
     | [] -> print_exp t
-    | (_, x, e) :: tel -> "(" ^ x ^ " : " ^ print_exp e ^ ")->> " ^ print_spi tel t ^ ")"
+    | (_, x, e) :: tel -> "(" ^ x ^ " : " ^ print_exp e ^ ") ->> " ^ print_spi tel t
 
   let print_exps es = "(" ^ String.concat ", " (List.map print_exp es) ^ ")"
 
@@ -314,4 +314,4 @@ module Int = struct
     | Syn (n, tel, decls) -> "(syn " ^ n ^ " " ^ print_stel tel ^ "\n" ^ print_sdecls decls ^ ")"
     | DefPM (n, tel, e, decls) -> "(def " ^ n ^ " (" ^ print_tel tel ^ ") " ^ print_exp e ^ "\n" ^ print_def_decls decls ^ ")"
     | Def (n, e1, e2) -> "(def " ^ n ^ " " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
-  end
+end

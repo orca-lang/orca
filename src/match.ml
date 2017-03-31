@@ -52,14 +52,14 @@ let rec rename_ctx_using_pats (cG : ctx) (ps : pats) =
 let rec subst_of_ctx_map sign (sigma : ctx_map) (tel : I.tel) : subst =
   match sigma, tel with
   | [], [] -> []
-  | p :: ps, (_, n, t) :: tel' -> (n, Procpat.exp_of_pat sign p) :: (subst_of_ctx_map sign ps tel')
+  | p :: ps, (_, n, t) :: tel' -> (n, Procpat.exp_of_pat sign I.Nil p) :: (subst_of_ctx_map sign ps tel')
   | _ -> raise (Error.Violation "subst_of_ctx_map got lists of different lengths")
 
 let compose_maps sign (sigma : ctx_map) (cD : ctx) (delta : ctx_map) : ctx_map =
   let delta_names = List.map2 (fun (x, _) p -> x, p) cD delta in
   Debug.print(fun () -> "Composing maps\nsigma = " ^ print_pats sigma
       ^ "\ndelta = " ^ print_pats delta ^ "\ndelta_names" ^ print_psubst delta_names);
-  List.map (simul_psubst sign delta_names) sigma
+  List.map (simul_psubst sign I.Nil delta_names) sigma
 
 let rec matching (p : pat) (q : pat) : pats =
   match p, q with
@@ -95,7 +95,6 @@ let inac_subst = List.map (fun (x, e) -> x, IInac e)
 let split_flex_unify (sign : signature) (p1 : pats) (thetatel : I.tel) (ps : pats)
                      (cD1 : ctx) (vs : I.exp list) (ws : I.exp list) =
   let sigma, cT = rename_ctx_using_pats (ctx_of_tel thetatel) ps in
-  Debug.begin_verbose ();
   Debug.print (fun () -> "Creating set of flexible variables\np1 = " ^ print_pats p1
     ^ "\nps = " ^ print_pats ps ^ "\ncD1 = " ^ print_ctx cD1 ^ "\ncT = " ^ print_ctx cT);
   let flex = flexible (p1 @ ps) (cD1 @ cT) in
@@ -117,7 +116,6 @@ let split_flex_unify (sign : signature) (p1 : pats) (thetatel : I.tel) (ps : pat
   Debug.print (fun () -> "cT = " ^ print_ctx cT ^ "\ncT' = " ^ print_ctx cT');
   let pdelta = inac_subst delta in
   Debug.print (fun () -> "pdelta = " ^ print_psubst pdelta);
-  Debug.end_verbose ();
   cD', cT, delta, pdelta, cT'
 
 let compute_split_map sign (ss:single_subst) (pss:single_psubst) (cD1:ctx) (x:name)
@@ -129,10 +127,10 @@ let compute_split_map sign (ss:single_subst) (pss:single_psubst) (cD1:ctx) (x:na
   let id_cD' = psubst_of_ctx cD1 in
   let delta' = compose_single_with_subst ss (delta @ [x, I.Var x]) in
   Debug.print (fun () -> "delta' = " ^ IP.print_subst delta');
-  let pdelta = compose_psubst sign pdelta id_cD' in
+  let pdelta = compose_psubst sign I.Nil pdelta id_cD' in
   Debug.print (fun () -> "pdelta = " ^ print_psubst pdelta);
   let pdelta_shift = pdelta @ [x, PVar x] in
-  let pdelta' = compose_single_with_psubst sign pss pdelta_shift in
+  let pdelta' = compose_single_with_psubst sign I.Nil pss pdelta_shift in
   Debug.print (fun () -> "pdelta' = " ^ print_psubst pdelta');
   let cD'', delta'' = cD' @ (simul_subst_on_ctx delta' cD2),
     (pats_of_psubst (shift_psubst_by_ctx pdelta' cD2)) in
@@ -182,7 +180,7 @@ let split_lam (sign : signature) (p1 : pats) (xs, p : string list * pat) (cD1 : 
     | _ -> raise (Error.Violation ("Split_lam obtained more than one parameter out of td (" ^ print_ctx td ^ ")"))
   in
   let ss = x, I.Lam (xs, e) in
-  let p' = match simul_psubst_on_list sign pdelta (pvar_list_of_ctx cT) with
+  let p' = match simul_psubst_on_list sign I.Nil pdelta (pvar_list_of_ctx cT) with
     | [p'] -> p'
     | _ -> raise (Error.Violation ("Split_lam obtained more than one parameter out of substituting in cT"))
   in
@@ -224,7 +222,7 @@ let split_const (sign : signature) (p1 : pats) (c, ps : def_name * pats)
                x, I.AppL (I.Const c, var_list_of_ctx td)
              else
                x, I.App (I.Const c, var_list_of_ctx td) in
-    let pss = x, PConst (c, simul_psubst_on_list sign pdelta (pvar_list_of_ctx cT)) in
+    let pss = x, PConst (c, simul_psubst_on_list sign I.Nil pdelta (pvar_list_of_ctx cT)) in
     let res = compute_split_map sign ss pss cD1 x cD2 delta pdelta cD' in
     Debug.deindent (); res
   else
@@ -250,25 +248,15 @@ let split_clos (sign : signature) (p1 : pats) (n, s : name * pat_subst) (cD1 : c
                                ^ "only be used against a boxed type. Found "
                                ^ IP.print_exp t))
   in
-  let rec get_domain cP s =
-      match cP, s with
-      | _, CEmpty -> I.Nil
-      | _, CDot(s, y) ->
-         I.Snoc(get_domain cP s, "_", lookup_bound cP y)
-      | _, CShift 0 -> cP
-      | I.Snoc(g, _, _), CShift m -> get_domain g (CShift (m-1))
-      | _, CShift m -> raise (Error.Error ("When checking pattern " ^ print_name n ^ "[" ^ print_pat_subst s
-                                           ^ "], expected context " ^ IP.print_bctx cP ^ " to have at least "
-                                           ^ string_of_int m ^ " variable" ^ if m > 1 then "s" else "" ^ " to shift over."))
-  in
   let rec subst_of_pat_subst = function
     | CShift n -> I.Shift n
     | CEmpty -> I.Empty
     | CDot(s, i) -> I.Dot(subst_of_pat_subst s, I.BVar i)
   in
   match Whnf.apply_inv t s with
-  | Some t -> compute_split_map sign (x, I.Clos(I.Var n, subst_of_pat_subst s, assert false)) (x, PClos(n, s))
-                                cD1 x cD2 [] [] (cD1 @ [n, I.Box (get_domain cP s, t)])
+  | Some t -> let cP' = get_domain cP s in
+              compute_split_map sign (x, I.Clos(I.Var n, subst_of_pat_subst s, cP')) (x, PClos(n, s))
+                                cD1 x cD2 [] [] (cD1 @ [n, I.Box (cP', t)])
   | None -> raise (Error.Error ("Cannot check pattern matching clause " ^ print_pat (PClos (n, s))
                                ^ " because it was not possible to compute an inverse substitution for " ^ print_pat_subst s))
 
@@ -388,17 +376,19 @@ let rec check_inacs (sign, cD : signature * ctx) (p : pats) (sigma : ctx_map) (c
   | _ -> raise (Error.Error "Size mismatch.")
 
 and check_inacs_syn (sign, cD : signature * ctx) (cP : I.bctx) (p : pats) (sigma : ctx_map) (tel : I.stel) : I.pats =
-  match p, sigma with
-  | p::ps, q::qs ->
-     begin match tel with
-     | (_, _, t)::tel' ->
-        let p' = check_inac_syn (sign, cD) cP p q t in
-        let tel'' = assert false in  (* ss_syn_subst_stel (exp_of_pat sign p') tel' in *)
-        p' :: check_inacs_syn (sign, cD) cP ps qs tel''
-     | _ -> raise (Error.Error "The context ended unexpectedly.")
-     end
-  | [], [] -> []
-  | _ -> raise (Error.Error "Size mismatch.")
+  let rec make_subst_tel ps qs tel cP' s =
+    match ps, qs with
+    | p::ps, q::qs ->
+       begin match tel with
+       | (_, x, t)::tel' ->
+          let p' = check_inac_syn (sign, cD) cP p q (I.Clos (t, s, cP')) in
+          let s' = I.Dot(s, exp_of_pat sign p') in
+          p' :: (make_subst_tel ps qs tel' (I.Snoc (cP', x, t)) s')
+       | _ -> raise (Error.Error "The context ended unexpectedly.")
+       end
+    | [], [] -> []
+    | _ -> raise (Error.Error "Size mismatch.")
+  in make_subst_tel p sigma tel cP I.idSub
 
 and check_inac (sign, cD : signature * ctx) (p : pat) (q : pat) (t : I.exp) : I.pat =
   match p, q with
@@ -408,7 +398,7 @@ and check_inac (sign, cD : signature * ctx) (p : pat) (q : pat) (t : I.exp) : I.
      let eq' = check (sign, cD) eq t in
      let _, sigma = try Unify.unify (sign, cD) ep' eq'
              with Unify.Unification_failure prob ->
-               raise (Error.Error ("Inacessible pattern check failed with:\n" ^ Unify.print_unification_problem prob))
+               raise (Error.Error ("Inaccessible pattern check failed with:\n" ^ Unify.print_unification_problem prob))
      in
      Debug.deindent ();
      I.Innac (simul_subst sigma ep')
@@ -417,7 +407,7 @@ and check_inac (sign, cD : signature * ctx) (p : pat) (q : pat) (t : I.exp) : I.
      let ep' = check (sign, cD) ep t in
      let _, sigma = try Unify.unify (sign, cD) ep' eq
              with Unify.Unification_failure prob ->
-               raise (Error.Error ("Inacessible pattern check failed with:\n" ^ Unify.print_unification_problem prob))
+               raise (Error.Error ("Inaccessible pattern check failed with:\n" ^ Unify.print_unification_problem prob))
      in
      Debug.deindent ();
      I.Innac (simul_subst sigma ep')
@@ -484,7 +474,8 @@ and check_inac_syn (sign, cD : signature * ctx) (cP : I.bctx) (p : pat) (q : pat
        I.PLam (xs, check_inac_syn (sign, cD) cP' p q (if tel' = [] then t else I.SPi (tel', t)))
      else
        raise (Error.Violation "Match - check_inac - PLam binding sizes differ. Who knows why?")
-  | PClos (n, s), PClos (n', s') when n = n' -> I.PClos(n, s, assert false)
+  | PClos (n, s), PClos (n', s') when n = n' ->
+     I.PClos(n, s, get_domain cP s)
 
   (* In the syntax cases, we might need to grow cP *)
   | p, q -> raise (Error.Error ("Pattern matching on syntax is not yet supported.\np = " ^ print_pat p ^ "\nq = " ^ print_pat q))

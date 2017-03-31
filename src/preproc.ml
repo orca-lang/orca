@@ -127,7 +127,6 @@ let rec get_bound_var_ctx_in_pat (p : E.pat) : bctx =
 
 let rec pproc_exp (s : sign) (cG : ctx) (cP : bctx) (e : E.exp) : A.exp =
   Debug.print (fun () -> "Preprocessing expression " ^ EP.print_exp e);
-  Debug.begin_verbose();
   Debug.indent ();
   let f e = pproc_exp s cG cP e in
   let res = match content e with
@@ -188,7 +187,6 @@ let rec pproc_exp (s : sign) (cG : ctx) (cP : bctx) (e : E.exp) : A.exp =
   | E.Hole (Some n) -> A.Hole (Name.gen_name n)
   | E.Hole None -> A.Hole (Name.gen_name "H")
   in Debug.deindent ();
-     Debug.end_verbose();
   res
 
 and pproc_comma (s : sign) (cG : ctx) (cP : bctx) (g : E.exp) : bctx * A.exp =
