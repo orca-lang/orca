@@ -145,7 +145,7 @@ let rec unify_flex (sign, cG) flex e1 e2 =
   | Comp (e1, cP, e2), Comp(e1', cP', e2') -> (* unify_many cG [e1;e2] [e1';e2'] *) assert false
   | Annot(e1, e2), Annot(e1', e2') -> unify_many cG [e1;e2] [e1';e2']
   | Ctx, Ctx -> cG, []
-  | BCtx cP, BCtx cP' -> assert false
+  | BCtx cP, BCtx cP' -> unify_flex_bctx (sign, cG) flex cP cP'
   | _, _ ->
      raise (Unification_failure(Expressions_dont_unify (flex, e1', e2')))
 
