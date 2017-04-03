@@ -14,7 +14,8 @@ type pat =
   | PBVar of int
   | UInac of A.exp              (* those are user written inacessible patterns *)
   | IInac of I.exp              (* those are inferred inacessible patterns from index unification *)
-  | PLam of string list * pat
+  | PLam of (string * I.exp) list * pat
+  | UPLam of string list * pat  (* same distinction as for UInac and IInac *)
   | PConst of def_name * pat list
   | PClos of name * pat_subst
   | PEmptyS
@@ -34,7 +35,10 @@ let rec print_pat (p : pat) : string = match p with
   | PBVar i -> "i" ^ string_of_int i
   | UInac e -> "." ^ AP.print_exp e
   | IInac e -> "+" ^ IP.print_exp e
-  | PLam (fs, p) -> "(\ " ^ String.concat " "  fs ^ " " ^ print_pat p ^ ")"
+  | PLam (fs, p) -> "(\ "
+                    ^ String.concat " " (List.map (fun (x, t) -> "("^ x ^ " : " ^ IP.print_exp t ^ ")") fs)
+                    ^ " " ^ print_pat p ^ ")"
+  | UPLam (fs, p) -> "(+\ " ^ String.concat " "  fs ^ " " ^ print_pat p ^ ")"
   | PConst (n, ps) -> "(" ^ n ^ " " ^ print_pats ps ^ ")"
   | PClos (n, s) -> print_name n ^ "[" ^ print_pat_subst s ^ "]"
   | PEmptyS -> "^"
@@ -68,6 +72,7 @@ let rec exp_of_pat sign cP : pat -> I.exp = function
   | IInac e -> e
   | UInac e -> raise (Error.Violation "We hope to never see you again (this message, not the user)")
   | PLam (fs, p) -> I.Lam (fs, exp_of_pat sign cP p)
+  | UPLam (fs, p) -> raise (Error.Violation "We hope to never see you again, again (this message, not the user)")
   | PConst (n, ps) when is_syn_con sign n -> I.AppL (I.Const n, List.map (exp_of_pat sign cP) ps)
   | PConst (n, ps) -> I.App (I.Const n, List.map (exp_of_pat sign cP) ps)
   | PClos (n, s) -> I.Clos (I.Var n, exp_of_pat_subst s, get_domain cP s)
@@ -100,6 +105,7 @@ let rec psubst sign cP ((x, p') as s) (p : pat) :  pat =
   | IInac e -> IInac (subst (x, exp_of_pat sign cP p') e)
   | UInac e -> raise (Error.Violation "We hope to never see you again (this message, not the user)")
   | PLam (f, p) -> PLam(f, psubst sign cP s p)
+  | UPLam (f, p) -> UPLam(f, psubst sign cP s p)
   | PConst (n, ps) -> PConst(n, List.map (psubst sign cP s) ps)
   | PClos (n, s) when n = x ->
      begin match p' with
@@ -157,7 +163,7 @@ and proc_pat : A.pat -> pat = function
   | A.PVar n -> PVar n
   | A.PBVar n -> PBVar n
   | A.Innac e -> UInac e
-  | A.PLam (xs, p) -> PLam (xs, proc_pat p)
+  | A.PLam (xs, p) -> UPLam (xs, proc_pat p)
   | A.PConst (n, ps) -> PConst (n, proc_pats ps)
   | A.PClos (n, s) -> PClos (n, s)
   | A.PEmptyS -> PEmptyS

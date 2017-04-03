@@ -114,3 +114,5 @@ let rec beautify_idx i cP =
 (* let rec syn_subst_spi (sigma : exp) (tel : stel) (t : exp) : stel * exp = *)
 (*   let tel', sigma' = syn_subst_stel sigma tel in *)
 (*   tel', Clos(t, sigma') *)
+
+let bctx_from_lam cP xs = List.fold_left (fun cP (x, t) -> Snoc(cP, x, t)) cP xs

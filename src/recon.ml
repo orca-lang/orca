@@ -114,7 +114,7 @@ and check (sign , cG : signature * ctx) (e : A.exp) (t : I.exp) : I.exp =
        I.Fn (fs, e')
 
     | _, I.Box (cP, alpha) when is_syntax e ->
-       check_syn (sign, cG) cP e alpha
+       I.TermBox (cP, check_syn (sign, cG) cP e alpha)
 
     | _, I.Ctx when is_syntax e -> I.BCtx (check_ctx (sign, cG) e)
 
@@ -231,19 +231,26 @@ and check_syn (sign, cG) cP (e : A.exp) (t : I.exp) =
     ^ IP.print_bctx cP ^ "\nand context " ^ print_ctx cG);
   Debug.indent ();
   let res =
-    match e, Whnf.whnf sign t with
-    | A.Lam (f, e), I.SPi (tel, t) ->
-       let cP', tel' = bctx_of_lam_stel f tel cP in
-       (* let cP'' = append_bctx cP' cP in *)
-      begin match tel' with
-      | [] -> I.Lam (f, check_syn (sign, cG) cP' e t)
-      | _ -> I.Lam (f, check_syn (sign, cG) cP' e (I.SPi (tel', t)))
-      end
+    match e, Whnf.whnf_open sign cP t with
+    | A.Lam (fs, e), I.SPi (tel, t) ->
+       let cP', tel' = bctx_of_lam_stel fs tel cP in
+       let rec lam_tel fs tel =
+         begin match fs, tel with
+         | x::xs, (_,_,t)::tel' -> (x, t) :: lam_tel xs tel'
+         | [], _ -> []
+         | _, [] -> raise (Error.Violation "It's a violation; the error was already raised (there).")
+         end
+       in
+       let fs' = lam_tel fs tel in
+       begin match tel' with
+       | [] -> I.Lam (fs', check_syn (sign, cG) cP' e t)
+       | _ -> I.Lam (fs', check_syn (sign, cG) cP' e (I.SPi (tel', t)))
+       end
     | _, I.Ctx -> I.BCtx(check_ctx (sign, cG) e)
     | A.EmptyS, I.BCtx I.Nil -> I.Empty
     | A.Shift n, I.BCtx cP' ->
-      let cP'' = drop_suffix cP' n in
-      let _ = try Unify.unify_bctx (sign, cG) cP cP''
+      let cP'' = drop_suffix cP n in
+      let _ = try Unify.unify_bctx (sign, cG) cP' cP''
         with Unify.Unification_failure prob ->
           raise (Error.Error ("Expected context: " ^ IP.print_bctx cP ^ " shifted by " ^ string_of_int n
                               ^ " position" ^ (if n > 1 then "s" else "")
@@ -262,7 +269,7 @@ and check_syn (sign, cG) cP (e : A.exp) (t : I.exp) =
         | e, t -> e, t
       in
       let _, sigma = try
-          Unify.unify (sign, cG) t t'
+          Unify.unify_open (sign, cG) cP t t'
       with
         Unify.Unification_failure prob ->
           raise (Error.Error ("Checking syntactic term " ^ AP.print_exp e ^ " against type " ^ IP.print_exp t
@@ -299,7 +306,7 @@ and infer_syn (sign, cG) cP (e : A.exp) =
 
     | A.AppL (e, es) ->
        let e', t' = infer_syn (sign, cG) cP e in
-      begin match Whnf.whnf sign t' with
+      begin match Whnf.whnf_open sign cP t' with
       | I.SPi (tel, t) ->
          let es', t' = check_spi_spine (sign, cG) cP es tel t in
          I.AppL(e', es'), t'
@@ -337,7 +344,7 @@ and check_syn_spine (sign, cG) cP sp tel t =
   Debug.indent ();
   let res = match sp, tel with
     | e::sp', (_, x, s)::tel ->
-      let e' = match Whnf.whnf sign s with
+      let e' = match Whnf.whnf_open sign cP s with
         | I.Box(cP', s) ->
            (* we forget about cP and go on with cP'... MMMM *)
            check_syn (sign, cG) cP' e s
@@ -351,7 +358,7 @@ and check_syn_spine (sign, cG) cP sp tel t =
   | [], [] -> [], t
   | _, [] ->
     begin
-      match Whnf.whnf sign t with
+      match Whnf.whnf_open sign cP t with
       | I.Pi (tel', t') -> check_syn_spine (sign, cG) cP sp tel' t'
       | _ -> raise (Error.Error ("Unconsumed application cannot check against type " ^ IP.print_exp t))
     end
@@ -371,7 +378,7 @@ and check_spi_spine (sign, cG) cP sp tel t =
     | [], [] -> [], I.Clos(t, sigma, cP')
     | _, [] ->
        begin
-         match Whnf.whnf sign (I.Clos (t, sigma, cP')) with
+         match Whnf.whnf_open sign cP (I.Clos (t, sigma, cP')) with
          | I.SPi (tel', t') -> check_spi_spine (sign, cG) cP sp tel' t
          | _ -> raise (Error.Error ("Unconsumed application cannot check against type " ^ IP.print_exp t))
        end

@@ -159,7 +159,7 @@ module Int = struct
     | Var of name
     | Fn of name list * exp
     | App of exp * exp list
-    | Lam of string list * exp
+    | Lam of (string * exp) list * exp
     | AppL of exp * exp list
     | BVar of index
     | Clos of exp * exp * bctx
@@ -171,6 +171,7 @@ module Int = struct
     | Comp of exp * bctx * exp
     | Shift of int
     | ShiftS of int * exp
+
 
   and bctx
     = Nil
@@ -189,7 +190,7 @@ module Int = struct
     | PVar of name
     | PBVar of index
     | Innac of exp
-    | PLam of string list * pat
+    | PLam of (string * exp) list * pat
     | PConst of def_name * pat list
     | PClos of name * pat_subst * bctx
     | PBCtx of pat_bctx

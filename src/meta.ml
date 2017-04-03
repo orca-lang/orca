@@ -294,6 +294,9 @@ let simul_subst_on_tel sigma tel =
 let simul_subst_on_stel sigma tel =
   List.map (fun (i, x, e) -> (i, x, simul_subst sigma e)) tel
 
+let simul_subst_on_bctx sigma cP =
+  List.fold_left (fun cP s -> subst_bctx s cP) cP sigma
+
 let rec compose_single_with_subst s = function
   | [] -> []
   | (y, t') :: sigma -> (y, subst s t') :: (compose_single_with_subst s sigma)

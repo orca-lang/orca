@@ -158,9 +158,10 @@ and fmt_exp (sign, cG) cP pps = function
      | Some n -> bound_name pps n
      end
   | Lam (xs, e) ->
-    let cP' = bctx_of_names xs cP in
+     let xs' = List.map fst xs in
+     let cP' = bctx_of_names xs' cP in
      Fmt.pf pps "(\\%a. %a)"
-            (list bound_name) (beautify_bound_names xs cP')
+            (list bound_name) (beautify_bound_names xs' cP')
             (fmt_exp (sign, cG) cP') e
 
   | Clos (e1, e2, cP') ->
@@ -223,9 +224,10 @@ let rec fmt_pat (sign, cG) cP pps = function
     | Some n -> bound_name pps n
     end
   | PLam (xs, p) ->
-     let cP' = bctx_of_names xs cP in
+     let xs' = List.map fst xs in
+     let cP' = bctx_of_names xs' cP in
      Fmt.pf pps "(\\%a. %a)"
-            (list bound_name) (beautify_bound_names xs cP)
+            (list bound_name) (beautify_bound_names xs' cP)
             (fmt_pat (sign, cG) cP') p
 
   | PClos (n, psub, _) ->

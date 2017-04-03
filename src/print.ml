@@ -202,7 +202,8 @@ module Int = struct
     | Box (ctx, e) -> "(" ^ print_bctx ctx ^ " |- " ^ print_exp e ^ ")"
     | TermBox (ctx, e) -> "(" ^ print_bctx ctx ^ " :> " ^ print_exp e ^ ")"
     | Fn (fs, e) -> "(fn " ^ (String.concat " " (List.map print_name fs)) ^ " " ^ print_exp e ^ ")"
-    | Lam (fs, e) -> "(\\ " ^ String.concat " " fs ^ " " ^ print_exp e ^ ")"
+    | Lam (fs, e) ->
+       "(\\ " ^ String.concat " " (List.map (fun (x, t) -> "("^ x ^ " : " ^ print_exp t ^ ")") fs) ^ " " ^ print_exp e ^ ")"
     | App (e, es) -> "(" ^ print_exp e ^ " " ^ String.concat " " (List.map print_exp es) ^ ")"
     | AppL (e1, es) -> "(" ^ print_exp e1 ^ " ' " ^ String.concat " ' " (List.map print_exp es) ^ ")"
     | Const n -> n
@@ -244,7 +245,7 @@ module Int = struct
     | PPar n -> "(<: " ^ print_name n ^ ")"
     | PBVar i -> "i" ^ string_of_int i
     | Innac e -> "." ^ print_exp e
-    | PLam (fs, p) -> "(\ " ^ String.concat " " fs ^ " " ^ print_pat p ^ ")"
+    | PLam (fs, p) -> "(\ " ^ String.concat " " (List.map (fun (x, t) -> "("^ x ^ " : " ^ print_exp t ^ ")") fs) ^ " " ^ print_pat p ^ ")"
     | PConst (n, ps) -> "(" ^ n ^ " " ^ (String.concat " " (List.map (fun p -> "(" ^ print_pat p ^ ")") ps)) ^ ")"
     | PClos (n, s, cP) -> print_name n ^ "[" ^ print_pat_subst s ^ " : " ^ print_bctx cP ^ "]"
     | PBCtx cP -> print_pat_bctx cP

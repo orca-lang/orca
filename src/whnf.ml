@@ -80,23 +80,23 @@ let rec check_stuck = function
   | Var _ -> true
   | _ -> false
 
-let rec match_pat sign p e =
-  let e = whnf sign e in
+let rec match_pat sign cP p e =
+  let e = whnf_open sign cP e in
   Debug.print ~verbose:true  (fun () -> "Matching pattern " ^ print_pat p ^ " against term " ^ print_exp e);
   match p, e with
   | Innac _, _ -> []
   | PVar n, e -> [n, e]
   | PPar n, BVar i -> [n, BVar i]
   | PBVar i, BVar i' when i = i' -> []
-  | PLam (_, p), Lam (_, e) -> match_pat sign p e
+  | PLam (_, p), Lam (xs, e) -> match_pat sign (bctx_from_lam cP xs) p e
 
   | PConst (n, []), Const n' when n = n' -> []
   | PConst (n, ps), App(Const n', sp) when n = n' ->
-     match_pats sign ps sp
+     match_pats sign cP ps sp
   | PConst (n, _), App(Const n', _) ->
      raise (Matching_failure (p, e))
   | PConst (n, ps), AppL(Const n', sp) when n = n' ->
-     match_pats sign ps sp
+     match_pats sign cP ps sp
   | PConst (n, _), AppL(Const n', _) ->
      raise (Matching_failure (p, e))
 
@@ -113,13 +113,13 @@ let rec match_pat sign p e =
 (* | PUnder -> *)
 (* | PWildcard -> *)
 
-and match_pats sign ps es =
-  List.concat (List.map2 (match_pat sign) ps es)
+and match_pats sign cP ps es =
+  List.concat (List.map2 (match_pat sign cP) ps es)
 
-and reduce_with_clause sign sp (pats, rhs) =
+and reduce_with_clause sign cP sp (pats, rhs) =
   Debug.print ~verbose:true  (fun () -> "Matching spine " ^ print_exps sp ^ " against patterns " ^ print_pats pats);
   begin try
-      let sigma = match_pats sign pats sp in
+      let sigma = match_pats sign cP pats sp in
       match rhs with
       | Just e -> Some (simul_subst sigma e) (* TODO this should call whnf *)
       | Impossible _ -> raise (Error.Violation "This case is impossible, it did not happen!")
@@ -129,7 +129,7 @@ and reduce_with_clause sign sp (pats, rhs) =
       None
   end
 
-and reduce_with_clauses sign sp cls =
+and reduce_with_clauses sign cP sp cls =
   let rec split n sp =
     match n, sp with
     | 0, _ -> [], sp
@@ -142,7 +142,7 @@ and reduce_with_clauses sign sp cls =
     function
     | [] -> None
     | cl::cls ->
-       begin match reduce_with_clause sign sp cl with
+       begin match reduce_with_clause sign cP sp cl with
        | None -> reduce sp cls
        | otw -> otw
        end
@@ -153,66 +153,67 @@ and reduce_with_clauses sign sp cls =
   else
     let sp1, sp2 = split cl_l sp in
     try
-      match reduce (List.map (whnf sign) sp1) cls with
+      match reduce (List.map (whnf_open sign cP) sp1) cls with
       | None -> raise (Error.Error ("Coverage error"))
       | Some e -> Some (e, sp2)
     with Stuck -> None
 
 
-and whnf (sign : signature) (e : exp) : exp =
+and whnf_open (sign : signature) cP (e : exp) : exp =
   Debug.print ~verbose:true  (fun () -> "Computing the whnf of " ^ print_exp e) ;
   Debug.indent();
   let res = match e with
     (* this removes degenerate applications should they occur *)
     | App(App(h, sp), sp') ->
-       whnf sign (App(h, sp @ sp'))
+       whnf_open sign cP (App(h, sp @ sp'))
     | App(h, []) ->
-       whnf sign h
+       whnf_open sign cP h
     | AppL(AppL(h, sp), sp') ->
-       whnf sign (AppL(h, sp @ sp'))
+       whnf_open sign cP (AppL(h, sp @ sp'))
     | AppL(h, []) ->
-       whnf sign h
-    | Pi (tel, Pi (tel', t)) -> whnf sign (Pi (tel @ tel', t))
-    | SPi (tel, SPi (tel', t)) -> whnf sign (SPi (tel @ tel', t))
+       whnf_open sign cP h
+    | Pi (tel, Pi (tel', t)) -> whnf_open sign cP (Pi (tel @ tel', t))
+    | SPi (tel, SPi (tel', t)) -> whnf_open sign cP (SPi (tel @ tel', t))
 
     | Const n ->
       Debug.print ~verbose:true  (fun () -> "Found constant : " ^ n);
        begin match lookup_sign_def sign n with
-       | D e -> Debug.print ~verbose:true  (fun () -> "Definition of " ^ n ^ " is " ^ print_exp e); whnf sign e
+       | D e -> Debug.print ~verbose:true  (fun () -> "Definition of " ^ n ^ " is " ^ print_exp e); whnf_open sign cP e
        | _ -> Const n
        end
     | App(h, sp) ->
       Debug.print ~verbose:true  (fun () -> "Found application. Head is: " ^ print_exp h);
-      begin match whnf sign h with
+      begin match whnf_open sign cP h with
       | Fn(xs, e) as f ->
         Debug.print ~verbose:true  (fun () -> "Head of application was a function " ^ print_exp f);
         let sigma = List.map2 (fun x e -> x, e) xs sp in
-        whnf sign (simul_subst sigma e) (* Beta reduction *)
+        whnf_open sign cP (simul_subst sigma e) (* Beta reduction *)
       | Const n ->
         Debug.print ~verbose:true  (fun () -> "Head of application was a constant " ^ print_exp (Const n));
         begin match lookup_sign_def sign n with
-        | D e -> whnf sign (App (e, sp))
+        | D e -> whnf_open sign cP (App (e, sp))
         | P cls ->
-          begin match reduce_with_clauses sign sp cls with
+          begin match reduce_with_clauses sign cP sp cls with
           | None -> App (Const n, sp)
-          | Some (e, []) -> whnf sign e
-          | Some (e, sp) -> whnf sign (App (e, sp))
+          | Some (e, []) -> whnf_open sign cP e
+          | Some (e, sp) -> whnf_open sign cP (App (e, sp))
           end
         | _ -> App(Const n, sp)
         end
       | h -> App(h, sp)
        end
-    | Annot(e, _) -> whnf sign e
+    | Annot(e, _) -> whnf_open sign cP e
 
-
-    | e -> rewrite sign e
+    | Box (cP, e) -> Box (cP, rewrite sign cP e)
+    | TermBox (cP, e) -> TermBox (cP, rewrite sign cP e)
+    | e -> rewrite sign cP e
   in
   Debug.deindent();
   Debug.print ~verbose:true  (fun () -> "====> " ^ print_exp res);
   res
 
-and rewrite (sign : signature) (e : exp) : exp =
-  let w = whnf sign in
+and rewrite (sign : signature) cP (e : exp) : exp =
+  let w e = whnf_open sign cP e in
   let dmsg msg e' =
     Debug.print ~verbose:true  (fun () -> "Rewriting rule: " ^ msg);
     Debug.print ~verbose:true (fun () -> "\ne = " ^ print_exp e ^ "\ne' = " ^ print_exp (e' ()));
@@ -227,12 +228,12 @@ and rewrite (sign : signature) (e : exp) : exp =
   (* Beta reduction *)
     | AppL(e, es) ->
       begin match w e with
-      | Lam (_, e1) ->
+      | Lam (xs, e1) ->
         let rec f es = match es with
           | [] -> Shift 0
           | e :: es -> Dot (f es, e)
         in
-        w (dmsg "beta reduction" (fun () -> (Clos(e1, f es, assert false))))
+        w (dmsg "beta reduction" (fun () -> (Clos(e1, f es, bctx_from_lam cP xs))))
       | e -> AppL(e, es)
       end
 
@@ -330,7 +331,8 @@ and rewrite (sign : signature) (e : exp) : exp =
   | Clos (Clos (e, s1, cP1), s2, cP2) -> w (dmsg "CongClosClos" (fun () -> (Clos (e, Comp(s2, cP2, s1), cP1))))
   | Clos (AppL(e, es), s, cP) -> w (dmsg "CongClosAppL" (fun () -> (AppL(Clos(e, s, cP), List.map (fun e-> Clos(e, s, cP)) es))))
   | Clos (Lam (xs, e), s, cP) ->
-     (dmsg "CongClosLam" (fun () -> (Lam (xs, Clos (e, fst (List.fold_left (fun (s, i) _ -> ShiftS (i+1, s), i+1) (s, 0) xs), assert false)))))
+     (dmsg "CongClosLam"
+           (fun () -> (Lam (xs, Clos (e, fst (List.fold_left (fun (s, i) _ -> ShiftS (i+1, s), i+1) (s, 0) xs), bctx_from_lam cP xs)))))
   | Clos (Set n, s, _) -> (dmsg "CongClosSet" (fun () -> (Set n)))
   | Clos (Star, s, _) -> (dmsg "CongClosStar" (fun () -> Star))
   (* | Clos (Pi(tel, t), s) -> *)
@@ -402,6 +404,8 @@ and rewrite (sign : signature) (e : exp) : exp =
   Debug.deindent ();
   Debug.print ~verbose:true  (fun () -> "===> " ^ print_exp res);
   res
+
+let whnf sign e = whnf_open sign Nil e
 
 let rec normalize sign e =
   let norm e = normalize sign e in
