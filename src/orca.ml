@@ -1,7 +1,6 @@
 module Menhir = MenhirLib.Convert.Simplified
 
 let file_name = "orca"
-
 let parse menhir_parser lexbuf =
   let position = ref (Lexer.initial_pos file_name) in
   let lexer () =
@@ -31,7 +30,6 @@ let disable_ansi, ansi_on =
   let ansi = ref true in
   (fun () -> ansi := false),
   (fun () -> !ansi)
-
 
 let usage_msg = "Bears ahead"
 let file = ref ""

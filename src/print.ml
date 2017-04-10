@@ -195,34 +195,42 @@ module Int = struct
 
   let rec print_exp = function
     | Set n -> print_universe n
-    | Star -> "*"
+
     | Ctx -> "ctx"
     | Pi (tel, t) -> print_pi tel t
-    | SPi (tel, t) -> print_spi tel t
-    | Box (ctx, e) -> "(" ^ print_bctx ctx ^ " |- " ^ print_exp e ^ ")"
-    | TermBox (ctx, e) -> "(" ^ print_bctx ctx ^ " :> " ^ print_exp e ^ ")"
+
+    | Box (ctx, e) -> "(" ^ print_bctx ctx ^ " |- " ^ print_syn_exp e ^ ")"
+    | TermBox (ctx, se) -> "(" ^ print_bctx ctx ^ " :> " ^ print_syn_exp se ^ ")"
     | Fn (fs, e) -> "(fn " ^ (String.concat " " (List.map print_name fs)) ^ " " ^ print_exp e ^ ")"
-    | Lam (fs, e) ->
-       "(\\ " ^ String.concat " " (List.map (fun (x, t) -> "("^ x ^ " : " ^ print_exp t ^ ")") fs) ^ " " ^ print_exp e ^ ")"
     | App (e, es) -> "(" ^ print_exp e ^ " " ^ String.concat " " (List.map print_exp es) ^ ")"
-    | AppL (e1, es) -> "(" ^ print_exp e1 ^ " ' " ^ String.concat " ' " (List.map print_exp es) ^ ")"
     | Const n -> n
     | Dest n -> n
     | Var n -> Name.print_name n
-    | BVar i -> "i" ^ string_of_int i
-    | Clos (e, s, cP) -> "(" ^ print_exp e ^ " [" ^ print_exp s ^ " : " ^ print_bctx cP ^ "])"
     | BCtx cP -> print_bctx cP
     | Annot (e1, e2) -> "(" ^ print_exp e1 ^ " : " ^ print_exp e2 ^ ")"
     | Hole s -> "?" ^ print_name s
+
+  and print_syn_exp = function
+    | Star -> "*"
+    | SPi (tel, t) -> print_spi tel t
+    | Lam (fs, e) ->
+       "(\\ " ^ String.concat " " (List.map (fun (x, t) -> "("^ x ^ " : " ^ print_syn_exp t ^ ")") fs) ^ " " ^ print_syn_exp e ^ ")"
+    | AppL (e1, es) -> "(" ^ print_syn_exp e1 ^ " ' " ^ String.concat " ' " (List.map print_syn_exp es) ^ ")"
+    | BVar i -> "i" ^ string_of_int i
+    | SConst n -> n ^ "%"
     | Empty -> "^"
     | Shift n -> "^" ^ string_of_int n
-    | ShiftS (n, s) -> "(^^" ^ string_of_int n ^ " " ^ print_exp s ^ ")"
-    | Comp (e1, cP, e2) -> "(" ^ print_exp e1 ^ " o" ^ print_bctx cP ^ " " ^ print_exp e2 ^ ")"
-    | Dot (s, e) -> "(" ^ print_exp s ^ " ; " ^ print_exp e ^ ")"
+    | ShiftS (n, s) -> "(^^" ^ string_of_int n ^ " " ^ print_syn_exp s ^ ")"
+    | Comp (e1, cP, e2) -> "(" ^ print_syn_exp e1 ^ " o" ^ print_bctx cP ^ " " ^ print_syn_exp e2 ^ ")"
+    | Dot (s, e) -> "(" ^ print_syn_exp s ^ " ; " ^ print_syn_exp e ^ ")"
+    | Clos (e, s, cP) -> "(" ^ print_syn_exp e ^ " [" ^ print_syn_exp s ^ " : " ^ print_bctx cP ^ "])"
+    | Unbox (e, se, cP) -> "(ub " ^ print_exp e ^ "[" ^ print_syn_exp se ^ " : " ^ print_bctx cP  ^ "])"
+    | SCtx -> "ctx"
+    | SBCtx cP -> print_bctx cP
 
   and print_bctx cP =
     let rec print = function
-    | Snoc (cP, x, e2) -> "(" ^ print  cP ^ ", " ^ x ^ " : " ^ print_exp e2 ^ ")"
+    | Snoc (cP, x, e2) -> "(" ^ print  cP ^ ", " ^ x ^ " : " ^ print_syn_exp e2 ^ ")"
     | Nil -> "0"
     | CtxVar n -> print_name n
     in
@@ -235,29 +243,37 @@ module Int = struct
        "(" ^ print_exp e ^ " -> " ^ print_pi tel t ^ ")"
     | (_, x, e) :: tel -> "(" ^ print_name x ^ " : " ^ print_exp e ^ ") -> " ^ print_pi tel t
   and print_spi tel t = match tel with
-    | [] -> print_exp t
-    | (_, x, e) :: tel -> "(" ^ x ^ " : " ^ print_exp e ^ ") ->> " ^ print_spi tel t
+    | [] -> print_syn_exp t
+    | (_, x, e) :: tel -> "(" ^ x ^ " : " ^ print_syn_exp e ^ ") ->> " ^ print_spi tel t
 
   let print_exps es = "(" ^ String.concat ", " (List.map print_exp es) ^ ")"
+  let print_syn_exps es = "(" ^ String.concat ", " (List.map print_syn_exp es) ^ ")"
 
   let rec print_pat (p : pat) : string = match p with
     | PVar n -> print_name n
     | PPar n -> "(<: " ^ print_name n ^ ")"
-    | PBVar i -> "i" ^ string_of_int i
     | Innac e -> "." ^ print_exp e
-    | PLam (fs, p) -> "(\ " ^ String.concat " " (List.map (fun (x, t) -> "("^ x ^ " : " ^ print_exp t ^ ")") fs) ^ " " ^ print_pat p ^ ")"
+
     | PConst (n, ps) -> "(" ^ n ^ " " ^ (String.concat " " (List.map (fun p -> "(" ^ print_pat p ^ ")") ps)) ^ ")"
-    | PClos (n, s, cP) -> print_name n ^ "[" ^ print_pat_subst s ^ " : " ^ print_bctx cP ^ "]"
     | PBCtx cP -> print_pat_bctx cP
-    | PEmpty -> "^"
-    | PShift i -> "^ " ^ string_of_int i
-    | PDot (p1, p2) -> "(" ^ print_pat p1 ^ " ; " ^ print_pat p2 ^ ")"
     | PUnder -> "_"
     | PWildcard -> "._"
+    | PTBox (cP, p) -> "(" ^ print_bctx cP ^ " " ^ print_syn_pat p ^ ")"
+
+  and print_syn_pat = function
+    | PBVar i -> "i" ^ string_of_int i
+    | PLam (fs, p) -> "(\ " ^ String.concat " " (List.map (fun (x, t) -> "("^ x ^ " : " ^ print_syn_exp t ^ ")") fs) ^ " " ^ print_syn_pat p ^ ")"
+    | PSConst (n, ps) -> "(" ^ n ^ " " ^ (String.concat " " (List.map (fun p -> "(" ^ print_syn_pat p ^ ")") ps)) ^ ")"
+    | PUnbox (n, s, cP) -> "(u" ^ print_name n ^ "[" ^ print_pat_subst s ^ " : " ^ print_bctx cP ^ "])"
+    | PEmpty -> "^"
+    | PShift i -> "^ " ^ string_of_int i
+    | PDot (p1, p2) -> "(" ^ print_syn_pat p1 ^ " ; " ^ print_syn_pat p2 ^ ")"
+
+
 
   and print_pat_bctx = function
     | PNil -> "0"
-    | PSnoc (cP, x, p) -> "(" ^ print_pat_bctx cP ^ " , " ^ x ^ ":" ^ print_pat p ^ ")"
+    | PSnoc (cP, x, p) -> "(" ^ print_pat_bctx cP ^ " , " ^ x ^ ":" ^ print_syn_pat p ^ ")"
     | PCtxVar n -> print_name n
 
 
@@ -266,10 +282,12 @@ module Int = struct
                                                    ^ ", " ^ print_exp e ^ ")") tel)
 
   let print_stel (tel : stel) : string =
-    String.concat ", " (List.map (fun (_, x, e) -> "(" ^ x ^ ", " ^ print_exp e ^ ")") tel)
+    String.concat ", " (List.map (fun (_, x, e) -> "(" ^ x ^ ", " ^ print_syn_exp e ^ ")") tel)
 
 
   let print_dsig ((d, es) : dsig) = "(" ^ d ^ " " ^ String.concat " " (List.map print_exp es) ^ ")"
+
+  let print_syn_dsig ((d, es) : syn_dsig) = "(" ^ d ^ " " ^ String.concat " " (List.map print_syn_exp es) ^ ")"
 
   let print_decls (decls : decls) : string =
     String.concat "\n"
@@ -279,7 +297,7 @@ module Int = struct
   let print_sdecls (decls : sdecls) : string =
     String.concat "\n"
                   (List.map (fun (n, tel, dsig) -> "(" ^ n ^ " " ^ print_stel tel
-                                                   ^ " " ^ print_dsig dsig ^ ")") decls)
+                                                   ^ " " ^ print_syn_dsig dsig ^ ")") decls)
 
   let print_codecls (decls : codecls) : string =
     String.concat "\n"

@@ -17,93 +17,103 @@ let rec fv cG =
   in
   function
   | Set _ -> []
-  | Star -> []
   | Ctx -> []
   | BCtx cP -> fv_ctx cG cP
   | Pi (tel, t) -> fv_pi cG tel t
-  | SPi (tel, e) -> fv_spi cG tel e
-  | Box (ctx, e) -> fv_ctx cG ctx @ fv e
-  | TermBox (ctx, e) -> fv_ctx cG ctx @ fv e
+  | Box (ctx, e) -> fv_ctx cG ctx @ fv_syn cG e
+  | TermBox (ctx, e) -> fv_ctx cG ctx @ fv_syn cG e
   | Fn (xs, e) ->
      List.fold_left (fun vars x -> vars -- x) (fv e) xs
-  | Lam (x, e) -> fv e
   | App (e1, es) -> fv e1 @ List.concat (List.map fv es)
-  | AppL (e, es) -> fv e @ List.concat (List.map fv es)
   | Const n -> []
   | Dest n -> []
   | Var n when in_ctx n cG -> []
   | Var n -> [n]
-  | BVar i -> []
-  | Clos (e1, e2, _) -> fv e1 @ fv e2
-  | Empty -> []
-  | Shift n -> []
-  | Comp (e1, _, e2)
-    | Dot (e1, e2) -> fv e1 @ fv e2
-  | ShiftS (_, e) -> fv e
   | Annot (e1, e2) -> fv e1 @ fv e2
   | Hole _ -> []
 
+and fv_syn cG =
+  let fvs e = fv_syn cG e in
+  function
+  | Star -> []
+  | SPi (tel, e) -> fv_spi cG tel e
+  | Lam (x, e) -> fvs e
+  | AppL (e, es) -> fvs e @ List.concat (List.map fvs es)
+  | SConst _ -> []
+  | BVar i -> []
+  | Clos (e1, e2, _) -> fvs e1 @ fvs e2
+  | Empty -> []
+  | Shift n -> []
+  | Comp (e1, _, e2)
+  | Dot (e1, e2) -> fvs e1 @ fvs e2
+  | ShiftS (_, e) -> fvs e
+  | Unbox (e, s, cP) ->
+     fv cG e @ fvs s @ fv_ctx cG cP
+  | SBCtx cP -> fv_ctx cG cP
+  | SCtx -> []
+
 and fv_ctx cG = function
   | Nil -> []
-  | Snoc(cP, _, e) -> fv_ctx cG cP @ fv cG e
+  | Snoc(cP, _, e) -> fv_ctx cG cP @ fv_syn cG e
   | CtxVar n -> [n]
 
 and fv_pi cG (tel : tel) (t : exp) = match tel with
   | [] -> fv cG t
   | (_, n, e)::tel -> fv cG e @ (fv_pi cG tel t -- n)
 
-and fv_spi cG (tel : stel) (t : exp) = match tel with
-  | [] -> fv cG t
-  | (_, n, e)::tel -> fv cG e @ (fv_spi cG tel t)
+and fv_spi cG (tel : stel) (t : syn_exp) = match tel with
+  | [] -> fv_syn cG t
+  | (_, n, e)::tel -> fv_syn cG e @ (fv_spi cG tel t)
 
 let rec fv_pat =
   function
   | PVar n -> [n]
   | PPar _ -> []
-  | PBVar i -> []
   | Innac e -> []
-  | PLam (f, p) -> fv_pat p
   | PConst (n, ps) -> fv_pats ps
-  | PClos (n, p, _) ->  [n]
   | PBCtx cP -> fv_pat_bctx cP
-  | PEmpty -> []
-  | PShift i -> []
-  | PDot (p1, p2) -> fv_pat p1 @ fv_pat p2
   | PUnder -> []
   | PWildcard -> []
+  | PTBox (cP, p) -> fv_syn_pat p (* MMMM *)
+
+and fv_syn_pat =
+  function
+  | PBVar i -> []
+  | PLam (f, p) -> fv_syn_pat p
+  | PSConst (n, ps) -> fv_syn_pats ps
+  | PUnbox (n, p, _) ->  [n]
+  | PEmpty -> []
+  | PShift i -> []
+  | PDot (p1, p2) -> fv_syn_pat p1 @ fv_syn_pat p2
 
 and fv_pat_bctx =
   function
   | PNil -> []
-  | PSnoc (cP, _, p) -> fv_pat_bctx cP @ fv_pat p
+  | PSnoc (cP, _, p) -> fv_pat_bctx cP @ fv_syn_pat p
   | PCtxVar n -> [n]
 
-
 and fv_pats ps = List.concat(List.map fv_pat ps)
+and fv_syn_pats ps = List.concat(List.map fv_syn_pat ps)
 
 (* Generate fresh names for all the bound variables,
      to keep names unique *)
-
 
 let rec refresh_exp (rep : (name * name) list) : exp -> exp =
   let f x = refresh_exp rep x in
   function
   | Set n -> Set n
-  | Star -> Star
+
   | Ctx -> Ctx
   | Pi (tel, t) -> let tel', t' = refresh_tel rep tel t in Pi(tel', t')
-  | SPi (tel, t) -> let tel', t' = refresh_stel rep tel t in SPi(tel', t')
-  | Box (cP, e) -> Box(refresh_bctx rep cP, f e)
-  | TermBox (cP, e) -> TermBox(refresh_bctx rep cP, f e)
+
+  | Box (cP, e) -> Box(refresh_bctx rep cP, refresh_syn_exp rep e)
+  | TermBox (cP, e) -> TermBox(refresh_bctx rep cP, refresh_syn_exp rep e)
   | BCtx cP -> BCtx (refresh_bctx rep cP)
   | Fn (xs, e) ->
      let xs' = List.map refresh_name xs in
      let extra = List.map2 (fun x y -> x, y) xs xs in
      Fn (xs', refresh_exp (extra @ rep) e)
-  | Lam (x, e) ->
-     Lam(x, f e)
   | App (e1, es) -> App(f e1, List.map f es)
-  | AppL (e1, es) -> AppL(f e1, List.map f es)
   | Const n -> Const n
   | Dest n -> Dest n
   | Var n ->
@@ -112,6 +122,19 @@ let rec refresh_exp (rep : (name * name) list) : exp -> exp =
        with
          Not_found -> Var n
      end
+  | Annot (e1, e2) -> Annot(f e1, f e2)
+  | Hole s -> Hole s
+
+and refresh_syn_exp rep =
+  let f x = refresh_syn_exp rep x in
+  function
+  | Star -> Star
+  | SCtx -> SCtx
+  | SPi (tel, t) -> let tel', t' = refresh_stel rep tel t in SPi(tel', t')
+  | Lam (x, e) ->
+     Lam(x, f e)
+  | AppL (e1, es) -> AppL(f e1, List.map f es)
+  | SConst n -> SConst n
   | BVar i -> BVar i
   | Clos (e1, e2, cP) -> Clos(f e1, f e2, refresh_bctx rep cP)
   | Empty -> Empty
@@ -119,12 +142,12 @@ let rec refresh_exp (rep : (name * name) list) : exp -> exp =
   | Comp (e1, cP, e2) -> Comp (f e1, refresh_bctx rep cP, f e2)
   | ShiftS (n, e) -> ShiftS (n, f e)
   | Dot (e1, e2) -> Dot (f e1, f e2)
-  | Annot (e1, e2) -> Annot(f e1, f e2)
-  | Hole s -> Hole s
+  | Unbox (e1, e2, cP) -> Unbox (refresh_exp rep e1, f e2, refresh_bctx rep cP)
+  | SBCtx cP -> SBCtx (refresh_bctx rep cP)
 
 and refresh_bctx (rep : (name * name) list) : bctx -> bctx =
   function
-  | Snoc (cP, x, e) -> Snoc (refresh_bctx rep cP, x, refresh_exp rep e)
+  | Snoc (cP, x, e) -> Snoc (refresh_bctx rep cP, x, refresh_syn_exp rep e)
   | Nil -> Nil
   | CtxVar n ->
      begin try
@@ -141,12 +164,12 @@ and refresh_tel (rep : (name * name) list) (tel : tel) (t : exp) : tel * exp =
      let tel', t' = refresh_tel ((n, n')::rep) tel t in
      ((i, n', refresh_exp rep e)::tel'), t'
 
-and refresh_stel (rep : (name * name) list) (tel : stel) (t : exp) : stel * exp =
+and refresh_stel (rep : (name * name) list) (tel : stel) (t : syn_exp) : stel * syn_exp =
   match tel with
-  | [] -> [], refresh_exp rep t
+  | [] -> [], refresh_syn_exp rep t
   | (i, n, e) :: tel ->
      let tel', t' = refresh_stel rep tel t in
-     ((i, n, refresh_exp rep e)::tel'), t'
+     ((i, n, refresh_syn_exp rep e)::tel'), t'
 
 let refresh (e : exp) : exp = refresh_exp [] e
 
@@ -155,39 +178,47 @@ let rec refresh_free_var (x , y : name * name) (e : exp) : exp =
   let f e = refresh_free_var (x, y) e in
   match e with
   | Set n -> Set n
-  | Star -> Star
   | Ctx -> Ctx
   | Pi (tel, t) ->
      let tel', t' = refresh_free_var_tel (x, y) tel t in
      Pi (tel', t')
-  | SPi (tel, t) ->
-     let tel', t' = refresh_free_var_stel (x, y) tel t in
-     SPi (tel', t')
-  | Box (cP, e) -> Box(refresh_free_var_bctx (x, y) cP, f e)
-  | TermBox (cP, e) -> TermBox(refresh_free_var_bctx (x, y) cP, f e)
+  | Box (cP, e) -> Box(refresh_free_var_bctx (x, y) cP, refresh_free_var_syn (x, y) e)
+  | TermBox (cP, e) -> TermBox(refresh_free_var_bctx (x, y) cP, refresh_free_var_syn (x, y) e)
   | BCtx cP -> BCtx (refresh_free_var_bctx (x, y) cP)
   | Fn (xs, _) when List.mem x xs -> raise (Error.Violation "Duplicate variable name")
   | Fn (xs, e) -> Fn (xs, f e)
-  | Lam (x, e) -> Lam(x, f e)
   | App (e1, es) -> App(f e1, List.map f es)
-  | AppL (e1, es) -> AppL(f e1, List.map f es)
   | Const n -> Const n
   | Dest n -> Dest n
   | Var n when n = x -> Var y
   | Var n -> Var n
+  | Annot (e1, e2) -> Annot(f e1, f e2)
+  | Hole s -> Hole s
+
+and refresh_free_var_syn (x, y) e =
+  let f e = refresh_free_var_syn (x, y) e in
+  match e with
+  | Star -> Star
+  | SCtx -> SCtx
+  | SPi (tel, t) ->
+     let tel', t' = refresh_free_var_stel (x, y) tel t in
+     SPi (tel', t')
+  | Lam (x, e) -> Lam(x, f e)
+  | AppL (e1, es) -> AppL(f e1, List.map f es)
   | BVar i -> BVar i
+  | SConst n -> SConst n
   | Clos (e1, e2, cP) -> Clos(f e1, f e2, refresh_free_var_bctx (x, y) cP)
+  | Unbox (e1, e2, cP) -> Unbox(refresh_free_var (x, y) e1, f e2, refresh_free_var_bctx (x, y) cP)
   | Empty -> Empty
   | Shift n -> Shift n
   | Comp (e1, cP, e2) -> Comp (f e1, refresh_free_var_bctx (x, y) cP, f e2)
   | ShiftS (n, e) -> ShiftS (n, f e)
   | Dot (e1, e2) -> Dot (f e1, f e2)
-  | Annot (e1, e2) -> Annot(f e1, f e2)
-  | Hole s -> Hole s
+  | SBCtx cP -> SBCtx (refresh_free_var_bctx (x, y) cP)
 
 and refresh_free_var_bctx (x, y) cP =
   match cP with
-  | Snoc (cP, z, e2) -> Snoc(refresh_free_var_bctx (x, y) cP , z, refresh_free_var (x, y) e2)
+  | Snoc (cP, z, e2) -> Snoc(refresh_free_var_bctx (x, y) cP , z, refresh_free_var_syn (x, y) e2)
   | Nil -> Nil
   | CtxVar n when n = x -> CtxVar y
   | CtxVar n -> CtxVar n
@@ -201,10 +232,10 @@ and refresh_free_var_tel (x, y) tel t =
      (i, n, refresh_free_var (x, y) e) :: tel', t'
 and refresh_free_var_stel (x, y) tel t =
   match tel with
-  | [] -> [], refresh_free_var (x, y) t
+  | [] -> [], refresh_free_var_syn (x, y) t
   | (i, n, e) :: tel ->
      let tel', t' = refresh_free_var_stel (x, y) tel t in
-     (i, n, refresh_free_var (x, y) e) :: tel', t'
+     (i, n, refresh_free_var_syn (x, y) e) :: tel', t'
 
 
 let refresh_free_vars (rep : (name * name) list) e =
@@ -221,16 +252,12 @@ let rec subst (x, es : single_subst) (e : exp) :  exp =
   let f e = subst (x, es) e in
   match e with
   | Set n -> Set n
-  | Star -> Star
   | Ctx -> Ctx
   | Pi (tel, t) ->
      let tel', t' = subst_pi (x, es) tel t in
      Pi(tel', t')
-  | SPi (tel, t) ->
-     let tel', t' = subst_spi (x, es) tel t in
-     SPi(tel', t')
-  | Box (ctx, e) -> Box(subst_bctx (x, es) ctx, f e)
-  | TermBox (ctx, e) -> TermBox(subst_bctx (x, es) ctx, f e)
+  | Box (ctx, e) -> Box(subst_bctx (x, es) ctx, subst_syn (x, es) e)
+  | TermBox (ctx, e) -> TermBox(subst_bctx (x, es) ctx, subst_syn (x, es) e)
   | BCtx cP -> BCtx(subst_bctx (x, es) cP)
   | Fn (ys, e) ->
      let ys' = List.map refresh_name ys in
@@ -239,26 +266,39 @@ let rec subst (x, es : single_subst) (e : exp) :  exp =
        "Duplicate variable name would be captured.") ; *)
      let extra = List.map2 (fun x y -> x, y) ys ys' in
      Fn(ys', subst (x, es) (refresh_free_vars extra e))
-  | Lam (x, e) -> Lam(x, f e)
+
   | App (e1, es) -> App(f e1, List.map f es)
-  | AppL (e1, es) -> AppL(f e1, List.map f es)
   | Const n -> Const n
   | Dest n -> Dest n
   | Var n  when x = n -> refresh es
   | Var n -> Var n
+  | Annot (e1, e2) -> Annot(f e1, f e2)
+  | Hole s -> Hole s
+
+and subst_syn (x, es) e =
+  let f e = subst_syn (x, es) e in
+  match e with
+  | Star -> Star
+  | SCtx -> SCtx
+  | SPi (tel, t) ->
+     let tel', t' = subst_spi (x, es) tel t in
+     SPi(tel', t')
+  | Lam (x, e) -> Lam(x, f e)
+  | AppL (e1, es) -> AppL(f e1, List.map f es)
+  | SConst n -> SConst n
   | BVar i -> BVar i
   | Clos (e1, e2, cP) -> Clos(f e1, f e2, subst_bctx (x, es) cP)
+  | Unbox (e1, e2, cP) -> Unbox(subst (x, es) e1, f e2, subst_bctx (x, es) cP)
   | Empty -> Empty
   | Shift n -> Shift n
   | ShiftS (n, e) -> ShiftS (n, f e)
   | Comp (e1, cP, e2) -> Comp (f e1, subst_bctx (x, es) cP, f e2)
   | Dot (e1, e2) -> Dot (f e1, f e2)
-  | Annot (e1, e2) -> Annot(f e1, f e2)
-  | Hole s -> Hole s
+  | SBCtx cP -> SBCtx (subst_bctx (x, es) cP)
 
 and subst_bctx (x, es : single_subst) cP =
   match cP with
-  | Snoc (e1, y, e2) -> Snoc (subst_bctx (x, es) e1, y, subst (x, es) e2)
+  | Snoc (e1, y, e2) -> Snoc (subst_bctx (x, es) e1, y, subst_syn (x, es) e2)
   | Nil -> Nil
   | CtxVar n when x = n ->
      begin match es with
@@ -280,13 +320,16 @@ and subst_pi (x, es) tel t =
      (i, n', subst (x, es) e) :: tel'', t''
 and subst_spi (x, es) tel t =
   match tel with
-  | [] -> [], subst (x, es) t
+  | [] -> [], subst_syn (x, es) t
   | (i, n, e) :: tel ->
      let tel', t' = subst_spi (x, es) tel t in
-     (i, n, subst (x, es) e) :: tel', t'
+     (i, n, subst_syn (x, es) e) :: tel', t'
 
 let simul_subst sigma e =
   List.fold_left (fun e s -> subst s e) e sigma
+
+let simul_subst_syn sigma e =
+  List.fold_left (fun e s -> subst_syn s e) e sigma
 
 let simul_subst_on_tel sigma tel =
   List.map (fun (i, x, e) -> (i, x, simul_subst sigma e)) tel
@@ -305,33 +348,42 @@ let compose_subst sigma delta = List.map (fun (x, t) -> x, simul_subst sigma t) 
 
 let exp_list_of_tel tel = List.map (fun (_, _, s) -> s) tel
 
-let rec exp_of_pat_subst : pat_subst -> exp = function
+let rec syn_exp_of_pat_subst : pat_subst -> syn_exp = function
   | CShift n -> Shift n
   | CEmpty -> Empty
-  | CDot (s, i) -> Dot(exp_of_pat_subst s, BVar i)
+  | CDot (s, i) -> Dot(syn_exp_of_pat_subst s, BVar i)
 
 let rec exp_of_pat sign : pat -> exp =
   fun p -> match p with
   | PVar n -> Var n
   | PPar n -> Var n           (* MMMMM *)
-  | PBVar i -> BVar i
+
   | Innac e -> e
-  | PLam (fs, p) -> Lam (fs, exp_of_pat sign p)
-  | PConst (n, ps) when Sign.is_syn_con sign n ->
-     AppL (Const n, List.map (exp_of_pat sign) ps)
-  | PConst (n, ps) ->
-     App (Const n, List.map (exp_of_pat sign) ps)
-  | PClos (n, s, cP) -> Clos (Var n, exp_of_pat_subst s, cP)
+
+   | PConst (n, ps) ->
+      App (Const n, List.map (exp_of_pat sign) ps)
+
+   | PTBox (cP, p) ->
+      TermBox(cP, syn_exp_of_pat sign p)
+
   | PBCtx cP -> BCtx (bctx_of_pat sign cP)
-  | PEmpty -> Empty
-  | PShift i -> Shift i
-  | PDot (p1, p2) -> Dot (exp_of_pat sign p1, exp_of_pat sign p2)
   | PUnder -> raise (Error.Violation "We'd be very surprised if this were to happen.")
   | PWildcard -> raise (Error.Violation "We'd also be very surprised if this were to happen.")
 
+and syn_exp_of_pat sign =
+  function
+  | PBVar i -> BVar i
+  | PLam (fs, p) -> Lam (fs, syn_exp_of_pat sign p)
+  | PSConst (n, ps) ->
+     AppL (SConst n, List.map (syn_exp_of_pat sign) ps)
+  | PUnbox (n, s, cP) -> Unbox (Var n, syn_exp_of_pat_subst s, cP)
+  | PEmpty -> Empty
+  | PShift i -> Shift i
+  | PDot (p1, p2) -> Dot (syn_exp_of_pat sign p1, syn_exp_of_pat sign p2)
+
 and bctx_of_pat sign = function
   | PNil -> Nil
-  | PSnoc (cP, x, p2) -> Snoc (bctx_of_pat sign cP, x, exp_of_pat sign p2)
+  | PSnoc (cP, x, p2) -> Snoc (bctx_of_pat sign cP, x, syn_exp_of_pat sign p2)
   | PCtxVar n -> CtxVar n
 
 let rec subst_of_pats sign (sigma : pats) (tel : tel) : subst =
@@ -349,6 +401,8 @@ let subst_of_ctx : ctx -> subst = List.map (fun (x, _) -> x, Var x)
 let name_list_of_ctx : ctx -> name list = List.map fst
 
 let var_list_of_ctx : ctx -> exp list = List.map (fun (x, _) -> Var x)
+
+let unbox_list_of_ctx cP : ctx -> syn_exp list = List.map (fun (x, _) -> Unbox(Var x, id_sub, cP))
 
 let rec ctx_subst s = function
   | (x, t) :: cG -> (x, subst s t) :: (ctx_subst s cG)

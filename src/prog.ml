@@ -61,7 +61,7 @@ let tc_syn_constructor (sign , cG : signature * ctx) (tel : I.stel)
              ^ " does not return a term of the fully applied type for " ^ n'))
   in
   Debug.print (fun () -> "Checking indices applied to " ^ n' ^ " at the tail of signature of " ^ n);
-  let es' = check_indices es tel cP I.idSub in
+  let es' = check_indices es tel cP I.id_sub in
   SConstructor (n, tel'', (n', es')), (n, tel'', (n', es'))
 
 let rec tc_syn_constructors (sign , cG : signature * ctx) (tel : I.stel)

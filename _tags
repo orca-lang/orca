@@ -1,4 +1,5 @@
 true : use_menhir, use_str, annot
+<src/debug.ml> : package(ulex)
 <src/lexer.ml> : syntax(camlp4o), package(ulex)
 <src/parser.ml> : package(menhirLib, ulex)
 <src/repl.ml> : package(ulex)

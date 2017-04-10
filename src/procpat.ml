@@ -10,44 +10,14 @@ module AP = Print.Apx
 module IP = Print.Int
 
 type pat =
-  | PVar of name
-  | PBVar of int
-  | UInac of A.exp              (* those are user written inacessible patterns *)
-  | IInac of I.exp              (* those are inferred inacessible patterns from index unification *)
-  | PLam of (string * I.exp) list * pat
-  | UPLam of string list * pat  (* same distinction as for UInac and IInac *)
-  | PConst of def_name * pat list
-  | PClos of name * pat_subst
-  | PEmptyS
-  | PShift of int
-  | PDot of pat * pat
-  | PNil
-  | PSnoc of pat * string * pat
-  | PPar of name
-  | PUnder
-  | PWildcard
+  | Apx of A.pat
+  | Int of I.pat
 
 type pats = pat list
 
 let rec print_pat (p : pat) : string = match p with
-  | PVar n -> print_name n
-  | PPar n -> "(<: " ^ print_name n ^ ")"
-  | PBVar i -> "i" ^ string_of_int i
-  | UInac e -> "." ^ AP.print_exp e
-  | IInac e -> "+" ^ IP.print_exp e
-  | PLam (fs, p) -> "(\ "
-                    ^ String.concat " " (List.map (fun (x, t) -> "("^ x ^ " : " ^ IP.print_exp t ^ ")") fs)
-                    ^ " " ^ print_pat p ^ ")"
-  | UPLam (fs, p) -> "(+\ " ^ String.concat " "  fs ^ " " ^ print_pat p ^ ")"
-  | PConst (n, ps) -> "(" ^ n ^ " " ^ print_pats ps ^ ")"
-  | PClos (n, s) -> print_name n ^ "[" ^ print_pat_subst s ^ "]"
-  | PEmptyS -> "^"
-  | PShift i -> "^ " ^ string_of_int i
-  | PDot (p1, p2) -> "(" ^ print_pat p1 ^ " ; " ^ print_pat p2 ^ ")"
-  | PNil -> "0"
-  | PSnoc (p1, x, p2) -> "(" ^ print_pat p1 ^ " , " ^ x ^ ":" ^ print_pat p1 ^ ")"
-  | PUnder -> "_"
-  | PWildcard -> "._"
+  | Apx p -> AP.print_pat p
+  | Int p -> IP.print_pat p
 and print_pats ps = String.concat " " (List.map (fun p -> "(" ^ print_pat p ^ ")") ps)
 
 let rec get_domain cP s =
@@ -60,117 +30,113 @@ let rec get_domain cP s =
   | _, CShift m -> raise (Error.Error ("Expected context " ^ IP.print_bctx cP ^ " to have at least "
                                        ^ string_of_int m ^ " variable" ^ if m > 1 then "s" else "" ^ " to shift over."))
 
-let rec exp_of_pat_subst : pat_subst -> I.exp = function
-  | CShift n -> I.Shift n
-  | CEmpty -> I.Empty
-  | CDot (s, i) -> I.Dot(exp_of_pat_subst s, I.BVar i)
+let pvar_list_of_ctx : ctx -> I.pats = List.map (fun (x, _) -> I.PVar x)
 
-let rec exp_of_pat sign cP : pat -> I.exp = function
-  | PVar n -> I.Var n
-  | PPar n -> I.Var n           (* MMMMM *)
-  | PBVar i -> I.BVar i
-  | IInac e -> e
-  | UInac e -> raise (Error.Violation "We hope to never see you again (this message, not the user)")
-  | PLam (fs, p) -> I.Lam (fs, exp_of_pat sign cP p)
-  | UPLam (fs, p) -> raise (Error.Violation "We hope to never see you again, again (this message, not the user)")
-  | PConst (n, ps) when is_syn_con sign n -> I.AppL (I.Const n, List.map (exp_of_pat sign cP) ps)
-  | PConst (n, ps) -> I.App (I.Const n, List.map (exp_of_pat sign cP) ps)
-  | PClos (n, s) -> I.Clos (I.Var n, exp_of_pat_subst s, get_domain cP s)
-  | PEmptyS -> I.Empty
-  | PShift i -> I.Shift i
-  | PDot (p1, p2) -> I.Dot (exp_of_pat sign cP p1, exp_of_pat sign cP p2)
-  | PNil -> I.BCtx I.Nil
-  | PSnoc (p1, x, p2) ->
-     begin match exp_of_pat sign cP p1 with
-     | I.BCtx cP -> I.BCtx (I.Snoc (cP, x, exp_of_pat sign cP p2))
-     | _ -> raise (Error.Violation "It's a violation!... who knows...")
-     end
-  | PUnder -> raise (Error.Violation "We'd be very surprised if this were to happen.")
-  | PWildcard -> raise (Error.Violation "We'd also be very surprised if this were to happen.")
+let punbox_list_of_ctx cP : ctx -> I.syn_pat list = List.map (fun (x, _) -> I.PUnbox(x, pid_sub, cP))
 
-let pvar_list_of_ctx : ctx -> pat list = List.map (fun (x, _) -> PVar x)
-
-type single_psubst = name * pat
+type single_psubst = name * I.pat
 type psubst = single_psubst list
 
-let print_psubst c = "[" ^ (String.concat "," (List.map (fun (x, e) -> print_name x ^ " := " ^ print_pat e) c)) ^ "]"
+let print_psubst c = "[" ^ (String.concat "," (List.map (fun (x, e) -> print_name x ^ " := " ^ IP.print_pat e) c)) ^ "]"
 
-let rec psubst sign cP ((x, p') as s) (p : pat) :  pat =
-  match p with
-  | PVar n when n = x -> p'
-  | PVar n -> PVar n
-  | PPar n when n = x -> p'   (* MMMMM *)
-  | PPar n -> PPar n
-  | PBVar i -> PBVar i
-  | IInac e -> IInac (subst (x, exp_of_pat sign cP p') e)
-  | UInac e -> raise (Error.Violation "We hope to never see you again (this message, not the user)")
-  | PLam (f, p) -> PLam(f, psubst sign cP s p)
-  | UPLam (f, p) -> UPLam(f, psubst sign cP s p)
-  | PConst (n, ps) -> PConst(n, List.map (psubst sign cP s) ps)
-  | PClos (n, s) when n = x ->
-     begin match p' with
-     | PVar n' -> PClos (n', s)
-     | _ -> assert false (* MMMMMMM *)
-     end
-  | PClos (n, s) -> PClos (n, s)
-  | PEmptyS -> PEmptyS
-  | PShift i -> PShift i
-  | PDot (p1, p2) -> PDot (psubst sign cP s p1, psubst sign cP s p2)
-  | PNil -> PNil
-  | PSnoc (p1, x, p2) -> PSnoc (psubst sign cP s p1, x, psubst sign cP s p2)
-  | PUnder -> PUnder
-  | PWildcard -> PWildcard
+let rec psubst sign (x, p') = function
+  | I.PVar n when n = x -> p'
+  | I.PVar n -> I.PVar n
+  | I.Innac e -> I.Innac (subst (x, exp_of_pat sign p') e)
+  | I.PConst (n, ps) -> I.PConst (n, List.map (psubst sign (x, p')) ps)
+  | I.PPar n when n = x -> raise (Error.Violation "Don't think this can happen")
+  | I.PPar n -> I.PPar n
+  | I.PBCtx cP -> I.PBCtx (bctx_psubst sign (x, p') cP)
+  | I.PUnder -> I.PUnder
+  | I.PWildcard -> I.PWildcard
+  | I.PTBox (cP, p) -> let cP' = subst_bctx (x, exp_of_pat sign p') cP in
+                      I.PTBox (cP', syn_psubst sign cP' (x, p') p)
+and syn_psubst sign cP (x, p') = function
+  | I.PBVar i -> I.PBVar i
+  | I.PLam (xs, p) -> I.PLam (xs, syn_psubst sign (bctx_from_lam cP xs) (x, p') p) (* What about shifts in p'? *)
+  | I.PSConst (n, ps) -> I.PSConst (n, List.map (syn_psubst sign cP (x, p')) ps)
+  | I.PUnbox (n, s, cP) -> I.PUnbox (n, s, cP)
+  | I.PEmpty -> I.PEmpty
+  | I.PShift n -> I.PShift n
+  | I.PDot (s, p) -> I.PDot (syn_psubst sign cP (x, p') s, syn_psubst sign cP (x, p') p)
 
-let rec compose_single_with_psubst sign cP s = function
+and bctx_psubst sign (x, p') = function
+  | I.PNil -> I.PNil
+  | I.PSnoc (cP, s, p) -> I.PSnoc (bctx_psubst sign (x, p') cP, s, syn_psubst sign (bctx_of_pat sign cP) (x, p') p)
+  | I.PCtxVar n when n = x -> raise (Error.Violation "Why?")
+  | I.PCtxVar n -> I.PCtxVar n
+
+(* let psubst sign (x, p') (p : I.pat) : I.pat = *)
+  (* match p with *)
+  (* | Apx p -> *)
+  (*    let rec sanity_check = function *)
+  (*      | A.PPar n when n = x -> raise (Error.Violation ("Pattern substitution done on variable " *)
+  (*                                    ^ print_name n ^ " which we believe should have not occured due to linearity")) *)
+  (*      | A.PVar n when n = x -> raise (Error.Violation ("Pattern substitution done on variable " *)
+  (*                                    ^ print_name n ^ " which we believe should have not occured due to linearity")) *)
+  (*      | A.Innac e -> raise (Error.Violation "Pattern substitution applied to approximate inaccessible pattern") *)
+  (*      | A.PLam (xs, p) -> A.PLam (xs, sanity_check p) *)
+  (*      | A.PConst (n, ps) -> A.PConst (n, List.map sanity_check ps) *)
+  (*      | A.PDot (p1, p2) -> A.PDot (sanity_check p1, sanity_check p2) *)
+  (*      | A.PSnoc (p1, s, p2) -> A.PSnoc (sanity_check p1, s, sanity_check p2) *)
+  (*      | p -> p *)
+  (*    in *)
+  (*    Apx (sanity_check p) *)
+  (* | Int p -> *)
+  (* psubst_int sign (x, p') p *)
+
+let rec compose_single_with_psubst sign s = function
   | [] -> []
-  | (y, t') :: sigma -> (y, psubst sign cP s t') :: (compose_single_with_psubst sign cP s sigma)
+  | (y, t') :: sigma -> (y, psubst sign s t') :: (compose_single_with_psubst sign s sigma)
 
-let pats_of_psubst : psubst -> pats = List.map snd
+let pats_of_psubst : psubst -> I.pats = List.map (fun (x, p) -> p)
 
-let simul_psubst sign cP sigma p =
-  List.fold_left (fun p s -> psubst sign cP s p) p sigma
+let simul_psubst sign sigma p =
+  List.fold_left (fun p s -> psubst sign s p) p sigma
 
-let simul_psubst_on_list sign cP sigma ps =
-  List.map (simul_psubst sign cP sigma) ps
+let simul_syn_psubst sign cP sigma p =
+  List.fold_left (fun p s -> syn_psubst sign cP s p) p sigma
 
-let compose_psubst sign cP sigma delta = List.map (fun (x, t) -> x, simul_psubst sign cP sigma t) delta
+(* let simul_psubst_int sign sigma p = *)
+(*   List.fold_left (fun p s -> psubst_int sign s p) p sigma *)
 
-let psubst_of_ctx : ctx -> psubst = List.map (fun (x, _) -> x, PVar x)
+let simul_psubst_on_list sign sigma ps =
+  List.map (simul_psubst sign sigma) ps
 
-let simul_psubst_on_ctx sign cP sigma =
-    List.map (fun (x, e) -> x, simul_psubst sign cP sigma e)
+let simul_syn_psubst_on_list sign cP sigma ps =
+  List.map (simul_syn_psubst sign cP sigma) ps
+
+let compose_psubst sign sigma delta = List.map (fun (x, t) -> x, simul_psubst sign sigma t) delta
+
+let psubst_of_ctx : ctx -> psubst = List.map (fun (x, _) -> x, I.PVar x)
+
+let simul_psubst_on_ctx sign sigma =
+    List.map (fun (x, e) -> x, simul_psubst sign sigma e)
 
 let rec rename_ctx_using_psubst (cG : ctx) (sigma : psubst) =
   match cG with
   | [] -> []
   | (x, t) :: cG' ->
      match lookup_ctx sigma x with
-     | Some (PVar y) -> (y, t) :: (rename_ctx_using_psubst cG' sigma)
+     | Some (I.PVar y) -> (y, t) :: (rename_ctx_using_psubst cG' sigma)
      | _ -> (x, t) :: (rename_ctx_using_psubst cG' sigma)
 
 
 let shift_psubst_by_ctx sigma cG =
-  let sigma' = sigma @ (List.map (fun (x, _) -> x, PVar x) cG) in
+  let sigma' = sigma @ (List.map (fun (x, _) -> x, I.PVar x) cG) in
   Debug.print (fun () -> "Shift called with sigma = " ^ print_psubst sigma
                          ^ "\ncG = " ^ print_ctx cG
                          ^ "\nresulting in " ^ print_psubst sigma'
                          ^ ".");
   sigma'
 
+let rec exp_of_pat_subst : pat_subst -> I.syn_exp = function
+  | CShift n -> I.Shift n
+  | CEmpty -> I.Empty
+  | CDot (s, i) -> I.Dot(exp_of_pat_subst s, I.BVar i)
 
-let rec proc_pats (p : A.pats) : pats = List.map proc_pat p
-and proc_pat : A.pat -> pat = function
-  | A.PVar n -> PVar n
-  | A.PBVar n -> PBVar n
-  | A.Innac e -> UInac e
-  | A.PLam (xs, p) -> UPLam (xs, proc_pat p)
-  | A.PConst (n, ps) -> PConst (n, proc_pats ps)
-  | A.PClos (n, s) -> PClos (n, s)
-  | A.PEmptyS -> PEmptyS
-  | A.PShift i -> PShift i
-  | A.PDot (p1, p2) -> PDot (proc_pat p1, proc_pat p2)
-  | A.PNil -> PNil
-  | A.PSnoc (g, x, p) -> PSnoc (proc_pat g, x, proc_pat p)
-  | A.PPar x -> PPar x
-  | A.PUnder -> PUnder
-  | A.PWildcard -> PWildcard
+let exp_of_pat sign cP : pat -> I.exp = function
+  | Int p -> exp_of_pat sign p
+  | Apx p -> raise (Error.Violation "This is Sparta")
+
+let rec proc_pats : A.pats -> pats = List.map (fun p -> Apx p)

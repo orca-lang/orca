@@ -8,7 +8,7 @@ type signature_entry
   = Definition of def_name * tel * exp * exp (* the name, the type, and the definition *)
   (* name, parameters, constructed type *)
   | Constructor of def_name * tel * dsig
-  | SConstructor of def_name * stel * dsig
+  | SConstructor of def_name * stel * syn_dsig
   (* name, parameters, indices, resulting universe *)
   | DataDef of def_name * tel * tel * universe
   | SynDef of def_name * stel
@@ -48,7 +48,7 @@ let lookup_cons_entry (sign : signature) (c : def_name) : tel * dsig =
   | Constructor (_, tel, dsig) -> tel, dsig
   | _ -> raise (Error.Error ("Constant " ^ c ^ " was expected to be a constructor."))
 
-let lookup_syn_cons_entry (sign : signature) (c : def_name) (cP : bctx) : tel * dsig =
+let lookup_syn_cons_entry (sign : signature) (c : def_name) (cP : bctx) : tel * syn_dsig =
   match lookup_sign_entry sign c with
   | SConstructor (_, tel, (n, es)) ->
     let extract_sigma sl = List.fold_right (fun (_, _, x) sigma -> Dot(sigma, x)) sl (Shift (List.length sl)) in
@@ -60,14 +60,14 @@ let lookup_syn_cons_entry (sign : signature) (c : def_name) (cP : bctx) : tel * 
          let cP' = extend_cP sl in
          let sigma = extract_sigma sl in
          let xn = Name.gen_name x in
-         let sl' = (x, s, Var xn) :: sl in
+         let sl' = (x, s, Unbox(Var xn, Shift 0, cP')) :: sl in
          let tel'', sl'' = abstract tel' sl'  in
          (i, xn, Box(cP, Clos (s, sigma, cP')))::tel'', sl''
     in
     let tel', sl = abstract tel [] in
     let sigma = extract_sigma sl in
     let cP' = extend_cP sl in
-    tel', (n, List.map (fun e -> Clos (e, sigma, cP')) es)
+    tel', (n, List.map (fun e -> Clos(e, sigma, cP')) es)
   | _ -> raise (Error.Error ("Constant " ^ c ^ " was expected to be a syntactic constructor."))
 
 let lookup_sign sign n =
@@ -80,10 +80,6 @@ let lookup_sign sign n =
      if tel = []
      then Set u
      else Pi (tel, Set u)
-  | SynDef (_, tel) ->
-     if tel = []
-     then Star
-     else (SPi (tel, Star))
   | Constructor (_, is, (n', pes)) ->
      let t =
        if pes = [] then
@@ -96,20 +92,29 @@ let lookup_sign sign n =
      in
      Debug.print (fun () -> "Looked up constructor " ^ n ^ " which has type " ^ print_exp t');
      t'
+  | Program (_,tel,t, _) -> if tel = [] then t else Pi (tel, t)
+
+  | _ -> raise (Error.Error ("Name " ^ n ^ " is syntactic"))
+
+let lookup_syn_sign sign n =
+  match lookup_sign_entry sign n with
+  | SynDef (_, tel) ->
+     if tel = []
+     then Star
+     else (SPi (tel, Star))
   | SConstructor (_, is, (n', pes)) ->
      let t =
        if pes = [] then
-         Const n'
+         SConst n'
        else
-         AppL (Const n', pes)
+         AppL (SConst n', pes)
      in
      let t' =
        if is = [] then t else SPi (is, t)
      in
-     Debug.print (fun () -> "Looked up constructor " ^ n ^ " which has type " ^ print_exp t');
+     Debug.print (fun () -> "Looked up constructor " ^ n ^ " which has type " ^ print_syn_exp t');
      t'
-
-  | Program (_,tel,t, _) -> if tel = [] then t else Pi (tel, t)
+  | _ -> raise (Error.Error ("Name " ^ n ^ " is syntactic"))
 
 type lookup_result
   = D of exp                    (* A definition without pattern matching *)

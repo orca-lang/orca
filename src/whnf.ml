@@ -6,6 +6,7 @@ open MetaSub
 open Sign
 
 exception Matching_failure of pat * exp
+exception Matching_syn_failure of syn_pat * syn_exp
 exception Stuck
 
 exception Inv_fail
@@ -27,27 +28,13 @@ let apply_inv e s =
     match e, s with
     | e, CShift 0 -> e
     | BVar n, _ -> apply_inv' n s 0
-    | Set n, _ -> Set n
     | Star, _ -> Star
-    | Pi(tel, t'), _ ->
-      Pi(List.map (fun (i,x,e) -> i, x, apply_inv e s) tel, apply_inv t' s)
     | SPi(tel, t'),_ ->
       SPi(List.map (fun (i,x,e) -> i, x, apply_inv e s) tel, apply_inv t' (add_id_cdot (List.length tel) s))
-    | Box (g, e), _ -> raise Inv_fail
-    | TermBox (g, e), _ -> raise Inv_fail
-    | Ctx, _ -> Ctx
-    | Const c, _ -> Const c
-    | Dest d, _ -> Dest d
-    | Var x, _ -> Var x                 (* MMMM *)
-    | Fn (xs, e),_ -> Fn (xs, apply_inv e s)
-    | App (e, es),_ -> App(apply_inv e s, List.map (fun e -> apply_inv e s) es)
     | Lam (x, e), _ -> Lam(x, apply_inv e (CDot (s, 0)))
     | AppL (e, es), _ -> AppL(apply_inv e s, List.map (fun e -> apply_inv e s) es)
-    | Hole n, _ -> Hole n
-    | Annot (e1, e2), _ -> Annot (apply_inv e1 s, apply_inv e2 s)
-    | BCtx cP, _ -> BCtx cP
+    | SBCtx cP, _ -> SBCtx cP
     | Clos (e, s', cP), _ -> Clos(e, apply_inv s' s, cP)
-
     | Empty, _ -> Empty
     | Shift n, CShift m when n >= m -> Shift (n - m)
     | Shift n, CShift _ -> raise (Error.Error "Shift too long")
@@ -57,7 +44,9 @@ let apply_inv e s =
     | Dot (s, e), s' -> Dot (apply_inv s s', apply_inv e s')
     | Comp _, _-> assert false
     | ShiftS _, _-> assert false
-
+    | SCtx, _ -> SCtx
+    | SConst n, _ -> SConst n
+    | Unbox(e, s', cP), _ -> Unbox (e, apply_inv s' s, cP)
   in
   try Some (apply_inv e s)
   with Inv_fail -> None
@@ -74,34 +63,41 @@ let cong_stel tel s cP =
   let tel', i, cP' = ninja tel 0 cP in
   tel', (ShiftS (i, s)), cP'
 
-let rec check_stuck = function
+let rec check_stuck = function  (* MMMMM *)
   | AppL(e, _)
   | Clos(e, _, _) -> check_stuck e
-  | Var _ -> true
+  (* | Var _ -> true *)
   | _ -> false
 
-let rec match_pat sign cP p e =
-  let e = whnf_open sign cP e in
+let rec match_pat sign p e =
+  let e = whnf sign e in
   Debug.print ~verbose:true  (fun () -> "Matching pattern " ^ print_pat p ^ " against term " ^ print_exp e);
   match p, e with
   | Innac _, _ -> []
   | PVar n, e -> [n, e]
-  | PPar n, BVar i -> [n, BVar i]
-  | PBVar i, BVar i' when i = i' -> []
-  | PLam (_, p), Lam (xs, e) -> match_pat sign (bctx_from_lam cP xs) p e
-
   | PConst (n, []), Const n' when n = n' -> []
   | PConst (n, ps), App(Const n', sp) when n = n' ->
-     match_pats sign cP ps sp
+     match_pats sign ps sp
   | PConst (n, _), App(Const n', _) ->
      raise (Matching_failure (p, e))
-  | PConst (n, ps), AppL(Const n', sp) when n = n' ->
-     match_pats sign cP ps sp
-  | PConst (n, _), AppL(Const n', _) ->
-     raise (Matching_failure (p, e))
-
-  | _ when check_stuck e -> raise Stuck
   | _ -> raise (Matching_failure (p, e))
+
+and match_pats sign ps es =
+  List.concat (List.map2 (match_pat sign) ps es)
+
+and match_syn_pat sign cP p e =
+  match p, rewrite sign cP e with
+  | PBVar i, BVar i' when i = i' -> []
+  | PLam (_, p), Lam (xs, e) -> match_syn_pat sign (bctx_from_lam cP xs) p e
+  | PSConst (n, []), SConst n' when n = n' -> []
+  | PSConst (n, ps), AppL(SConst n', sp) when n = n' ->
+     match_syn_pats sign cP ps sp
+  | PSConst (n, _), AppL(SConst n', _) ->
+     raise (Matching_syn_failure (p, e))
+
+  (* | PPar n, BVar i -> [n, BVar i] *)
+  | _ when check_stuck e -> raise Stuck
+  | _ -> raise (Matching_syn_failure (p, e))
 
 (* | PAnnot (p, e) -> *)
 (* | PClos (n, p) -> *)
@@ -113,13 +109,13 @@ let rec match_pat sign cP p e =
 (* | PUnder -> *)
 (* | PWildcard -> *)
 
-and match_pats sign cP ps es =
-  List.concat (List.map2 (match_pat sign cP) ps es)
+and match_syn_pats sign cP ps es =
+  List.concat (List.map2 (match_syn_pat sign cP) ps es)
 
-and reduce_with_clause sign cP sp (pats, rhs) =
+and reduce_with_clause sign sp (pats, rhs) =
   Debug.print ~verbose:true  (fun () -> "Matching spine " ^ print_exps sp ^ " against patterns " ^ print_pats pats);
   begin try
-      let sigma = match_pats sign cP pats sp in
+      let sigma = match_pats sign pats sp in
       match rhs with
       | Just e -> Some (simul_subst sigma e) (* TODO this should call whnf *)
       | Impossible _ -> raise (Error.Violation "This case is impossible, it did not happen!")
@@ -129,7 +125,7 @@ and reduce_with_clause sign cP sp (pats, rhs) =
       None
   end
 
-and reduce_with_clauses sign cP sp cls =
+and reduce_with_clauses sign sp cls =
   let rec split n sp =
     match n, sp with
     | 0, _ -> [], sp
@@ -142,7 +138,7 @@ and reduce_with_clauses sign cP sp cls =
     function
     | [] -> None
     | cl::cls ->
-       begin match reduce_with_clause sign cP sp cl with
+       begin match reduce_with_clause sign sp cl with
        | None -> reduce sp cls
        | otw -> otw
        end
@@ -153,75 +149,80 @@ and reduce_with_clauses sign cP sp cls =
   else
     let sp1, sp2 = split cl_l sp in
     try
-      match reduce (List.map (whnf_open sign cP) sp1) cls with
+      match reduce (List.map (whnf sign) sp1) cls with
       | None -> raise (Error.Error ("Coverage error"))
       | Some e -> Some (e, sp2)
     with Stuck -> None
 
 
-and whnf_open (sign : signature) cP (e : exp) : exp =
+and whnf (sign : signature) (e : exp) : exp =
   Debug.print ~verbose:true  (fun () -> "Computing the whnf of " ^ print_exp e) ;
   Debug.indent();
   let res = match e with
     (* this removes degenerate applications should they occur *)
     | App(App(h, sp), sp') ->
-       whnf_open sign cP (App(h, sp @ sp'))
+       whnf sign (App(h, sp @ sp'))
     | App(h, []) ->
-       whnf_open sign cP h
-    | AppL(AppL(h, sp), sp') ->
-       whnf_open sign cP (AppL(h, sp @ sp'))
-    | AppL(h, []) ->
-       whnf_open sign cP h
-    | Pi (tel, Pi (tel', t)) -> whnf_open sign cP (Pi (tel @ tel', t))
-    | SPi (tel, SPi (tel', t)) -> whnf_open sign cP (SPi (tel @ tel', t))
+       whnf sign h
+    | Pi (tel, Pi (tel', t)) -> whnf sign (Pi (tel @ tel', t))
 
     | Const n ->
       Debug.print ~verbose:true  (fun () -> "Found constant : " ^ n);
        begin match lookup_sign_def sign n with
-       | D e -> Debug.print ~verbose:true  (fun () -> "Definition of " ^ n ^ " is " ^ print_exp e); whnf_open sign cP e
+       | D e -> Debug.print ~verbose:true  (fun () -> "Definition of " ^ n ^ " is " ^ print_exp e); whnf sign e
        | _ -> Const n
        end
     | App(h, sp) ->
       Debug.print ~verbose:true  (fun () -> "Found application. Head is: " ^ print_exp h);
-      begin match whnf_open sign cP h with
+      begin match whnf sign h with
       | Fn(xs, e) as f ->
         Debug.print ~verbose:true  (fun () -> "Head of application was a function " ^ print_exp f);
         let sigma = List.map2 (fun x e -> x, e) xs sp in
-        whnf_open sign cP (simul_subst sigma e) (* Beta reduction *)
+        whnf sign (simul_subst sigma e) (* Beta reduction *)
       | Const n ->
         Debug.print ~verbose:true  (fun () -> "Head of application was a constant " ^ print_exp (Const n));
         begin match lookup_sign_def sign n with
-        | D e -> whnf_open sign cP (App (e, sp))
+        | D e -> whnf sign (App (e, sp))
         | P cls ->
-          begin match reduce_with_clauses sign cP sp cls with
+          begin match reduce_with_clauses sign sp cls with
           | None -> App (Const n, sp)
-          | Some (e, []) -> whnf_open sign cP e
-          | Some (e, sp) -> whnf_open sign cP (App (e, sp))
+          | Some (e, []) -> whnf sign e
+          | Some (e, sp) -> whnf sign (App (e, sp))
           end
         | _ -> App(Const n, sp)
         end
       | h -> App(h, sp)
        end
-    | Annot(e, _) -> whnf_open sign cP e
+    | Annot(e, _) -> whnf sign e
 
     | Box (cP, e) -> Box (cP, rewrite sign cP e)
     | TermBox (cP, e) -> TermBox (cP, rewrite sign cP e)
-    | e -> rewrite sign cP e
+    | e -> e
   in
   Debug.deindent();
   Debug.print ~verbose:true  (fun () -> "====> " ^ print_exp res);
   res
 
-and rewrite (sign : signature) cP (e : exp) : exp =
-  let w e = whnf_open sign cP e in
+and rewrite (sign : signature) cP (e : syn_exp) : syn_exp =
+  let w e = rewrite sign cP e in
   let dmsg msg e' =
     Debug.print ~verbose:true  (fun () -> "Rewriting rule: " ^ msg);
-    Debug.print ~verbose:true (fun () -> "\ne = " ^ print_exp e ^ "\ne' = " ^ print_exp (e' ()));
+    Debug.print ~verbose:true (fun () -> "\ne = " ^ print_syn_exp e ^ "\ne' = " ^ print_syn_exp (e' ()));
     e' ()
   in
-  Debug.print ~verbose:true  (fun () -> "Rewriting " ^ print_exp e);
+  Debug.print ~verbose:true  (fun () -> "Rewriting " ^ print_syn_exp e);
   Debug.indent ();
   let res = match e with
+
+    | AppL(AppL(h, sp), sp') -> w (AppL(h, sp @ sp'))
+    | AppL(h, []) -> w h
+    | SPi (tel, SPi (tel', t)) -> w (SPi (tel @ tel', t))
+
+    | Unbox(TermBox(cP, e), s, cP') when cP = cP' -> w (Clos(e, s, cP'))
+    | Unbox(TermBox(cP, e), s, cP') -> raise (Error.Violation "Okay they don't always match. Good to know")
+    | Unbox(Box(cP, e), s, cP') when cP = cP' -> w (Clos(e, s, cP'))
+    | Unbox(Box(cP, e), s, cP') -> raise (Error.Violation "Okay they don't always match. Good to know")
+
 
   (* Syntactic rewriting rules *)
 
@@ -327,22 +328,16 @@ and rewrite (sign : signature) cP (e : exp) : exp =
   | Clos (e, Comp (s, _, Empty), _) -> w (dmsg "CompEmpty" (fun () -> e))
 
   (* Congruence rules *)
-  | Clos (Const n, _, _) -> w (dmsg "CongClosConst" (fun () -> (Const n)))
+  | Clos (SConst n, _, _) -> w (dmsg "CongClosConst" (fun () -> (SConst n)))
   | Clos (Clos (e, s1, cP1), s2, cP2) -> w (dmsg "CongClosClos" (fun () -> (Clos (e, Comp(s2, cP2, s1), cP1))))
   | Clos (AppL(e, es), s, cP) -> w (dmsg "CongClosAppL" (fun () -> (AppL(Clos(e, s, cP), List.map (fun e-> Clos(e, s, cP)) es))))
   | Clos (Lam (xs, e), s, cP) ->
      (dmsg "CongClosLam"
            (fun () -> (Lam (xs, Clos (e, fst (List.fold_left (fun (s, i) _ -> ShiftS (i+1, s), i+1) (s, 0) xs), bctx_from_lam cP xs)))))
-  | Clos (Set n, s, _) -> (dmsg "CongClosSet" (fun () -> (Set n)))
   | Clos (Star, s, _) -> (dmsg "CongClosStar" (fun () -> Star))
-  (* | Clos (Pi(tel, t), s) -> *)
-  (*    let tel' = List.map (fun (i, x, e) -> i, x, Clos (e, s)) tel in *)
-  (*    (dmsg "CongClosPi" (Pi(tel', Clos (t, s)))) *)
   | Clos (SPi(tel, t), s, cP) ->
      let tel', s, cP' = cong_stel tel s cP in
     (dmsg "CongClosSPi" (fun () -> (SPi (tel', Clos (t, s, cP')))))
-  (* | Clos (Fn (x, e), s) -> (dmsg "CongClosFn" (Fn (x, Clos(e, s)))) *)
-  (* | Clos (Annot (e, t), s) -> (dmsg "CongClosAnnot" (Annot (Clos(e,s), Clos(t, s)))) *)
 
  (* Contexts bind their own variables *)
   (* | Clos (Ctx, s) -> Ctx *)
@@ -402,49 +397,47 @@ and rewrite (sign : signature) cP (e : exp) : exp =
 
   in
   Debug.deindent ();
-  Debug.print ~verbose:true  (fun () -> "===> " ^ print_exp res);
+  Debug.print ~verbose:true  (fun () -> "===> " ^ print_syn_exp res);
   res
 
-let whnf sign e = whnf_open sign Nil e
+(* let rec normalize sign e = *)
+(*   let norm e = normalize sign e in *)
+(*   match whnf sign e with *)
+(*   | Set n -> Set n *)
+(*   | Star -> Star *)
+(*   | Pi (tel, e) -> *)
+(*      let tel' = List.map (fun (i, x, t) -> i, x, norm t) tel in *)
+(*      let e' = norm e in *)
+(*      Pi (tel', e') *)
+(*   | SPi (tel, e) -> *)
+(*      let tel' = List.map (fun (i, x, t) -> i, x, norm t) tel in *)
+(*      let e' = norm e in *)
+(*      SPi (tel', e') *)
+(*   | Box (cP, e) -> *)
+(*      Box (normalize_bctx sign cP, norm e) *)
+(*   | TermBox (cP, e) -> *)
+(*      TermBox (normalize_bctx sign cP, norm e) *)
+(*   | Ctx -> Ctx *)
+(*   | Const n -> Const n *)
+(*   | Dest n -> Dest n *)
+(*   | Var n -> Var n *)
+(*   | Fn (ns, e) -> Fn (ns, norm e) *)
+(*   | App (e, es) -> App(norm e, List.map norm es) *)
+(*   | Lam (ns, e) -> Lam (ns, norm e) *)
+(*   | AppL (e, es) -> AppL (norm e, List.map norm es) *)
+(*   | BVar i -> BVar i *)
+(*   | Clos (e, s, cP) -> Clos (norm e, norm s, normalize_bctx sign cP) *)
+(*   | BCtx cP -> BCtx (normalize_bctx sign cP) *)
+(*   | Annot (e, t) -> Annot (norm e, norm t) *)
+(*   | Hole n -> Hole n *)
+(*   | Empty -> Empty *)
+(*   | Dot (s, e) -> Dot (norm s, norm e) *)
+(*   | Comp (s1, cP, s2) -> Comp (norm s1, normalize_bctx sign cP, norm s2) *)
+(*   | Shift n -> Shift n *)
+(*   | ShiftS (n, s) -> ShiftS (n, norm s) *)
 
-let rec normalize sign e =
-  let norm e = normalize sign e in
-  match whnf sign e with
-  | Set n -> Set n
-  | Star -> Star
-  | Pi (tel, e) ->
-     let tel' = List.map (fun (i, x, t) -> i, x, norm t) tel in
-     let e' = norm e in
-     Pi (tel', e')
-  | SPi (tel, e) ->
-     let tel' = List.map (fun (i, x, t) -> i, x, norm t) tel in
-     let e' = norm e in
-     SPi (tel', e')
-  | Box (cP, e) ->
-     Box (normalize_bctx sign cP, norm e)
-  | TermBox (cP, e) ->
-     TermBox (normalize_bctx sign cP, norm e)
-  | Ctx -> Ctx
-  | Const n -> Const n
-  | Dest n -> Dest n
-  | Var n -> Var n
-  | Fn (ns, e) -> Fn (ns, norm e)
-  | App (e, es) -> App(norm e, List.map norm es)
-  | Lam (ns, e) -> Lam (ns, norm e)
-  | AppL (e, es) -> AppL (norm e, List.map norm es)
-  | BVar i -> BVar i
-  | Clos (e, s, cP) -> Clos (norm e, norm s, normalize_bctx sign cP)
-  | BCtx cP -> BCtx (normalize_bctx sign cP)
-  | Annot (e, t) -> Annot (norm e, norm t)
-  | Hole n -> Hole n
-  | Empty -> Empty
-  | Dot (s, e) -> Dot (norm s, norm e)
-  | Comp (s1, cP, s2) -> Comp (norm s1, normalize_bctx sign cP, norm s2)
-  | Shift n -> Shift n
-  | ShiftS (n, s) -> ShiftS (n, norm s)
-
-and normalize_bctx sign cP =
-  match cP with
-  | CtxVar n -> CtxVar n
-  | Nil -> Nil
-  | Snoc(cP, x, t) -> Snoc(normalize_bctx sign cP, x, normalize sign t)
+(* and normalize_bctx sign cP = *)
+(*   match cP with *)
+(*   | CtxVar n -> CtxVar n *)
+(*   | Nil -> Nil *)
+(*   | Snoc(cP, x, t) -> Snoc(normalize_bctx sign cP, x, normalize sign t) *)

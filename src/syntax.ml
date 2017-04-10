@@ -6,6 +6,8 @@ type pat_subst
   | CEmpty
   | CDot of pat_subst * int
 
+let pid_sub = CShift 0
+
 module Ext = struct
 
   type name = string
@@ -148,71 +150,84 @@ module Int = struct
 
   type exp
     = Set of universe
-    | Star (* Universe of syntax *)
     | Pi of tel * exp  (* A pi type *)
-    | SPi of stel * exp (* A syntactic type *)
-    | Box of bctx * exp
-    | TermBox of bctx * exp
+    | Box of bctx * syn_exp
     | Ctx (* of exp *) (* Let's think about it *)
     | Const of def_name (* The name of a constant *)
     | Dest of def_name
     | Var of name
     | Fn of name list * exp
     | App of exp * exp list
-    | Lam of (string * exp) list * exp
-    | AppL of exp * exp list
-    | BVar of index
-    | Clos of exp * exp * bctx
     | BCtx of bctx
     | Annot of exp * exp
     | Hole of name
-    | Empty
-    | Dot of exp * exp
-    | Comp of exp * bctx * exp
-    | Shift of int
-    | ShiftS of int * exp
+    | TermBox of bctx * syn_exp
 
+  and syn_exp
+    = Lam of (string * syn_exp) list * syn_exp
+    | AppL of syn_exp * syn_exp list
+    | SConst of def_name (* The name of a syntactic constant *)
+    | BVar of index
+    | Clos of syn_exp * syn_exp * bctx
+    | Empty
+    | Dot of syn_exp * syn_exp
+    | Comp of syn_exp * bctx * syn_exp
+    | Shift of int
+    | ShiftS of int * syn_exp
+    | Star (* Universe of syntax *)
+    | SPi of stel * syn_exp (* A syntactic type *)
+    | SBCtx of bctx
+    | SCtx
+    | Unbox of exp * syn_exp * bctx
 
   and bctx
     = Nil
     | CtxVar of name
-    | Snoc of bctx * string * exp
+    | Snoc of bctx * string * syn_exp
 
    and tel_entry = icit * name * exp
    and tel = tel_entry list
 
-   and stel_entry = icit * string * exp
+   and stel_entry = icit * string * syn_exp
    and stel = stel_entry list
 
-  let idSub = Shift 0
+  let id_sub = Shift 0
 
   type pat =
     | PVar of name
-    | PBVar of index
     | Innac of exp
-    | PLam of (string * exp) list * pat
     | PConst of def_name * pat list
-    | PClos of name * pat_subst * bctx
     | PBCtx of pat_bctx
-    | PEmpty
-    | PShift of int
-    | PDot of pat * pat
     | PPar of name
     | PUnder
     | PWildcard
+    | PTBox of bctx * syn_pat
+
+  and syn_pat =
+    | PBVar of index
+    | PLam of (string * syn_exp) list * syn_pat
+    | PSConst of def_name * syn_pat list
+    | PUnbox of name * pat_subst * bctx
+    | PEmpty
+    | PShift of int
+    | PDot of syn_pat * syn_pat
 
   and pat_bctx =
     | PNil
-    | PSnoc of pat_bctx * string * pat
+    | PSnoc of pat_bctx * string * syn_pat
     | PCtxVar of name
 
   type pats = pat list
+  type syn_pats = syn_pat list
   (* name of the constructed type, the type parameters, and the indices *)
   type dsig = def_name * exp list
+  type syn_dsig = def_name * syn_exp list
+
   type decl = (def_name * tel * dsig)
   type decls = decl list
-  type sdecl = (def_name * stel * dsig)
+  type sdecl = (def_name * stel * syn_dsig)
   type sdecls = sdecl list
+
   type codecls = (def_name * tel * dsig * exp) list
   type rhs
     = Just of exp
