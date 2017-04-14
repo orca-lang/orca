@@ -98,6 +98,7 @@ and syn_matching_apx (p : I.syn_pat) (q : A.pat) : I.syn_pat list =
   match p, q with
   | I.PLam (xs, p), A.PLam (ys, q) -> syn_matching_apx p q
   | I.PUnbox (n, s, cP), A.PClos (n', s') when s = s' -> [I.PUnbox(n', s, cP)] (* big MMMM *)
+  | I.PUnbox (n, CShift 0, cP), A.PVar n' -> [I.PUnbox(n', CShift 0, cP)]
   | I.PEmpty, A.PEmptyS -> []
   | I.PShift n, A.PShift n' when n = n' -> []
   | I.PSConst (n, ps), A.PConst (n', ps') when n = n' -> List.concat (List.map2 syn_matching_apx ps ps')
@@ -269,7 +270,11 @@ let split_const (sign : signature) (p1 : pats) (c, ps : def_name * pats)
                x, I.TermBox(cP, I.AppL (I.SConst c, unbox_list_of_ctx cP td))
              else
                x, I.App (I.Const c, var_list_of_ctx td) in
-    let pss = x, I.PConst (c, simul_psubst_on_list sign pdelta (pvar_list_of_ctx cT)) in
+    let pss = if is_syn_con sign c then
+               let cP = get_cP maybe_g in
+               x, I.PTBox(cP, I.PSConst (c, punbox_list_of_ctx cP td))
+             else
+               x, I.PConst (c, pvar_list_of_ctx td) in
     let res = compute_split_map sign ss pss cD1 x cD2 delta pdelta cD' in
     Debug.deindent (); res
   else
@@ -340,7 +345,9 @@ let split_rec (sign : signature) (ps : pats) (cD : ctx) : ctx * I.pats =
        search (p1 @ [Int(I.PVar y)]) ps (cD1 @ [y, t]) (ctx_subst (x, I.Var y) cD2)
     | I.Innac e, (x, t) :: cD2 ->
        search (p1 @ [Int(I.Innac e)]) ps (cD1 @ [x, t]) cD2
-    | _ -> raise (Error.Violation "I bet this will never be raised")
+    | I.PTBox (cP1, I.PUnbox(n, s, cP2)), (x, t) :: cD2 ->
+       search (p1 @ [Int(I.PTBox (cP1, I.PUnbox(n, s, cP2)))]) ps (cD1 @ [x, t]) cD2
+    | _ -> raise (Error.Violation ("I bet this will never be raised. p = " ^ IP.print_pat p))
   (*   match p, cD2 with *)
   (*   | I.PConst (c, sp), (x, t) :: cD2 -> *)
   (*      split_const sign p1 (c, List.map (fun p -> Int p) sp) cD1 (x, t) cD2 *)
@@ -417,6 +424,7 @@ let check_pats (sign : signature) (p : pats) (cG : ctx) : ctx * I.pats =
   Debug.indent ();
   let is_Pvar = function
     | Int (I.PVar _)
+    | Int (I.PTBox (_, I.PUnbox(_, _, _)))
     | Apx (A.PVar _) -> true
     | _ -> false
   in
@@ -493,12 +501,17 @@ and check_inac (sign, cD : signature * ctx) (p : A.pat) (q : I.pat) (t : I.exp) 
   | A.PConst (n, sp), I.PConst (n', sq) when n = n' ->
      begin match lookup_sign_entry sign n with
      | Constructor (_, tel, _) -> I.PConst (n, check_inacs (sign, cD) sp sq (ctx_of_tel tel))
-     | SConstructor (_, stel, _) -> raise (Error.Violation ("Syntactic constructor used with PConst"))
-        (* let cP = match t with *)
-        (*   | I.Box(cP, _) -> cP *)
-        (*   | _ -> raise (Error.Violation ("Syntactic constructor was used to split on a non boxed type")) *)
-        (* in *)
-        (* I.PTBox(cP, I.PSConst (n, check_inacs_syn (sign, cD) cP sp sq stel)) *)
+     | SConstructor (_, stel, _) -> (* raise (Error.Violation ("Syntactic constructor used with PConst")) *)
+        let cP = match t with
+          | I.Box(cP, _) -> cP
+          | _ -> raise (Error.Violation ("Syntactic constructor was used to split on a non boxed type"))
+        in
+        let f = function
+          | [] -> []
+          | _ -> Debug.print (fun() -> "SQ(pigs) are: " ^ IP.print_pats sq); assert false
+        in
+        let sq' = f sq in
+        I.PTBox(cP, I.PSConst (n, check_inacs_syn (sign, cD) cP sp sq' stel))
      | _ -> raise (Error.Violation ("It should have been a constructor."))
      end
   | _, I.PTBox (cP, q) -> begin match t with
@@ -530,6 +543,8 @@ and check_inac_syn (sign, cD : signature * ctx) (cP : I.bctx) (p : A.pat) (q : I
        raise (Error.Violation "Match - check_inac - PLam binding sizes differ. Who knows why?")
   | A.PClos (n, s), I.PUnbox (n', s', cP') when n = n' && s = s' ->
      I.PUnbox(n, s', cP')
+  | A.PVar n, I.PUnbox (n', CShift 0, cP') when n = n' ->
+     I.PUnbox(n, CShift 0, cP')
   | A.PBVar i, I.PBVar i' when i = i' ->
      I.PBVar i
 

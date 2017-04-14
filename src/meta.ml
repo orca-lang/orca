@@ -403,6 +403,7 @@ let name_list_of_ctx : ctx -> name list = List.map fst
 let var_list_of_ctx : ctx -> exp list = List.map (fun (x, _) -> Var x)
 
 let unbox_list_of_ctx cP : ctx -> syn_exp list = List.map (fun (x, _) -> Unbox(Var x, id_sub, cP))
+let punbox_list_of_ctx cP : ctx -> syn_pat list = List.map (fun (x, _) -> PUnbox(x, pid_sub, cP))
 
 let rec ctx_subst s = function
   | (x, t) :: cG -> (x, subst s t) :: (ctx_subst s cG)
