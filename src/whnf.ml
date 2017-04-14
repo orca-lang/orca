@@ -4,6 +4,7 @@ open Print.Int
 open Meta
 open MetaSub
 open Sign
+open Util
 
 exception Matching_failure of pat * exp
 exception Matching_syn_failure of syn_pat * syn_exp
@@ -126,14 +127,6 @@ and reduce_with_clause sign sp (pats, rhs) =
   end
 
 and reduce_with_clauses sign sp cls =
-  let rec split n sp =
-    match n, sp with
-    | 0, _ -> [], sp
-    | _, p :: sp' ->
-       let sp1, sp2 = split (n-1) sp' in
-       p :: sp1, sp2
-    | _ -> raise (Error.Violation "This will not happen")
-  in
   let rec reduce sp =
     function
     | [] -> None
@@ -147,7 +140,7 @@ and reduce_with_clauses sign sp cls =
   if List.length sp < cl_l then
     None
   else
-    let sp1, sp2 = split cl_l sp in
+    let sp1, sp2 = split_first cl_l sp in
     try
       match reduce (List.map (whnf sign) sp1) cls with
       | None -> raise (Error.Error ("Coverage error"))
