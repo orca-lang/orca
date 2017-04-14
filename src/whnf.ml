@@ -64,10 +64,13 @@ let cong_stel tel s cP =
   let tel', i, cP' = ninja tel 0 cP in
   tel', (ShiftS (i, s)), cP'
 
-let rec check_stuck = function  (* MMMMM *)
+let check_stuck = function (* MMMMM *)
+  | Var _ -> true
+  | _ -> false
+
+let rec check_syn_stuck = function (* MMMMM *)
   | AppL(e, _)
-  | Clos(e, _, _) -> check_stuck e
-  (* | Var _ -> true *)
+  | Clos(e, _, _) -> true (* check_stuck e *)
   | _ -> false
 
 let rec match_pat sign p e =
@@ -81,6 +84,7 @@ let rec match_pat sign p e =
      match_pats sign ps sp
   | PConst (n, _), App(Const n', _) ->
      raise (Matching_failure (p, e))
+  | _ when check_stuck e -> raise Stuck
   | _ -> raise (Matching_failure (p, e))
 
 and match_pats sign ps es =
@@ -97,7 +101,7 @@ and match_syn_pat sign cP p e =
      raise (Matching_syn_failure (p, e))
 
   (* | PPar n, BVar i -> [n, BVar i] *)
-  | _ when check_stuck e -> raise Stuck
+  | _ when check_syn_stuck e -> raise Stuck
   | _ -> raise (Matching_syn_failure (p, e))
 
 (* | PAnnot (p, e) -> *)
