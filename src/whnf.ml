@@ -147,7 +147,7 @@ and reduce_with_clauses sign sp cls =
     let sp1, sp2 = split_first cl_l sp in
     try
       match reduce (List.map (whnf sign) sp1) cls with
-      | None -> raise (Error.Error ("Coverage error"))
+      | None -> raise (Error.Error ("Coverage error")) (* Maybe we don't want to fail here, and just be stuck *)
       | Some e -> Some (e, sp2)
     with Stuck -> None
 
