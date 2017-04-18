@@ -14,28 +14,28 @@ module Ext = struct
   module N = Name
 
   type exp = raw_exp Location.t
-   and raw_exp
-     = Star
-     | Set of int
-     | Arr of exp * exp
-     | SArr of exp * exp
-     | Box of exp * exp
-     | ABox of exp * exp
-     | Fn of name list * exp
-     | Lam of name list * exp
-     | App of exp * exp
-     | AppL of exp * exp
-     | Hole of name option
-     | Ident of name
-     | BVar of int
-     | Clos of exp * exp
-     | EmptyS
-     | Shift of int
-     | Comma of exp * exp
-     | Semicolon of exp * exp
-     | Nil
-     | Annot of exp * exp
-     | Ctx
+  and raw_exp
+    = Star
+    | Set of int
+    | Arr of exp * exp
+    | SArr of exp * exp
+    | Box of exp * exp
+    | ABox of exp * exp
+    | Fn of name list * exp
+    | Lam of name list * exp
+    | App of exp * exp
+    | AppL of exp * exp
+    | Hole of name option
+    | Ident of name
+    | BVar of int
+    | Clos of exp * exp
+    | EmptyS
+    | Shift of int
+    | Comma of exp * exp
+    | Semicolon of exp * exp
+    | Nil
+    | Annot of exp * exp
+    | Ctx
 
   type pat =
     | PIdent of name
@@ -98,11 +98,11 @@ module Apx = struct
     | Annot of exp * exp
     | Hole of name
 
-   and tel_entry = icit * name * exp
-   and tel = tel_entry list
+  and tel_entry = icit * name * exp
+  and tel = tel_entry list
 
-   and stel_entry = icit * string * exp
-   and stel = stel_entry list
+  and stel_entry = icit * string * exp
+  and stel = stel_entry list
 
   type pat =
     | PVar of name
@@ -186,11 +186,13 @@ module Int = struct
     | CtxVar of name
     | Snoc of bctx * string * syn_exp
 
-   and tel_entry = icit * name * exp
-   and tel = tel_entry list
+  and tel_entry = icit * name * exp
+  and tel = tel_entry list
 
-   and stel_entry = icit * string * syn_exp
-   and stel = stel_entry list
+  and stel_entry = icit * string * syn_exp
+  and stel = stel_entry list
+
+  type ctx = (name * exp) list
 
   let id_sub = Shift 0
 
@@ -219,6 +221,9 @@ module Int = struct
     | PSnoc of pat_bctx * string * syn_pat
     | PCtxVar of name
 
+
+
+
   type pats = pat list
   type syn_pats = syn_pat list
   (* name of the constructed type, the type parameters, and the indices *)
@@ -243,4 +248,48 @@ module Int = struct
     | Syn of def_name * stel * sdecls
     | DefPM of def_name * tel * exp * pat_decls
     | Def of def_name * exp * exp
+
+  (* Some conversions on internal syntax  *)
+
+  let exp_list_of_tel tel = List.map (fun (_, _, s) -> s) tel
+
+  let rec syn_exp_of_pat_subst : pat_subst -> syn_exp = function
+    | CShift n -> Shift n
+    | CEmpty -> Empty
+    | CDot (s, i) -> Dot(syn_exp_of_pat_subst s, BVar i)
+
+  let rec exp_of_pat : pat -> exp =
+    fun p -> match p with
+             | PVar n -> Var n
+             | PPar n -> Var n           (* MMMMM *)
+
+             | Innac e -> e
+
+             | PConst (n, ps) ->
+                App (Const n, List.map (exp_of_pat) ps)
+
+             | PTBox (cP, p) ->
+                TermBox(cP, syn_exp_of_pat p)
+
+             | PBCtx cP -> BCtx (bctx_of_pat_ctx cP)
+             | PUnder -> raise (Error.Violation "We'd be very surprised if this were to happen.")
+             | PWildcard -> raise (Error.Violation "We'd also be very surprised if this were to happen.")
+
+  and syn_exp_of_pat =
+    function
+    | PBVar i -> BVar i
+    | PLam (fs, p) -> Lam (fs, syn_exp_of_pat p)
+    | PSConst (n, ps) ->
+       AppL (SConst n, List.map (syn_exp_of_pat) ps)
+    | PUnbox (n, s, cP) -> Unbox (Var n, syn_exp_of_pat_subst s, cP)
+    | SInnac (e, s, cP) -> Unbox (e, syn_exp_of_pat_subst s, cP)
+    | PEmpty -> Empty
+    | PShift i -> Shift i
+    | PDot (p1, p2) -> Dot (syn_exp_of_pat p1, syn_exp_of_pat p2)
+
+  and bctx_of_pat_ctx = function
+    | PNil -> Nil
+    | PSnoc (cP, x, p2) -> Snoc (bctx_of_pat_ctx cP, x, syn_exp_of_pat p2)
+    | PCtxVar n -> CtxVar n
+
 end

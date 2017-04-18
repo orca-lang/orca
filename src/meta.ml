@@ -347,51 +347,10 @@ let rec compose_single_with_subst s = function
 
 let compose_subst sigma delta = List.map (fun (x, t) -> x, simul_subst sigma t) delta
 
-let exp_list_of_tel tel = List.map (fun (_, _, s) -> s) tel
-
-let rec syn_exp_of_pat_subst : pat_subst -> syn_exp = function
-  | CShift n -> Shift n
-  | CEmpty -> Empty
-  | CDot (s, i) -> Dot(syn_exp_of_pat_subst s, BVar i)
-
-let rec exp_of_pat sign : pat -> exp =
-  fun p -> match p with
-  | PVar n -> Var n
-  | PPar n -> Var n           (* MMMMM *)
-
-  | Innac e -> e
-
-   | PConst (n, ps) ->
-      App (Const n, List.map (exp_of_pat sign) ps)
-
-   | PTBox (cP, p) ->
-      TermBox(cP, syn_exp_of_pat sign p)
-
-  | PBCtx cP -> BCtx (bctx_of_pat sign cP)
-  | PUnder -> raise (Error.Violation "We'd be very surprised if this were to happen.")
-  | PWildcard -> raise (Error.Violation "We'd also be very surprised if this were to happen.")
-
-and syn_exp_of_pat sign =
-  function
-  | PBVar i -> BVar i
-  | PLam (fs, p) -> Lam (fs, syn_exp_of_pat sign p)
-  | PSConst (n, ps) ->
-     AppL (SConst n, List.map (syn_exp_of_pat sign) ps)
-  | PUnbox (n, s, cP) -> Unbox (Var n, syn_exp_of_pat_subst s, cP)
-  | SInnac (e, s, cP) -> Unbox (e, syn_exp_of_pat_subst s, cP)
-  | PEmpty -> Empty
-  | PShift i -> Shift i
-  | PDot (p1, p2) -> Dot (syn_exp_of_pat sign p1, syn_exp_of_pat sign p2)
-
-and bctx_of_pat sign = function
-  | PNil -> Nil
-  | PSnoc (cP, x, p2) -> Snoc (bctx_of_pat sign cP, x, syn_exp_of_pat sign p2)
-  | PCtxVar n -> CtxVar n
-
 let rec subst_of_pats sign (sigma : pats) (tel : tel) : subst =
   match sigma, tel with
   | [], [] -> []
-  | p :: ps, (_, n, t) :: tel' -> (n, exp_of_pat sign p) :: (subst_of_pats sign ps tel')
+  | p :: ps, (_, n, t) :: tel' -> (n, exp_of_pat p) :: (subst_of_pats sign ps tel')
   | _ -> raise (Error.Violation "subst_of_ctx_map got lists of different lengths")
 
 let ctx_of_tel : tel -> ctx = List.map (fun (_, x, s) -> x, s)

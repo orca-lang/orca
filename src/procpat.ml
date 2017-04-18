@@ -1,7 +1,6 @@
 open Name
 open Syntax
 open Print
-open Sign
 open Meta
 open MetaSub
 module A = Syntax.Apx
@@ -30,9 +29,9 @@ let rec get_domain cP s =
   | _, CShift m -> raise (Error.Error ("Expected context " ^ IP.print_bctx cP ^ " to have at least "
                                        ^ string_of_int m ^ " variable" ^ if m > 1 then "s" else "" ^ " to shift over."))
 
-let pvar_list_of_ctx : ctx -> I.pats = List.map (fun (x, _) -> I.PVar x)
+let pvar_list_of_ctx : I.ctx -> I.pats = List.map (fun (x, _) -> I.PVar x)
 
-let punbox_list_of_ctx cP : ctx -> I.syn_pat list = List.map (fun (x, _) -> I.PUnbox(x, pid_sub, cP))
+let punbox_list_of_ctx cP : I.ctx -> I.syn_pat list = List.map (fun (x, _) -> I.PUnbox(x, pid_sub, cP))
 
 type single_psubst = name * I.pat
 type psubst = single_psubst list
@@ -42,14 +41,14 @@ let print_psubst c = "[" ^ (String.concat "," (List.map (fun (x, e) -> print_nam
 let rec psubst sign (x, p') = function
   | I.PVar n when n = x -> p'
   | I.PVar n -> I.PVar n
-  | I.Innac e -> I.Innac (subst (x, exp_of_pat sign p') e)
+  | I.Innac e -> I.Innac (subst (x, I.exp_of_pat p') e)
   | I.PConst (n, ps) -> I.PConst (n, List.map (psubst sign (x, p')) ps)
   | I.PPar n when n = x -> raise (Error.Violation "Don't think this can happen")
   | I.PPar n -> I.PPar n
   | I.PBCtx cP -> I.PBCtx (bctx_psubst sign (x, p') cP)
   | I.PUnder -> I.PUnder
   | I.PWildcard -> I.PWildcard
-  | I.PTBox (cP, p) -> let cP' = subst_bctx (x, exp_of_pat sign p') cP in
+  | I.PTBox (cP, p) -> let cP' = subst_bctx (x, I.exp_of_pat p') cP in
                       I.PTBox (cP', syn_psubst sign cP' (x, p') p)
 and syn_psubst sign cP (x, p') = function
   | I.PBVar i -> I.PBVar i
@@ -62,14 +61,14 @@ and syn_psubst sign cP (x, p') = function
      | p -> raise (Error.Violation ("I don't know which situation is that: " ^ IP.print_pat p))
      end
   | I.PUnbox (n, s, cP) -> I.PUnbox (n, s, cP)
-  | I.SInnac (e, s, cP) -> I.SInnac (subst (x, exp_of_pat sign p') e, s, cP)
+  | I.SInnac (e, s, cP) -> I.SInnac (subst (x, I.exp_of_pat p') e, s, cP)
   | I.PEmpty -> I.PEmpty
   | I.PShift n -> I.PShift n
   | I.PDot (s, p) -> I.PDot (syn_psubst sign cP (x, p') s, syn_psubst sign cP (x, p') p)
 
 and bctx_psubst sign (x, p') = function
   | I.PNil -> I.PNil
-  | I.PSnoc (cP, s, p) -> I.PSnoc (bctx_psubst sign (x, p') cP, s, syn_psubst sign (bctx_of_pat sign cP) (x, p') p)
+  | I.PSnoc (cP, s, p) -> I.PSnoc (bctx_psubst sign (x, p') cP, s, syn_psubst sign (I.bctx_of_pat_ctx cP) (x, p') p)
   | I.PCtxVar n when n = x -> raise (Error.Violation "Why?")
   | I.PCtxVar n -> I.PCtxVar n
 
@@ -115,12 +114,12 @@ let simul_syn_psubst_on_list sign cP sigma ps =
 
 let compose_psubst sign sigma delta = List.map (fun (x, t) -> x, simul_psubst sign sigma t) delta
 
-let psubst_of_ctx : ctx -> psubst = List.map (fun (x, _) -> x, I.PVar x)
+let psubst_of_ctx : I.ctx -> psubst = List.map (fun (x, _) -> x, I.PVar x)
 
 let simul_psubst_on_ctx sign sigma =
     List.map (fun (x, e) -> x, simul_psubst sign sigma e)
 
-let rec rename_ctx_using_psubst (cG : ctx) (sigma : psubst) =
+let rec rename_ctx_using_psubst (cG : I.ctx) (sigma : psubst) =
   match cG with
   | [] -> []
   | (x, t) :: cG' ->
@@ -132,7 +131,7 @@ let rec rename_ctx_using_psubst (cG : ctx) (sigma : psubst) =
 let shift_psubst_by_ctx sigma cG =
   let sigma' = sigma @ (List.map (fun (x, _) -> x, I.PVar x) cG) in
   Debug.print (fun () -> "Shift called with sigma = " ^ print_psubst sigma
-                         ^ "\ncG = " ^ print_ctx cG
+                         ^ "\ncG = " ^ IP.print_ctx cG
                          ^ "\nresulting in " ^ print_psubst sigma'
                          ^ ".");
   sigma'
@@ -143,7 +142,7 @@ let rec exp_of_pat_subst : pat_subst -> I.syn_exp = function
   | CDot (s, i) -> I.Dot(exp_of_pat_subst s, I.BVar i)
 
 let exp_of_pat sign cP : pat -> I.exp = function
-  | Int p -> exp_of_pat sign p
+  | Int p -> I.exp_of_pat p
   | Apx p -> raise (Error.Violation "This is Sparta")
 
 let rec proc_pats : A.pats -> pats = List.map (fun p -> Apx p)

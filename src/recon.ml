@@ -63,7 +63,7 @@ let compute_wkn (sign, cG) cP cP' =
 
 
 
-  (* Debug.print(fun () -> "Unifying contexts.\ng  = " ^ IP.print_exp g ^ "\ng' = " ^ IP.print_exp g' ^ "\n with ctx " ^ print_ctx cG); *)
+  (* Debug.print(fun () -> "Unifying contexts.\ng  = " ^ IP.print_exp g ^ "\ng' = " ^ IP.print_exp g' ^ "\n with ctx " ^ IP.print_ctx cG); *)
   (* let cD, sigma = *)
     (* try *)
     (*   Unify.unify_bctx (sign, cG) cP cP' *)
@@ -82,8 +82,8 @@ let compute_wkn (sign, cG) cP cP' =
 
 
 (* infers the type and returns the internal term and its type *)
-let rec infer (sign, cG : signature * ctx) (e : A.exp) : I.exp * I.exp =
-  Debug.print (fun () -> "Infer called with: " ^ AP.print_exp e ^ " in context: " ^ print_ctx cG);
+let rec infer (sign, cG : signature * I.ctx) (e : A.exp) : I.exp * I.exp =
+  Debug.print (fun () -> "Infer called with: " ^ AP.print_exp e ^ " in context: " ^ IP.print_ctx cG);
   Debug.indent() ;
   let res_e, res_t  =
     match e with
@@ -133,17 +133,17 @@ let rec infer (sign, cG : signature * ctx) (e : A.exp) : I.exp * I.exp =
   Debug.print(fun() -> "Result of infer for " ^ AP.print_exp e ^ " was " ^ IP.print_exp res_t) ;
   res_e, res_t
 
-and infer_type (sign, cG : signature * ctx) (s : A.exp) : I.exp * I.universe =
+and infer_type (sign, cG : signature * I.ctx) (s : A.exp) : I.exp * I.universe =
   match infer (sign, cG) s with
   | t, I.Set n -> t, n
   | t, e ->
      Debug.print (fun () -> "Assert universe failed for " ^ IP.print_exp e ^ ".") ;
      raise (Error.Error "Not a universe.")
 
-and check (sign , cG : signature * ctx) (e : A.exp) (t : I.exp) : I.exp =
+and check (sign , cG : signature * I.ctx) (e : A.exp) (t : I.exp) : I.exp =
   Debug.print (fun () ->
       "Checking " ^ AP.print_exp e ^ "\nagainst "
-      ^ Pretty.print_exp (sign, cG) t ^ "\nin context: " ^ print_ctx cG);
+      ^ Pretty.print_exp cG t ^ "\nin context: " ^ IP.print_ctx cG);
   Debug.indent();
   let res_e = match e, Whnf.whnf sign t with
     (* checkable terms *)
@@ -154,9 +154,9 @@ and check (sign , cG : signature * ctx) (e : A.exp) (t : I.exp) : I.exp =
        let cG' = simul_subst_on_ctx sigma cG in
        let cGext = List.map2 (fun f (_, _, s) -> f, s) fs (simul_subst_on_tel sigma tel) in
        Debug.indent();
-       Debug.print (fun () -> "Checking function: " ^ AP.print_exp (A.Fn (fs, e)) ^ "\nin context " ^ print_ctx cG ^ ".");
-       Debug.print (fun () -> "Resulted in ctx " ^ print_ctx cG'
-                              ^ "\nwith extension " ^ print_ctx cGext
+       Debug.print (fun () -> "Checking function: " ^ AP.print_exp (A.Fn (fs, e)) ^ "\nin context " ^ IP.print_ctx cG ^ ".");
+       Debug.print (fun () -> "Resulted in ctx " ^ IP.print_ctx cG'
+                              ^ "\nwith extension " ^ IP.print_ctx cGext
                               ^ "\nwith renaming " ^ IP.print_subst sigma ^ ".");
        let e' = check (sign, cGext @ cG') e t' in
        Debug.deindent() ;
@@ -232,7 +232,7 @@ and check_pi (sign, cG) tel t =
 
 and check_syn_type (sign, cG) cP (e : A.exp) : I.syn_exp =
   Debug.print (fun () -> "Checking syntactic type " ^ AP.print_exp e
-                         ^ "\nin context " ^ print_ctx cG);
+                         ^ "\nin context " ^ IP.print_ctx cG);
   Debug.indent ();
   let res =
     match e with
@@ -274,8 +274,8 @@ and check_ctx (sign, cG) g =
 
 and check_syn (sign, cG) cP (e : A.exp) (t : I.syn_exp) =
   Debug.print (fun () -> "Checking syntactic expression " ^ AP.print_exp e
-    ^ "\nagainst type " ^ Pretty.print_syn_exp (sign, cG) cP t ^ "\nin bound context "
-    ^ IP.print_bctx cP ^ "\nand context " ^ print_ctx cG);
+    ^ "\nagainst type " ^ Pretty.print_syn_exp cG cP t ^ "\nin bound context "
+    ^ IP.print_bctx cP ^ "\nand context " ^ IP.print_ctx cG);
   Debug.indent ();
   let res =
     match e, Whnf.rewrite sign cP t with
@@ -330,7 +330,7 @@ and check_syn (sign, cG) cP (e : A.exp) (t : I.syn_exp) =
 
 and infer_syn (sign, cG) cP (e : A.exp) =
   Debug.print (fun () -> "Inferring type of syntactic expression " ^ AP.print_exp e
-    ^ "\nin bound context " ^ IP.print_bctx cP ^ "\nand context " ^ print_ctx cG);
+    ^ "\nin bound context " ^ IP.print_bctx cP ^ "\nand context " ^ IP.print_ctx cG);
   Debug.indent ();
   let res =
     match e with
@@ -357,7 +357,7 @@ and infer_syn (sign, cG) cP (e : A.exp) =
       end
 
     | A.Var x ->
-       Debug.print (fun () -> "Variable " ^ print_name x ^ " is being looked up in context " ^ print_ctx cG);
+       Debug.print (fun () -> "Variable " ^ print_name x ^ " is being looked up in context " ^ IP.print_ctx cG);
        begin match lookup_ctx_fail cG x with
        | I.Box(cP', t') ->
           let sigma = compute_wkn (sign, cG) cP cP' in

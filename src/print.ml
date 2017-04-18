@@ -271,13 +271,15 @@ module Int = struct
     | PShift i -> "^ " ^ string_of_int i
     | PDot (p1, p2) -> "(" ^ print_syn_pat p1 ^ " ; " ^ print_syn_pat p2 ^ ")"
 
-
-
   and print_pat_bctx = function
     | PNil -> "0"
     | PSnoc (cP, x, p) -> "(" ^ print_pat_bctx cP ^ " , " ^ x ^ ":" ^ print_syn_pat p ^ ")"
     | PCtxVar n -> print_name n
 
+  let print_ctx = function
+    | [] -> "[]"
+    | [x, e] -> "[" ^ print_name x ^ " : " ^ print_exp e ^ "]"
+    | c -> "[" ^ (String.concat "," (List.map (fun (x, e) -> print_name x ^ ": " ^ print_exp e ^ "\n") c)) ^ "]"
 
   let print_tel (tel : tel) : string =
     String.concat ", " (List.map (fun (_, x, e) -> "(" ^ print_name x

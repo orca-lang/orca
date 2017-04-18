@@ -139,10 +139,3 @@ let lookup_constructors sign n =
   List.map signature_entry_name (List.filter constructs_n sign)
 
 let rec print_signature sign = "[" ^ String.concat "; " (List.map signature_entry_name sign) ^ "]"
-
-type ctx = (name * exp) list
-
-let print_ctx = function
-  | [] -> "[]"
-  | [x, e] -> "[" ^ print_name x ^ " : " ^ print_exp e ^ "]"
-  | c -> "[" ^ (String.concat "," (List.map (fun (x, e) -> print_name x ^ ": " ^ print_exp e ^ "\n") c)) ^ "]"

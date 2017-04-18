@@ -63,35 +63,6 @@ let drop_suffix cP n =
     in
     keep cP n
 
-
-
-let rec beautify_bound_name x cP =
-  let rec count = function
-    | CtxVar _
-      | Nil -> 0
-    | Snoc (cP', x', _) when x = x' -> 1 + count cP'
-    | Snoc (cP', x', _) -> count cP'
-  in
-  let c = count cP in
-  if c = 0 then x
-  else x ^ string_of_int c
-
-let rec beautify_bound_names xs cP =
-  match xs with
-  |[] -> []
-  | x::xs ->
-    let x' = beautify_bound_name x cP in
-    x'::beautify_bound_names xs (Snoc (cP, x, Star)) (* star is a dummy type *)
-
-let rec beautify_idx i cP =
-  if not (do_beautify ()) then None
-  else match i, cP with
-  | _, CtxVar _
-  | _, Nil -> None
-  | 0, Snoc(cP', x, _) -> Some (beautify_bound_name x cP')
-  | i, Snoc(cP', _, _) -> beautify_idx (i-1) cP'
-
-
 (* Applying syntactic substitutions *)
 
 (* let syn_subst_stel (sigma : exp) (cP : bctx) (tel : stel) : stel * exp = *)

@@ -10,7 +10,7 @@ open Recon
 module I = Syntax.Int
 module IP = Print.Int
 
-let tc_constructor (sign , cG : signature * ctx) (u : I.universe) (tel : I.tel)
+let tc_constructor (sign , cG : signature * I.ctx) (u : I.universe) (tel : I.tel)
                    (n , tel', (n', es) : def_name * tel * dsig) : signature_entry * I.decl =
   Debug.print_string ("Typechecking constructor: " ^ n) ;
   let tel'', uc = check_tel (sign, cG) u tel' in
@@ -36,7 +36,7 @@ let tc_constructor (sign , cG : signature * ctx) (u : I.universe) (tel : I.tel)
                         ^ " which does not fit in " ^ print_universe u
                         ^ ", the universe of the data type " ^ n'))
 
-let rec tc_constructors (sign , cG : signature * ctx) (u : I.universe) (tel : I.tel)
+let rec tc_constructors (sign , cG : signature * I.ctx) (u : I.universe) (tel : I.tel)
                     (ds : decls) : signature * I.decls =
   match ds with
   | [] -> sign, []
@@ -45,7 +45,7 @@ let rec tc_constructors (sign , cG : signature * ctx) (u : I.universe) (tel : I.
      let sign', ds' = tc_constructors (sign, cG) u tel ds in
      se::sign', d'::ds'
 
-let tc_syn_constructor (sign , cG : signature * ctx) (tel : I.stel)
+let tc_syn_constructor (sign , cG : signature * I.ctx) (tel : I.stel)
                        (n , tel', (n', es) : def_name * stel * dsig) : signature_entry * I.sdecl =
   Debug.print_string ("Typechecking syntax constructor: " ^ n) ;
   let tel'' = check_stel (sign, cG) I.Nil tel' in
@@ -64,7 +64,7 @@ let tc_syn_constructor (sign , cG : signature * ctx) (tel : I.stel)
   let es' = check_indices es tel cP I.id_sub in
   SConstructor (n, tel'', (n', es')), (n, tel'', (n', es'))
 
-let rec tc_syn_constructors (sign , cG : signature * ctx) (tel : I.stel)
+let rec tc_syn_constructors (sign , cG : signature * I.ctx) (tel : I.stel)
                         (ds : sdecls) : signature * I.sdecls =
   match ds with
   | [] -> sign, []
