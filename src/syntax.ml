@@ -221,9 +221,6 @@ module Int = struct
     | PSnoc of pat_bctx * string * syn_pat
     | PCtxVar of name
 
-
-
-
   type pats = pat list
   type syn_pats = syn_pat list
   (* name of the constructed type, the type parameters, and the indices *)
