@@ -52,10 +52,14 @@ let nbsp : unit Fmt.t = fun pps () -> Fmt.pf pps " "
 let keyword = styled keyword_color string (* coloured word *)
 let def = styled def_color string
 let const = styled def_color string
-let comp_var cG pps n =
-  match Name.beautify_name n cG with
-  | None -> (styled comp_var_color Name.fmt_name) pps n
-  | Some s -> (styled comp_var_color string) pps s
+
+let comp_var, comp_new_var =
+  let with_beautify f cG pps n =
+    match f n cG with
+    | None -> (styled comp_var_color Name.fmt_name) pps n
+    | Some s -> (styled comp_var_color string) pps s
+  in
+  with_beautify Name.beautify_name, with_beautify Name.beautify_new_name
 
 let bound_var = styled bound_var_color Fmt.int
 let bound_name = styled `Bold (styled bound_var_color string)
@@ -233,6 +237,14 @@ and fmt_bctx cG pps = function
            bound_name (beautify_bound_name n cP)
            (fmt_syn_exp cG cP) e
   | CtxVar n -> comp_var cG pps n
+
+let rec fmt_ctx pps = function
+  | [] -> string pps "."
+  | (x, t)::cG ->
+     Fmt.pf pps "%a; %a : %a"
+            fmt_ctx cG
+            (comp_new_var cG) x
+            (fmt_exp cG) t
 
 let rec fmt_pat_subst pps = function
   | CShift 0 ->
@@ -476,6 +488,8 @@ let produce_string f e =
 let print_program p = produce_string fmt_program p
 let print_programs p = produce_string fmt_programs p
 let print_exp cG e = produce_string (fmt_exp cG) e
+let print_bctx cG cP = produce_string (fmt_bctx cG) cP
+let print_ctx cP = produce_string fmt_ctx cP
 let print_syn_exp cG cP e = produce_string (fmt_syn_exp cG cP) e
 let print_tel_entry cG te = produce_string (fmt_tel_entry cG) te
 let print_tel cG tel = produce_string (fmt_tel cG) tel

@@ -23,3 +23,5 @@ val disable_beautify : unit -> unit
 val do_beautify : unit -> bool
 
 val beautify_name : name -> (name * 'a) list -> string option
+
+val beautify_new_name : name -> (name * 'a) list -> string option
