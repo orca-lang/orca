@@ -325,7 +325,7 @@ and rewrite (sign : signature) cP (e : syn_exp) : syn_exp =
   | Clos (e, Comp (s, _, Empty), _) -> w (dmsg "CompEmpty" (fun () -> e))
 
   (* Congruence rules *)
-  | Clos (SConst n, _, _) -> w (dmsg "CongClosConst" (fun () -> (SConst n)))
+  | Clos (SConst n, _, _) -> dmsg "CongClosConst" (fun () -> (SConst n))
   | Clos (Clos (e, s1, cP1), s2, cP2) -> w (dmsg "CongClosClos" (fun () -> (Clos (e, Comp(s2, cP2, s1), cP1))))
   | Clos (AppL(e, es), s, cP) -> w (dmsg "CongClosAppL" (fun () -> (AppL(Clos(e, s, cP), List.map (fun e-> Clos(e, s, cP)) es))))
   | Clos (Lam (xs, e), s, cP) ->

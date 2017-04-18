@@ -55,7 +55,14 @@ and syn_psubst sign cP (x, p') = function
   | I.PBVar i -> I.PBVar i
   | I.PLam (xs, p) -> I.PLam (xs, syn_psubst sign (bctx_from_lam cP xs) (x, p') p) (* What about shifts in p'? *)
   | I.PSConst (n, ps) -> I.PSConst (n, List.map (syn_psubst sign cP (x, p')) ps)
+  | I.PUnbox (n, s, cP') when n = x ->
+     begin match p' with
+     | I.PVar m -> I.PUnbox (m, s, cP')
+     | I.Innac e -> I.SInnac (e, s, cP')
+     | p -> raise (Error.Violation ("I don't know which situation is that: " ^ IP.print_pat p))
+     end
   | I.PUnbox (n, s, cP) -> I.PUnbox (n, s, cP)
+  | I.SInnac (e, s, cP) -> I.SInnac (subst (x, exp_of_pat sign p') e, s, cP)
   | I.PEmpty -> I.PEmpty
   | I.PShift n -> I.PShift n
   | I.PDot (s, p) -> I.PDot (syn_psubst sign cP (x, p') s, syn_psubst sign cP (x, p') p)

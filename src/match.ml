@@ -18,9 +18,13 @@ type comp_or_syn
   = Syn of I.syn_exp list
   | Comp of I.exp list
 
+let print_cos = function
+  | Syn s -> IP.print_syn_exps s
+  | Comp e -> IP.print_exps e
+
 (* Given the name of a type and a spine, return the parameter, the indices *)
 let split_idx_param (sign : signature) (cG : ctx) (n : def_name) (es1 : comp_or_syn)
-    (es2 : comp_or_syn) : ctx * comp_or_syn * comp_or_syn * comp_or_syn =
+    (es2 : comp_or_syn) : ctx * subst * comp_or_syn * comp_or_syn * comp_or_syn =
   match lookup_sign_entry sign n with
   | DataDef (_, ps, is, _) ->
      (* Debug.print (fun () -> "Splitting parameters " ^ IP.print_exps es1 ^ " against " ^ IP.print_tel ps); *)
@@ -34,9 +38,9 @@ let split_idx_param (sign : signature) (cG : ctx) (n : def_name) (es1 : comp_or_
      let us1, vs1 = split (es1, ps) in
      let us2, vs2 = split (es2, ps) in
      let cD, sigma = Unify.unify_many (sign, cG) us1 us2 in
-     cD, Comp (List.map (simul_subst sigma) us1), Comp (List.map (simul_subst sigma) vs1), Comp (List.map (simul_subst sigma) vs2)
+     cD, sigma, Comp (List.map (simul_subst sigma) us1), Comp (List.map (simul_subst sigma) vs1), Comp (List.map (simul_subst sigma) vs2)
   | SynDef _ ->
-    cG, Syn [], es1, es2
+    cG, [], Syn [], es1, es2
   | _ -> raise (Error.Error ("split_idx_param expected a datatype."))
 
 
@@ -78,7 +82,7 @@ let rec matching (p : I.pat) (q : pat) : pats =
   | I.PConst (n, ps) , Int(I.PConst (n', qs)) -> raise(Error.Error "Pattern matching does not match. (I)")
   | I.PConst (n, ps) , Apx(A.PConst (n', qs)) -> raise(Error.Error "Pattern matching does not match. (A)")
   | I.PTBox (cP, p), Int(I.PTBox(cP', p')) when cP = cP' -> List.map (fun p -> Int(I.PTBox(cP, p))) (syn_matching_int p p')
-  | I.PTBox (cP, p), Apx p' -> List.map (fun p -> Int(I.PTBox(cP, p))) (syn_matching_apx p p')
+  | I.PTBox (cP, p), Apx p' -> syn_matching_apx cP p p'
 
   | _ -> raise (Error.Error ("what is love? p = " ^ IP.print_pat p ^ " q = " ^ print_pat q))
 
@@ -94,17 +98,24 @@ and syn_matching_int (p : I.syn_pat) (q : I.syn_pat) : I.syn_pat list =
   | I.PDot (p1, p2), I.PDot (p1', p2') -> syn_matching_int p1 p1' @ syn_matching_int p2 p2'
   | _ -> raise (Error.Error ("Pats do not match " ^ IP.print_syn_pat p ^ " and " ^ IP.print_syn_pat q))
 
-and syn_matching_apx (p : I.syn_pat) (q : A.pat) : I.syn_pat list =
+and syn_matching_int' (p : I.syn_pat) (q : I.pat) : I.syn_pat list =
   match p, q with
-  | I.PLam (xs, p), A.PLam (ys, q) -> syn_matching_apx p q
-  | I.PUnbox (n, s, cP), A.PClos (n', s') when s = s' -> [I.PUnbox(n', s, cP)] (* big MMMM *)
-  | I.PUnbox (n, CShift 0, cP), A.PVar n' -> [I.PUnbox(n', CShift 0, cP)]
+  | I.PUnbox (n, CShift 0, cP'), I.PVar n' -> [I.PUnbox(n', CShift 0, cP')]
+  | I.PUnbox (n, CShift 0, cP'), I.Innac e -> [I.SInnac(e, CShift 0, cP')]
+  | _ -> raise (Error.Error ("bfvPats do not match " ^ IP.print_syn_pat p ^ " and " ^ IP.print_pat q))
+
+and syn_matching_apx cP (p : I.syn_pat) (q : A.pat) : pats =
+  match p, q with
+  | I.PLam (xs, p), A.PLam (ys, q) -> syn_matching_apx (bctx_from_lam cP xs) p q
+  | I.PUnbox (n, s, cP'), A.PClos (n', s') when s = s' -> [Int (I.PTBox (cP, I.PUnbox(n', s, cP')))] (* big MMMM *)
+  | I.PUnbox (n, CShift 0, cP'), A.PVar n' -> [Int (I.PTBox (cP, I.PUnbox(n', CShift 0, cP')))]
+  | I.PUnbox (n, CShift 0, cP'), A.Innac e -> [Apx (A.SInnac (e, CShift 0))]
   | I.PEmpty, A.PEmptyS -> []
   | I.PShift n, A.PShift n' when n = n' -> []
-  | I.PSConst (n, ps), A.PConst (n', ps') when n = n' -> List.concat (List.map2 syn_matching_apx ps ps')
+  | I.PSConst (n, ps), A.PConst (n', ps') when n = n' -> List.concat (List.map2 (syn_matching_apx cP) ps ps')
   | I.PSConst (n, _), A.PConst (n', _') -> raise (Error.Error (n ^ " is not equal " ^ n'))
   | I.PBVar i, A.PBVar i' when i = i' -> []
-  | I.PDot (p1, p2), A.PDot (p1', p2') -> syn_matching_apx p1 p1' @ syn_matching_apx p2 p2'
+  | I.PDot (p1, p2), A.PDot (p1', p2') -> syn_matching_apx cP p1 p1' @ syn_matching_apx cP p2 p2'
   | _ -> raise (Error.Error ("Pats do not match " ^ IP.print_syn_pat p ^ " and " ^ AP.print_pat q))
 
 and matchings (sigma : I.pats) (p : pats) : pats =
@@ -124,9 +135,9 @@ let rec flexible (p : pats)(cG : ctx) : name list =
 let inac_ctx = List.map (fun (_, t) -> I.Innac t)
 let inac_subst = List.map (fun (x, e) -> x, I.Innac e)
 
-let split_flex_unify (sign : signature) maybe_g (p1 : pats) (thetatel : I.tel) (ps : pats)
+let split_flex_unify (sign : signature) sigma0 maybe_g (p1 : pats) (thetatel : I.tel) (ps : pats)
                      (cD1 : ctx) (vs : comp_or_syn) (ws : comp_or_syn) =
-  let sigma, cT = rename_ctx_using_pats (ctx_of_tel thetatel) ps in
+  let sigma, cT = rename_ctx_using_pats (simul_subst_on_ctx sigma0 (ctx_of_tel thetatel)) ps in
   Debug.print (fun () -> "Creating set of flexible variables\np1 = " ^ print_pats p1
     ^ "\nps = " ^ print_pats ps ^ "\ncD1 = " ^ print_ctx cD1 ^ "\ncT = " ^ print_ctx cT);
   let flex = flexible (p1 @ ps) (cD1 @ cT) in
@@ -138,7 +149,7 @@ let split_flex_unify (sign : signature) maybe_g (p1 : pats) (thetatel : I.tel) (
   let vs = f vs in
   let ws = f ws in
   let cD', delta =
-    (* Debug.print (fun () -> "Split unifies vs = " ^ IP.print_exps vs ^ ", ws = " ^ IP.print_exps ws); *)
+    Debug.print (fun () -> "Split unifies\nvs = " ^ print_cos vs ^ "\nws = " ^ print_cos ws);
     try
       match maybe_g, vs, ws with
       | None, Comp vs, Comp ws -> Unify.unify_flex_many (sign, cD1 @ cT) flex vs ws
@@ -148,6 +159,7 @@ let split_flex_unify (sign : signature) maybe_g (p1 : pats) (thetatel : I.tel) (
       Unify.Unification_failure prob ->
       raise (Error.Error ("Split failed with unification problem " ^ Unify.print_unification_problem prob))
   in
+  let delta = delta @ sigma0 in
   Debug.print (fun () -> "Split unification outputed : cD' = " ^ print_ctx cD');
   let cT' = simul_subst_on_ctx delta (rename_ctx_using_subst cT delta) in
   Debug.print (fun () -> "delta = " ^ IP.print_subst delta ^ ", cT = " ^ print_ctx cT ^ ", cT' = " ^ print_ctx cT');
@@ -213,7 +225,7 @@ let split_lam (sign : signature) (p1 : pats) (xs, p : string list * pat) (cD1 : 
   let thetatel = [Syntax.Explicit, gen_floating_name (),
                   I.Box(g', if tel' = [] then t else I.SPi (tel', t))] in
   let ws = Syn [I.SPi (tel0, I.SPi(tel', t))] in
-  let cD', cT, delta, pdelta, td = split_flex_unify sign (Some g) p1 thetatel [p] cD1 vs ws in
+  let cD', cT, delta, pdelta, td = split_flex_unify sign [] (Some g) p1 thetatel [p] cD1 vs ws in
   let e = match var_list_of_ctx td with
     | [e] -> e
     | _ -> raise (Error.Violation ("Split_lam obtained more than one parameter out of td (" ^ print_ctx td ^ ")"))
@@ -232,6 +244,7 @@ let split_const (sign : signature) (p1 : pats) (c, ps : def_name * pats)
                 (cD1 : ctx) (x, t : name * I.exp) (cD2 : ctx) : ctx * I.pats =
   Debug.indent ();
   Debug.print (fun () -> "Splitting on constructor " ^ c ^ "\nSplit type " ^ IP.print_exp t) ;
+  Debug.print (fun () -> "wtf? : " ^ print_ctx cD1);
   let maybe_g, n, sp =
     match Whnf.whnf sign t with
     | I.App(I.Const n, sp) -> None, n, Comp sp
@@ -263,8 +276,9 @@ let split_const (sign : signature) (p1 : pats) (c, ps : def_name * pats)
   Debug.print (fun () -> "thetatel = " ^ IP.print_tel thetatel);
   if n = n'
   then
-    let cD1, us, vs, ws = split_idx_param sign cD1 n sp sp' in
-    let cD', cT, delta, pdelta, td = split_flex_unify sign maybe_g p1 thetatel ps cD1 vs ws in
+    let cD1, sigma, us, vs, ws = split_idx_param sign cD1 n sp sp' in
+    Debug.print (fun () -> "wtf? : " ^ print_ctx cD1);
+    let cD', cT, delta, pdelta, td = split_flex_unify sign sigma maybe_g p1 thetatel ps cD1 vs ws in
     let ss = if is_syn_con sign c then
                let cP = get_cP maybe_g in
                x, I.TermBox(cP, I.AppL (I.SConst c, unbox_list_of_ctx cP td))
@@ -272,9 +286,9 @@ let split_const (sign : signature) (p1 : pats) (c, ps : def_name * pats)
                x, I.App (I.Const c, var_list_of_ctx td) in
     let pss = if is_syn_con sign c then
                let cP = get_cP maybe_g in
-               x, I.PTBox(cP, I.PSConst (c, punbox_list_of_ctx cP td))
+               x, I.PTBox(cP, I.PSConst (c, simul_syn_psubst_on_list sign cP pdelta (punbox_list_of_ctx cP cT)))
              else
-               x, I.PConst (c, pvar_list_of_ctx td) in
+               x, I.PConst (c, simul_psubst_on_list sign pdelta (pvar_list_of_ctx cT)) in
     let res = compute_split_map sign ss pss cD1 x cD2 delta pdelta cD' in
     Debug.deindent (); res
   else
@@ -319,7 +333,7 @@ let split_rec (sign : signature) (ps : pats) (cD : ctx) : ctx * I.pats =
     | Apx p :: ps -> search_apx p1 p ps cD1 cD2
 
     | Int p :: ps -> search_int p1 p ps cD1 cD2
-    | [] -> [], []
+    | [] -> raise (Error.Violation ("Search concluded and didn't choose a pattern to split on."))
   and search_apx p1 p ps cD1 cD2 =
     match p, cD2 with
     | A.PConst (c, sp), (x, t) :: cD2 ->
@@ -334,6 +348,8 @@ let split_rec (sign : signature) (ps : pats) (cD : ctx) : ctx * I.pats =
        check_ppar sign p1 y cD1 (x, t) cD2
     | A.PClos (y, s), (x, t) :: cD2 ->
        split_clos sign p1 (y, s) cD1 (x, t) cD2
+    | A.SInnac (e, s), (x, t) :: cD2 ->
+       search (p1 @ [Apx(A.SInnac (e, s))]) ps (cD1 @ [x, t]) cD2
     | A.PLam (xs, p), (x, t) :: cD2 ->
        split_lam sign p1 (xs, Apx p) cD1 (x, t) cD2
 
@@ -425,6 +441,7 @@ let check_pats (sign : signature) (p : pats) (cG : ctx) : ctx * I.pats =
   let is_Pvar = function
     | Int (I.PVar _)
     | Int (I.PTBox (_, I.PUnbox(_, _, _)))
+    | Apx (A.SInnac (_, _))
     | Apx (A.PVar _) -> true
     | _ -> false
   in

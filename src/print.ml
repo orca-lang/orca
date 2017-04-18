@@ -122,6 +122,7 @@ module Apx = struct
     | PLam (fs, p) -> "(\ " ^ String.concat " " fs ^ " " ^ print_pat p ^ ")"
     | PConst (n, ps) -> "(" ^ n ^ " " ^ (String.concat " " (List.map (fun p -> "(" ^ print_pat p ^ ")") ps)) ^ ")"
     | PClos (n, s) -> print_name n ^ "[" ^ print_pat_subst s ^ "]"
+    | SInnac (e, s) -> "." ^ print_exp e ^ "[" ^ print_pat_subst s ^ "]"
     | PEmptyS -> "^"
     | PShift i -> "^ " ^ string_of_int i
     | PDot (p1, p2) -> "(" ^ print_pat p1 ^ " ; " ^ print_pat p2 ^ ")"
@@ -265,6 +266,7 @@ module Int = struct
     | PLam (fs, p) -> "(\ " ^ String.concat " " (List.map (fun (x, t) -> "("^ x ^ " : " ^ print_syn_exp t ^ ")") fs) ^ " " ^ print_syn_pat p ^ ")"
     | PSConst (n, ps) -> "(" ^ n ^ " " ^ (String.concat " " (List.map (fun p -> "(" ^ print_syn_pat p ^ ")") ps)) ^ ")"
     | PUnbox (n, s, cP) -> "(u " ^ print_name n ^ "[" ^ print_pat_subst s ^ " : " ^ print_bctx cP ^ "])"
+    | SInnac (e, s, cP) -> "(s. " ^ print_exp e ^ "[" ^ print_pat_subst s ^ " : " ^ print_bctx cP ^ "])"
     | PEmpty -> "^"
     | PShift i -> "^ " ^ string_of_int i
     | PDot (p1, p2) -> "(" ^ print_syn_pat p1 ^ " ; " ^ print_syn_pat p2 ^ ")"
@@ -321,8 +323,8 @@ module Int = struct
 
   let print_params ps = String.concat " " (List.map print_param ps)
 
-  let print_subst c = "[" ^ (String.concat "," (List.map (fun (x, e) -> print_name x ^ " := " ^ print_exp e) c)) ^ "]"
-  let print_psubst c = "[" ^ (String.concat "," (List.map (fun (x, e) -> print_name x ^ " := " ^ print_pat e) c)) ^ "]"
+  let print_subst c = "[" ^ (String.concat ",\n" (List.map (fun (x, e) -> print_name x ^ " := " ^ print_exp e) c)) ^ "]"
+  let print_psubst c = "[" ^ (String.concat ",\n" (List.map (fun (x, e) -> print_name x ^ " := " ^ print_pat e) c)) ^ "]"
 
   let print_program = function
     | Data (n, ps, is, u, decls) ->

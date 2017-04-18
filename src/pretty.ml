@@ -271,6 +271,11 @@ and fmt_syn_pat (sign, cG) cP pps = function
             (comp_var cG) n
             fmt_pat_subst psub
 
+  | SInnac (e, psub, _) ->
+     Fmt.pf pps ".%a[%a]"
+            (fmt_exp (sign,cG)) e
+            fmt_pat_subst psub
+
   | PEmpty -> string pps "^"
   | PShift n ->
      Fmt.pf pps "^%d" n

@@ -111,6 +111,7 @@ module Apx = struct
     | PLam of string list * pat
     | PConst of def_name * pat list
     | PClos of name * pat_subst
+    | SInnac of exp * pat_subst
     | PEmptyS
     | PShift of int
     | PDot of pat * pat
@@ -208,6 +209,7 @@ module Int = struct
     | PLam of (string * syn_exp) list * syn_pat
     | PSConst of def_name * syn_pat list
     | PUnbox of name * pat_subst * bctx
+    | SInnac of exp * pat_subst * bctx
     | PEmpty
     | PShift of int
     | PDot of syn_pat * syn_pat

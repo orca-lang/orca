@@ -112,7 +112,7 @@ and occur_check_stel sign cP n tel =
 let rem n cG = let cG' = List.filter (fun (x, _) -> x <> n) cG in
                Debug.print ~verbose:true  (fun () -> "Removing " ^ print_name n
                                       ^ " from context " ^ print_ctx cG
-                                      ^ " yielding " ^ print_ctx cG'); cG'
+                                      ^ "\nyielding " ^ print_ctx cG'); cG'
 
 
 let rec unify_flex (sign, cG) flex e1 e2 =
@@ -169,6 +169,8 @@ and unify_flex_syn (sign, cG) cP flex e1 e2 =
   let unify_spi = unify_flex_spi (sign, cG) cP flex in
   let unify_many_syn e1 e2 = unify_flex_many_syn (sign, cG) cP flex e1 e2 in
   let e1', e2' =  Whnf.rewrite sign cP e1, Whnf.rewrite sign cP e2 in
+  Debug.print ~verbose:true (fun () -> "Unifying syntactic expressions\ne1 = " ^ print_syn_exp e1
+                        ^ "\ne2 = " ^ print_syn_exp e2 ^ "\ne1' = " ^ print_syn_exp e1' ^ "\ne2' = " ^ print_syn_exp e2');
   match e1', e2' with
   | SPi (tel, t), SPi(tel', t') -> unify_spi tel t tel' t'
   | Lam(_,e), Lam(xs, e') -> unify_flex_syn (sign, cG) (bctx_from_lam cP xs) flex e e'

@@ -69,7 +69,7 @@ let rec fv_pat =
   function
   | PVar n -> [n]
   | PPar _ -> []
-  | Innac e -> []
+  | Innac _ -> []
   | PConst (n, ps) -> fv_pats ps
   | PBCtx cP -> fv_pat_bctx cP
   | PUnder -> []
@@ -81,7 +81,8 @@ and fv_syn_pat =
   | PBVar i -> []
   | PLam (f, p) -> fv_syn_pat p
   | PSConst (n, ps) -> fv_syn_pats ps
-  | PUnbox (n, p, _) ->  [n]
+  | PUnbox (n, _, _) -> [n]
+  | SInnac (_, _, _) -> []
   | PEmpty -> []
   | PShift i -> []
   | PDot (p1, p2) -> fv_syn_pat p1 @ fv_syn_pat p2
@@ -377,6 +378,7 @@ and syn_exp_of_pat sign =
   | PSConst (n, ps) ->
      AppL (SConst n, List.map (syn_exp_of_pat sign) ps)
   | PUnbox (n, s, cP) -> Unbox (Var n, syn_exp_of_pat_subst s, cP)
+  | SInnac (e, s, cP) -> Unbox (e, syn_exp_of_pat_subst s, cP)
   | PEmpty -> Empty
   | PShift i -> Shift i
   | PDot (p1, p2) -> Dot (syn_exp_of_pat sign p1, syn_exp_of_pat sign p2)
