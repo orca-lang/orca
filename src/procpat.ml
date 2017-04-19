@@ -7,6 +7,7 @@ module A = Syntax.Apx
 module I = Syntax.Int
 module AP = Print.Apx
 module IP = Print.Int
+module PP = Pretty
 
 type pat =
   | Apx of A.pat
@@ -49,16 +50,45 @@ let rec psubst sign (x, p') = function
   | I.PUnder -> I.PUnder
   | I.PWildcard -> I.PWildcard
   | I.PTBox (cP, p) -> let cP' = subst_bctx (x, I.exp_of_pat p') cP in
-                      I.PTBox (cP', syn_psubst sign cP' (x, p') p)
+                       I.PTBox (cP', syn_psubst sign cP' (x, p') p)
 and syn_psubst sign cP (x, p') = function
   | I.PBVar i -> I.PBVar i
   | I.PLam (xs, p) -> I.PLam (xs, syn_psubst sign (bctx_from_lam cP xs) (x, p') p) (* What about shifts in p'? *)
   | I.PSConst (n, ps) -> I.PSConst (n, List.map (syn_psubst sign cP (x, p')) ps)
   | I.PUnbox (n, s, cP') when n = x ->
      begin match p' with
-     | I.PVar m -> I.PUnbox (m, s, cP')
-     | I.Innac e -> I.SInnac (e, s, cP')
-     | p -> raise (Error.Violation ("I don't know which situation is that: " ^ IP.print_pat p))
+       | I.PVar m -> I.PUnbox (m, s, cP')
+       | I.Innac e -> I.SInnac (e, s, cP')
+       | I.PTBox (cP'', q) ->  (* cP' should be equal to cP'' *)
+          let rec push_unbox (s, cP') = function
+            | I.PBVar i ->
+               I.PBVar (lookup_pat_subst ("Expected term " ^ IP.print_syn_pat q ^ " to be closed") i s)
+            | I.PLam (xs , p) -> I.PLam(xs, push_unbox (wkn_pat_subst_by_n s (List.length xs), bctx_from_lam cP' xs) p)
+            | I.PSConst (n,ps) -> I.PSConst (n, List.map (push_unbox (s, cP')) ps)
+            | I.PUnbox (m, s', cP'') ->
+               I.PUnbox (m, comp_pat_subst ("Mismatching substitution from term " ^ IP.print_syn_pat q) s s', cP'')
+            | I.SInnac (e, s', cP'') ->
+               I.SInnac (e, comp_pat_subst ("Mismatching substitution from term " ^ IP.print_syn_pat q) s s', cP'')
+            | I.PEmpty  -> I.PEmpty
+            | I.PShift n ->
+               let rec comp s n =
+                 match s, n with
+                 | _, 0 ->
+                    let rec convert = function
+                      | CEmpty -> I.PEmpty
+                      | CShift n -> I.PShift n
+                      | CDot (s, i) -> I.PDot (convert s, I.PBVar i)
+                    in
+                    convert s
+                 | CDot (s', _), _ -> comp s' (n-1)
+                 | CShift n', _ -> I.PShift (n+n')
+                 | CEmpty, _ -> raise (Error.Error ("Empty substitution applied to a shift."))
+               in
+               comp s n
+            | I.PDot (sigma, p) -> I.PDot (push_unbox (s, cP') sigma, push_unbox (s, cP') p)
+          in
+          push_unbox (s, cP') q
+       | _ -> assert false
      end
   | I.PUnbox (n, s, cP) -> I.PUnbox (n, s, cP)
   | I.SInnac (e, s, cP) -> I.SInnac (subst (x, I.exp_of_pat p') e, s, cP)

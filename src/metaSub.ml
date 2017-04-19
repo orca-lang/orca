@@ -1,4 +1,5 @@
 open Name
+open Syntax
 open Syntax.Int
 open Print.Int
 
@@ -87,3 +88,117 @@ let drop_suffix cP n =
 (*   tel', Clos(t, sigma') *)
 
 let bctx_from_lam cP xs = List.fold_left (fun cP (x, t) -> Snoc(cP, x, t)) cP xs
+
+let rec wkn_pat_subst_by_n s =
+  let rec shift = function
+    | CShift n -> CShift (n+1)
+    | CEmpty -> CEmpty
+    | CDot (s, n) -> CDot (shift s, n+1)
+  in
+  function
+  | 0 -> s
+  | n -> wkn_pat_subst_by_n (CDot (shift s , 0)) (n-1)
+
+let rec lookup_pat_subst err i s = match i, s with
+  | 0, CDot (_, j) -> j
+  | i, CDot (s', _) -> lookup_pat_subst err (i-1) s'
+  | i, CShift n -> (i + n)
+  | i, CEmpty -> raise (Error.Error err)
+
+
+let rec comp_pat_subst err s s' =
+  match s, s' with
+  | CShift n, CShift n' -> CShift (n + n')
+  | _, CEmpty -> CEmpty
+  | CEmpty, CShift _ -> raise (Error.Error err)
+  | CEmpty, CDot _ -> raise (Error.Error err)
+  | s, CDot(s', x) ->
+     CDot(comp_pat_subst err s s', lookup_pat_subst err x s)
+  | CDot (s', x), CShift n -> comp_pat_subst err s' (CShift (n-1))
+
+exception Inv_fail
+
+let apply_inv_pat_subst e s =
+  let rec add_id_cdot n s =
+    if n = 0 then s
+    else CDot(add_id_cdot (n-1) s, n-1)
+  in
+  let rec apply_inv e s =
+    let rec apply_inv' n s cnt =
+      match s with
+      | CDot (s, m) when n = m -> BVar cnt
+      | CDot (s, _) -> apply_inv' n s (cnt+1)
+      | CShift m when n < m -> raise Inv_fail
+      | CShift m -> BVar (n - m)
+      | CEmpty -> raise Inv_fail
+    in
+    match e, s with
+    | e, CShift 0 -> e
+    | BVar n, _ -> apply_inv' n s 0
+    | Star, _ -> Star
+    | SPi(tel, t'),_ ->
+      SPi(List.map (fun (i,x,e) -> i, x, apply_inv e s) tel, apply_inv t' (add_id_cdot (List.length tel) s))
+    | Lam (x, e), _ -> Lam(x, apply_inv e (CDot (s, 0)))
+    | AppL (e, es), _ -> AppL(apply_inv e s, List.map (fun e -> apply_inv e s) es)
+    | SBCtx cP, _ -> SBCtx cP
+    | Clos (e, s', cP), _ -> Clos(e, apply_inv s' s, cP)
+    | Empty, _ -> Empty
+    | Shift n, CShift m when n >= m -> Shift (n - m)
+    | Shift n, CShift _ -> raise (Error.Error "Shift too long")
+    | Shift n, CEmpty -> Empty
+    | Shift n, CDot(_,_) -> assert false
+
+    | Dot (s, e), s' -> Dot (apply_inv s s', apply_inv e s')
+    | Comp _, _-> assert false
+    | ShiftS _, _-> assert false
+    | SCtx, _ -> SCtx
+    | SConst n, _ -> SConst n
+    | Unbox(e, s', cP), _ -> Unbox (e, apply_inv s' s, cP)
+  in
+  try Some (apply_inv e s)
+  with Inv_fail -> None
+
+let apply_inv_subst e s =
+  let rec add_id_cdot n s =
+    if n = 0 then s
+    else Dot(add_id_cdot (n-1) s, BVar (n-1))
+  in
+  let rec apply_inv e s =
+    let rec apply_inv' n s cnt =
+      match s with
+      | Dot (s, BVar m) when n = m -> BVar cnt
+      | Dot (s, _) -> apply_inv' n s (cnt+1)
+      | Shift m when n < m -> raise Inv_fail
+      | Shift m -> BVar (n - m)
+      | Empty -> raise Inv_fail
+      | ShiftS _ -> assert false
+      | Comp _ -> assert false
+      | _ -> raise Inv_fail (* Not a substitution *)
+    in
+    match e, s with
+    | e, Shift 0 -> e
+    | BVar n, _ -> apply_inv' n s 0
+    | Star, _ -> Star
+    | SPi(tel, t'),_ ->
+      SPi(List.map (fun (i,x,e) -> i, x, apply_inv e s) tel, apply_inv t' (add_id_cdot (List.length tel) s))
+    | Lam (xs, e), _ -> Lam(xs, apply_inv e (ShiftS (List.length xs, s)))
+    | AppL (e, es), _ -> AppL(apply_inv e s, List.map (fun e -> apply_inv e s) es)
+    | SBCtx cP, _ -> SBCtx cP
+    | Clos (e, s', cP), _ -> Clos(e, apply_inv s' s, cP)
+    | Empty, _ -> Empty
+    | Shift n, Shift m when n >= m -> Shift (n - m)
+    | Shift n, Shift _ -> raise (Error.Error "Shift too long")
+    | Shift n, Empty -> Empty
+    | Shift n, Dot(_,_) -> assert false
+
+    | Dot (s, e), s' -> Dot (apply_inv s s', apply_inv e s')
+    | Comp _, _-> assert false
+    | ShiftS _, _-> assert false
+    | SCtx, _ -> SCtx
+    | SConst n, _ -> SConst n
+    | Unbox(e, s', cP), _ -> Unbox (e, apply_inv s' s, cP)
+    | _ -> raise (Error.Violation ("Failed to apply inverse substitution " ^ print_syn_exp s
+                                   ^ " because it was not a substitution."))
+  in
+  try Some (apply_inv e s)
+  with Inv_fail -> None

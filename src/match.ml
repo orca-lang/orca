@@ -84,12 +84,8 @@ let matching (p : I.pat) (q : pat) : pats =
      and syn_apx_match cP p q =
        match p, q with
        | I.PLam (xs, p), A.PLam (ys, q) -> syn_apx_match (bctx_from_lam cP xs) p q
-       | I.PUnbox (n, s, cP'), _ ->
-          begin match q with
-          | A.PVar m -> [Int (I.PTBox (cP, I.PUnbox (m, s, cP')))]
-          | A.Innac e ->[Apx (A.SInnac (e, s))]
-          | _ -> assert false
-          end
+       | I.PUnbox (n, s, cP'), A.PClos (m, s') when s = s' -> [Int (I.PTBox (cP, (I.PUnbox (m, s, cP'))))]
+       | I.PUnbox (n, s, cP'), _ -> [Apx q] (* need to apply inverse sub to q *)
        | I.SInnac _, _ -> []
        | I.PEmpty, A.PEmptyS -> []
        | I.PShift n, A.PShift n' when n = n' -> []
@@ -114,7 +110,7 @@ let matching (p : I.pat) (q : pat) : pats =
      and syn_int_match cP p q =
        match p, q with
        | I.PLam (xs, p), I.PLam (ys, q) -> syn_int_match (bctx_from_lam cP xs) p q
-       | I.PUnbox (n, s, cP'), _ -> assert false
+       | I.PUnbox (n, s, cP'), _ -> [Int (I.PTBox(cP, q))]
        | I.SInnac _, _ -> []
        | I.PEmpty, I.PEmpty -> []
        | I.PShift n, I.PShift n' when n = n' -> []
@@ -136,6 +132,8 @@ let rec flexible (p : pats)(cG : I.ctx) : name list =
   match p, cG with
     | [], [] -> []
     | Int (I.Innac _)::ps, (x, t)::cG'
+    | Int (I.PTBox (_, I.SInnac _))::ps, (x, t)::cG'
+    | Apx (A.SInnac _)::ps, (x, t)::cG'
     | Apx (A.Innac _)::ps, (x, t)::cG' -> x::(flexible ps cG')
     | p::ps, (x, t)::cG' -> flexible ps cG'
     | _ -> raise (Error.Violation ("Flexible: length violation."))
@@ -147,7 +145,8 @@ let split_flex_unify (sign : signature) sigma0 maybe_g (p1 : pats) (thetatel : I
                      (cD1 : I.ctx) (vs : comp_or_syn) (ws : comp_or_syn) =
   let sigma, cT = rename_ctx_using_pats (simul_subst_on_ctx sigma0 (ctx_of_tel thetatel)) ps in
   Debug.print (fun () -> "Creating set of flexible variables\np1 = " ^ print_pats p1
-    ^ "\nps = " ^ print_pats ps ^ "\ncD1 = " ^ IP.print_ctx cD1 ^ "\ncT = " ^ IP.print_ctx cT);
+    ^ "\nps = " ^ print_pats ps ^ "\ncD1 = " ^ IP.print_ctx cD1 ^ "\ncT = " ^ IP.print_ctx cT
+    ^ "\nsigma0 = " ^ print_subst sigma0 ^ "\nsigma = " ^ print_subst sigma);
   let flex = flexible (p1 @ ps) (cD1 @ cT) in
   Debug.print (fun () -> "Flexibles variables are " ^ print_names flex);
   let f = function
@@ -327,7 +326,7 @@ let split_clos (sign : signature) (p1 : pats) (n, s : name * pat_subst) (cD1 : I
     | CEmpty -> I.Empty
     | CDot(s, i) -> I.Dot(subst_of_pat_subst s, I.BVar i)
   in
-  match Whnf.apply_inv t s with
+  match apply_inv_pat_subst t s with
   | Some t -> let cP' = get_domain cP s in
               compute_split_map sign (x, I.TermBox (cP, I.Unbox(I.Var n, subst_of_pat_subst s, cP')))
                                 (x, I.PTBox(cP, I.PUnbox(n, s, cP')))
@@ -355,6 +354,7 @@ let split_rec (sign : signature) (ps : pats) (cD : I.ctx) : I.ctx * I.pats =
     | A.PPar y, (x, t) :: cD2 ->
        check_ppar sign p1 y cD1 (x, t) cD2
     | A.PClos (y, s), (x, t) :: cD2 ->
+       Debug.print (fun () -> "Hello!");
        split_clos sign p1 (y, s) cD1 (x, t) cD2
     | A.SInnac (e, s), (x, t) :: cD2 ->
        search (p1 @ [Apx(A.SInnac (e, s))]) ps (cD1 @ [x, t]) cD2
@@ -552,6 +552,16 @@ and check_inac (sign, cD : signature * I.ctx) (p : A.pat) (q : I.pat) (t : I.exp
 
 and check_inac_syn (sign, cD : signature * I.ctx) (cP : I.bctx) (p : A.pat) (q : I.syn_pat) (t : I.syn_exp) : I.syn_pat =
   match p, q with
+  | A.Innac ep, I.SInnac (eq, s, cP') ->
+     Debug.indent ();
+     let ep' = check_syn (sign, cD) cP ep t in
+     let s' = exp_of_pat_subst s in
+     let _, sigma = try Unify.unify_syn (sign, cD) cP ep' (I.Unbox (eq, s', cP'))
+             with Unify.Unification_failure prob ->
+               raise (Error.Error ("Inaccessible pattern check failed with:\n" ^ Unify.print_unification_problem prob))
+     in
+     Debug.deindent ();
+     I.SInnac (simul_subst sigma eq, s, simul_subst_on_bctx sigma cP')
   | A.PConst (n, sp), I.PSConst (n', sq) when n = n' ->
      begin match lookup_sign_entry sign n with
      | Constructor (_, tel, _) -> raise (Error.Error ("Used a data type constructor inside a syntactic pattern"))

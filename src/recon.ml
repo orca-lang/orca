@@ -9,6 +9,8 @@ module AP = Print.Apx
 module I = Syntax.Int
 module IP = Print.Int
 
+module PP = Pretty
+
 let is_syntax = function
   | A.Lam _
   | A.AppL _
@@ -337,6 +339,14 @@ and infer_syn (sign, cG) cP (e : A.exp) =
     | A.SPi (tel, t) ->
        let tel', t' = check_spi (sign, cG) cP tel t in
        I.SPi (tel', t'), I.Star
+    | A.App (A.Const n, es) when not (is_syn_con sign n) ->
+       let e, t = infer (sign, cG) e in
+       begin match t with
+       | I.Box (cP', t') ->
+          let sigma = compute_wkn (sign, cG) cP cP' in
+          I.Unbox (e, sigma, cP'), I.Clos (t', sigma, cP')
+       | _ -> raise (Error.Error ("Expected a box type, got " ^ IP.print_exp t))
+       end
     (* App of Spi type get translated to AppL *)
     | A.App (e, es) ->
       begin match infer_syn (sign, cG) cP e with
@@ -361,13 +371,19 @@ and infer_syn (sign, cG) cP (e : A.exp) =
        begin match lookup_ctx_fail cG x with
        | I.Box(cP', t') ->
           let sigma = compute_wkn (sign, cG) cP cP' in
-          I.Unbox(I.Var x, sigma, cP'),  I.Clos(t', sigma, cP')
+          I.Unbox(I.Var x, sigma, cP'), I.Clos(t', sigma, cP')
        | t -> raise (Error.Error ("Expected a box type, got " ^ IP.print_exp t))
        end
     | A.Const n when is_syn_con sign n ->
        I.SConst n, lookup_syn_sign sign n
 
-    | A.Const n -> raise (Error.Error ("Constructor " ^ n ^ " was used where a syntactic type was expected."))
+    | A.Const n ->
+       begin match lookup_sign sign n with
+       | I.Box (cP', t') ->
+          let sigma = compute_wkn (sign, cG) cP cP' in
+          I.Unbox(I.Const n, sigma, cP'), I.Clos(t', sigma, cP')
+       | t -> raise (Error.Error ("Constant " ^ n ^ " has type " ^ PP.print_exp cG t ^ " where a syntactic type was expected."))
+       end
 
     | A.BVar i ->
        let t = lookup_bound cP i in

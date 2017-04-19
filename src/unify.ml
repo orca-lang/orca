@@ -9,6 +9,7 @@ open Name
 type unification_problem
   = Different_constuctors of def_name * def_name
   | Occur_check of name  * exp
+  | Occur_check_syn of name  * syn_exp
   | Expressions_dont_unify of name list * exp * exp
   | Expressions_dont_unify_syn of name list * syn_exp * syn_exp
   | Universes_dont_match of int * int
@@ -22,6 +23,8 @@ let print_unification_problem = function
      "Constructor " ^ n ^ " and " ^ n' ^ " do not unify."
   | Occur_check (n, e) ->
      "Occurs check failed for " ^ print_name n ^ " in expression " ^ print_exp e ^ "."
+  | Occur_check_syn (n, e) ->
+     "Occurs check failed for " ^ print_name n ^ " in expression " ^ print_syn_exp e ^ "."
   | Expressions_dont_unify (flex, e1, e2) ->
      "Expressions\ne1 = " ^ print_exp e1
      ^ "\ne2 = " ^ print_exp e2
@@ -166,6 +169,7 @@ let rec unify_flex (sign, cG) flex e1 e2 =
      raise (Unification_failure(Expressions_dont_unify (flex, e1', e2')))
 
 and unify_flex_syn (sign, cG) cP flex e1 e2 =
+  let is_flex n = List.mem n flex in
   let unify_spi = unify_flex_spi (sign, cG) cP flex in
   let unify_many_syn e1 e2 = unify_flex_many_syn (sign, cG) cP flex e1 e2 in
   let e1', e2' =  Whnf.rewrite sign cP e1, Whnf.rewrite sign cP e2 in
@@ -192,11 +196,38 @@ and unify_flex_syn (sign, cG) cP flex e1 e2 =
   | SCtx, SCtx -> cG, []
   | SBCtx cP, SBCtx cP' -> unify_flex_bctx (sign, cG) flex cP cP'
   | Star, Star -> cG, []
+  | Unbox(Var n, _, _), Unbox (Var m, _, _) when n = m -> cG, [] (* MMM *)
+  | Unbox(Var n, s, cP'), _ when is_flex n ->
+     if not (occur_check_syn sign cP n e2') then
+       try
+         match apply_inv_subst e2' s with
+         | None -> raise (Unification_failure (Expressions_dont_unify_syn(flex, e1', e2')))
+         | Some e ->
+            let e' = Whnf.whnf sign (TermBox (cP', e)) in
+            ctx_subst (n, e') (rem n cG), [n, e']
+       with
+         Inv_fail -> raise (Unification_failure (Expressions_dont_unify_syn(flex, e1', e2')))
+     else
+       raise (Unification_failure(Occur_check_syn (n, e2)))
+  | _, Unbox(Var n, s, cP') when is_flex n ->
+     if not (occur_check_syn sign cP n e1') then
+       try
+         match apply_inv_subst e1' s with
+         | None -> raise (Unification_failure (Expressions_dont_unify_syn(flex, e1', e2')))
+         | Some e ->
+            let e' =  Whnf.whnf sign (TermBox (cP', e)) in
+            ctx_subst (n, e') (rem n cG), [n, e']
+       with
+         Inv_fail -> raise (Unification_failure (Expressions_dont_unify_syn(flex, e1', e2')))
+     else
+       raise (Unification_failure(Occur_check_syn (n, e1)))
+
   | Unbox(e1, s1, cP1), Unbox(e2, s2, cP2) ->
      let cG', sigma = unify_flex_syn (sign, cG) cP flex s1 s2 in
-     let cP1' = simul_subst_on_bctx sigma cP1 in
-     let cG'', sigma' = unify_flex_bctx (sign, cG') flex cP1' (simul_subst_on_bctx sigma cP2) in
-     let sigma0 = sigma' @ sigma in
+     let cG'' = cG' in
+     (* let cP1' = simul_subst_on_bctx sigma cP1 in *)
+     (* let cG'', sigma' = unify_flex_bctx (sign, cG') flex cP1' (simul_subst_on_bctx sigma cP2) in *)
+     let sigma0 = (* sigma' @ *) sigma in
      let cG''', sigma'' = unify_flex (sign, cG'') flex (simul_subst sigma0 e1) (simul_subst sigma0 e2) in
      cG''', sigma'' @ sigma0
   | SConst n, SConst n' ->

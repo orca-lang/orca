@@ -10,48 +10,6 @@ exception Matching_failure of pat * exp
 exception Matching_syn_failure of syn_pat * syn_exp
 exception Stuck
 
-exception Inv_fail
-
-let apply_inv e s =
-  let rec add_id_cdot n s =
-    if n = 0 then s
-    else CDot(add_id_cdot (n-1) s, n-1)
-  in
-  let rec apply_inv e s =
-    let rec apply_inv' n s cnt =
-      match s with
-      | CDot (s, m) when n = m -> BVar cnt
-      | CDot (s, _) -> apply_inv' n s (cnt+1)
-      | CShift m when n < m -> raise Inv_fail
-      | CShift m -> BVar (n - m)
-      | CEmpty -> raise Inv_fail
-    in
-    match e, s with
-    | e, CShift 0 -> e
-    | BVar n, _ -> apply_inv' n s 0
-    | Star, _ -> Star
-    | SPi(tel, t'),_ ->
-      SPi(List.map (fun (i,x,e) -> i, x, apply_inv e s) tel, apply_inv t' (add_id_cdot (List.length tel) s))
-    | Lam (x, e), _ -> Lam(x, apply_inv e (CDot (s, 0)))
-    | AppL (e, es), _ -> AppL(apply_inv e s, List.map (fun e -> apply_inv e s) es)
-    | SBCtx cP, _ -> SBCtx cP
-    | Clos (e, s', cP), _ -> Clos(e, apply_inv s' s, cP)
-    | Empty, _ -> Empty
-    | Shift n, CShift m when n >= m -> Shift (n - m)
-    | Shift n, CShift _ -> raise (Error.Error "Shift too long")
-    | Shift n, CEmpty -> Empty
-    | Shift n, CDot(_,_) -> assert false
-
-    | Dot (s, e), s' -> Dot (apply_inv s s', apply_inv e s')
-    | Comp _, _-> assert false
-    | ShiftS _, _-> assert false
-    | SCtx, _ -> SCtx
-    | SConst n, _ -> SConst n
-    | Unbox(e, s', cP), _ -> Unbox (e, apply_inv s' s, cP)
-  in
-  try Some (apply_inv e s)
-  with Inv_fail -> None
-
 let cong_stel tel s cP =
   let rec ninja tel i cP' =
     match tel with
@@ -215,10 +173,17 @@ and rewrite (sign : signature) cP (e : syn_exp) : syn_exp =
     | AppL(h, []) -> w h
     | SPi (tel, SPi (tel', t)) -> w (SPi (tel @ tel', t))
 
-    | Unbox(TermBox(cP, e), s, cP') when cP = cP' -> w (Clos(e, s, cP'))
-    | Unbox(TermBox(cP, e), s, cP') -> raise (Error.Violation "Okay they don't always match. Good to know")
-    | Unbox(Box(cP, e), s, cP') when cP = cP' -> w (Clos(e, s, cP'))
-    | Unbox(Box(cP, e), s, cP') -> raise (Error.Violation "Okay they don't always match. Good to know")
+    | Unbox(e, s, cP') ->
+       begin match whnf sign e with
+       | TermBox (cP, e) -> w (Clos(e, s, cP)) (* MMMMM what about cP = cP' condition? *)
+       | e -> Unbox (e, s, cP')
+       end
+
+    (* | Unbox(TermBox(cP, e), s, cP') -> raise (Error.Violation ("Okay they don't always match. Good to know\n cP = " *)
+    (*                                                            ^ print_bctx cP ^ "\n cP' = " ^ print_bctx cP')) *)
+    (* | Unbox(Box(cP, e), s, cP') when cP = cP' -> w (Clos(e, s, cP')) *)
+    (* | Unbox(Box(cP, e), s, cP') -> raise (Error.Violation ("Okay they don't always match. Good to know\n cP = " *)
+    (*                                                            ^ print_bctx cP ^ "\n cP' = " ^ print_bctx cP')) *)
 
 
   (* Syntactic rewriting rules *)
