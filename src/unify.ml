@@ -123,9 +123,10 @@ let rec unify_flex (sign, cG) flex e1 e2 =
   let unify_many cG e1 e2 = unify_flex_many (sign, cG) flex e1 e2 in
   let unify_pi = unify_flex_pi (sign, cG) flex in
   let is_flex n = List.mem n flex in
-  let e1', e2' =  Whnf.whnf sign e1, Whnf.whnf sign e2 in
-  Debug.print ~verbose:true (fun () -> "Unifying expressions\ne1 = " ^ print_exp e1
-                        ^ "\ne2 = " ^ print_exp e2 ^ "\ne1' = " ^ print_exp e1' ^ "\ne2' = " ^ print_exp e2');
+  let e1', e2' =  Whnf.normalize sign e1, Whnf.normalize sign e2 in
+  Debug.print ~verbose:true (fun () -> "Unifying expressions\ne1 = " ^ Pretty.print_exp cG e1
+    ^ "\ne2 = " ^ Pretty.print_exp cG e2 ^ "\ne1' = " ^ Pretty.print_exp cG e1'
+    ^ "\ne2' = " ^ Pretty.print_exp cG e2');
   match e1', e2' with
   | Set n , Set n' when n = n' -> cG, []
   | Set n, Set n' -> raise (Unification_failure (Universes_dont_match (n, n')))
@@ -172,9 +173,11 @@ and unify_flex_syn (sign, cG) cP flex e1 e2 =
   let is_flex n = List.mem n flex in
   let unify_spi = unify_flex_spi (sign, cG) cP flex in
   let unify_many_syn e1 e2 = unify_flex_many_syn (sign, cG) cP flex e1 e2 in
-  let e1', e2' =  Whnf.rewrite sign cP e1, Whnf.rewrite sign cP e2 in
-  Debug.print ~verbose:true (fun () -> "Unifying syntactic expressions\ne1 = " ^ print_syn_exp e1
-                        ^ "\ne2 = " ^ print_syn_exp e2 ^ "\ne1' = " ^ print_syn_exp e1' ^ "\ne2' = " ^ print_syn_exp e2');
+  let e1', e2' =  Whnf.normalize_syn sign cP e1, Whnf.normalize_syn sign cP e2 in
+  Debug.print ~verbose:true (fun () -> "Unifying syntactic expressions in context " ^ Pretty.print_ctx (Whnf.whnf_ctx sign cG)
+    ^ "\ne1 = " ^ Pretty.print_syn_exp cG cP e1 ^ "\ne2 = " ^ Pretty.print_syn_exp cG cP e2
+    ^ "\ne1' = " ^ Pretty.print_syn_exp cG cP e1'
+    ^ "\ne2' = " ^ Pretty.print_syn_exp cG cP e2');
   match e1', e2' with
   | SPi (tel, t), SPi(tel', t') -> unify_spi tel t tel' t'
   | Lam(_,e), Lam(xs, e') -> unify_flex_syn (sign, cG) (bctx_from_lam cP xs) flex e e'
@@ -196,6 +199,34 @@ and unify_flex_syn (sign, cG) cP flex e1 e2 =
   | SCtx, SCtx -> cG, []
   | SBCtx cP, SBCtx cP' -> unify_flex_bctx (sign, cG) flex cP cP'
   | Star, Star -> cG, []
+  (* (\* This is comparing eta long and eta short versions *\) *)
+  | Unbox(Var n, s, _), Lam (xs, (AppL (Unbox (Var m, s', _), es))) when n = m ->
+    Debug.print (fun () -> "Hello!");
+    let n = List.length xs in
+    let rec is_eta n =
+      function
+      | BVar m :: es when n = m -> is_eta (n-1) es
+      | [] -> true
+      | _ -> false
+    in
+    if is_eta (n-1) es then
+      unify_flex_syn (sign, cG) cP flex s' (Comp (Shift n, bctx_from_lam cP xs, s))
+    else
+      raise (Unification_failure(Expressions_dont_unify_syn (flex, e1', e2')))
+  | Lam (xs, (AppL (Unbox (Var m, s', _), es))), Unbox(Var n, s, _) when n = m  ->
+    Debug.print (fun () -> "Hello!!");
+    let n = List.length xs in
+    let rec is_eta n =
+      function
+      | BVar m :: es when n = m -> is_eta (n-1) es
+      | [] -> true
+      | _ -> false
+    in
+    if is_eta (n-1) es then
+      unify_flex_syn (sign, cG) cP flex s' (Comp (Shift n, bctx_from_lam cP xs, s))
+    else
+      raise (Unification_failure(Expressions_dont_unify_syn (flex, e1', e2')))
+
   | Unbox(Var n, _, _), Unbox (Var m, _, _) when n = m -> cG, [] (* MMM *)
   | Unbox(Var n, s, cP'), _ when is_flex n ->
      if not (occur_check_syn sign cP n e2') then

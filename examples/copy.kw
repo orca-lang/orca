@@ -34,8 +34,8 @@ def oft-copy : (g : ctx) -> (m : (g |- tm)) -> (t : |- tp) -> (g |- oft m t[^]) 
 | g one unit t-unit => t-unit
 | g (app m n) t (t-app .m .n (s[^]) .(t[^]) d1 d2) =>
   t-app (copy g m) (copy g n) s[^] t[^] (oft-copy g m (arr s[^] t[^]) d1) (oft-copy g n s[^] d2)
-(*) | g (lam m) (arr s[^] t[^]) (t-lam .m .(s[^]) .(t[^]) d) =>
-(*)   t-lam (\x.copy (g,x:tm) (m[^1] ' x)) s[^] t[^] (\x. \u. (oft-copy (g,x:tm,oft x s[^]) (m[^2] ' x) t (d[^2] ' x ' u)))
+| g (lam m) (arr s[^] t[^]) (t-lam .m .(s[^]) .(t[^]) d) =>
+  t-lam (\x.copy (g,x:tm) (m ' x)) s[^] t[^] (\x. \u. (oft-copy (g,x:tm,oft x s[^]) (m ' x) t (d ' x ' u)))
 
 (*) def oft-copy-wkn : (g : ctx) -> (m : (g |- tm)) -> (t : |- tp) -> (g |- oft m t[^]) -> (g,x:tm |- oft ((copy g m)[^1]) t[^]) where
 (*) | g one unit t-unit => t-unit

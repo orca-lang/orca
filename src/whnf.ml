@@ -111,7 +111,7 @@ and reduce_with_clauses sign sp cls =
 
 
 and whnf (sign : signature) (e : exp) : exp =
-  Debug.print ~verbose:true  (fun () -> "Computing the whnf of " ^ print_exp e) ;
+  (* Debug.print ~verbose:true  (fun () -> "Computing the whnf of " ^ print_exp e) ; *)
   Debug.indent();
   let res = match e with
     (* this removes degenerate applications should they occur *)
@@ -155,17 +155,17 @@ and whnf (sign : signature) (e : exp) : exp =
     | e -> e
   in
   Debug.deindent();
-  Debug.print ~verbose:true  (fun () -> "====> " ^ print_exp res);
+  (* Debug.print ~verbose:true  (fun () -> "====> " ^ print_exp res); *)
   res
 
 and rewrite (sign : signature) cP (e : syn_exp) : syn_exp =
   let w e = rewrite sign cP e in
   let dmsg msg e' =
-    Debug.print ~verbose:true  (fun () -> "Rewriting rule: " ^ msg);
-    Debug.print ~verbose:true (fun () -> "\ne = " ^ print_syn_exp e ^ "\ne' = " ^ print_syn_exp (e' ()));
+    Debug.print ~verbose:true (fun () -> "Rewriting rule: " ^ msg);
+    Debug.print ~verbose:true (fun () -> "\ne = " ^ Pretty.print_syn_exp [] cP e ^ "\ne' = " ^ Pretty.print_syn_exp [] cP (e' ()));
     e' ()
   in
-  Debug.print ~verbose:true  (fun () -> "Rewriting " ^ print_syn_exp e);
+  (* Debug.print ~verbose:true  (fun () -> "Rewriting " ^ print_syn_exp e); *)
   Debug.indent ();
   let res = match e with
 
@@ -225,7 +225,7 @@ and rewrite (sign : signature) cP (e : syn_exp) : syn_exp =
   | Clos(BVar 0, Dot (s, e), _) -> w (dmsg "FVarsCons" (fun () -> e))
 
   (* FVarLift 1 *)
-  | Clos(BVar i, ShiftS (n, s), _) when i < n -> (dmsg "FVarLift 1" (fun () -> (BVar 0)))
+  | Clos(BVar i, ShiftS (n, s), _) when i < n -> (dmsg "FVarLift 1" (fun () -> (BVar i)))
 
   (* FVarLift 2 *)
   | Clos(BVar i, Comp(s2, cP, ShiftS (n, s1)), _) when i < n -> w (dmsg "FVarLift 2" (fun () -> (Clos(BVar i, s2, cP))))
@@ -292,6 +292,7 @@ and rewrite (sign : signature) cP (e : syn_exp) : syn_exp =
   (* Congruence rules *)
   | Clos (SConst n, _, _) -> dmsg "CongClosConst" (fun () -> (SConst n))
   | Clos (Clos (e, s1, cP1), s2, cP2) -> w (dmsg "CongClosClos" (fun () -> (Clos (e, Comp(s2, cP2, s1), cP1))))
+  | Clos (Unbox (e, s1, cP1), s2, cP2) -> w (dmsg "CongClosUnbox" (fun () -> (Unbox (e, Comp(s2, cP2, s1), cP1))))
   | Clos (AppL(e, es), s, cP) -> w (dmsg "CongClosAppL" (fun () -> (AppL(Clos(e, s, cP), List.map (fun e-> Clos(e, s, cP)) es))))
   | Clos (Lam (xs, e), s, cP) ->
      (dmsg "CongClosLam"
@@ -359,47 +360,83 @@ and rewrite (sign : signature) cP (e : syn_exp) : syn_exp =
 
   in
   Debug.deindent ();
-  Debug.print ~verbose:true  (fun () -> "===> " ^ print_syn_exp res);
+  (* Debug.print ~verbose:true  (fun () -> "===> " ^ print_syn_exp res); *)
   res
 
-(* let rec normalize sign e = *)
-(*   let norm e = normalize sign e in *)
-(*   match whnf sign e with *)
-(*   | Set n -> Set n *)
-(*   | Star -> Star *)
-(*   | Pi (tel, e) -> *)
-(*      let tel' = List.map (fun (i, x, t) -> i, x, norm t) tel in *)
-(*      let e' = norm e in *)
-(*      Pi (tel', e') *)
-(*   | SPi (tel, e) -> *)
-(*      let tel' = List.map (fun (i, x, t) -> i, x, norm t) tel in *)
-(*      let e' = norm e in *)
-(*      SPi (tel', e') *)
-(*   | Box (cP, e) -> *)
-(*      Box (normalize_bctx sign cP, norm e) *)
-(*   | TermBox (cP, e) -> *)
-(*      TermBox (normalize_bctx sign cP, norm e) *)
-(*   | Ctx -> Ctx *)
-(*   | Const n -> Const n *)
-(*   | Dest n -> Dest n *)
-(*   | Var n -> Var n *)
-(*   | Fn (ns, e) -> Fn (ns, norm e) *)
-(*   | App (e, es) -> App(norm e, List.map norm es) *)
-(*   | Lam (ns, e) -> Lam (ns, norm e) *)
-(*   | AppL (e, es) -> AppL (norm e, List.map norm es) *)
-(*   | BVar i -> BVar i *)
-(*   | Clos (e, s, cP) -> Clos (norm e, norm s, normalize_bctx sign cP) *)
-(*   | BCtx cP -> BCtx (normalize_bctx sign cP) *)
-(*   | Annot (e, t) -> Annot (norm e, norm t) *)
-(*   | Hole n -> Hole n *)
-(*   | Empty -> Empty *)
-(*   | Dot (s, e) -> Dot (norm s, norm e) *)
-(*   | Comp (s1, cP, s2) -> Comp (norm s1, normalize_bctx sign cP, norm s2) *)
-(*   | Shift n -> Shift n *)
-(*   | ShiftS (n, s) -> ShiftS (n, norm s) *)
+let rec whnf_ctx sign = function
+  | [] -> []
+  | (x, t) :: cG -> (x, whnf sign t) :: whnf_ctx sign cG
 
-(* and normalize_bctx sign cP = *)
-(*   match cP with *)
-(*   | CtxVar n -> CtxVar n *)
-(*   | Nil -> Nil *)
-(*   | Snoc(cP, x, t) -> Snoc(normalize_bctx sign cP, x, normalize sign t) *)
+let rec whnf_bctx sign = function
+  | Nil -> Nil
+  | CtxVar g -> CtxVar g
+  | Snoc (cP, x, t) ->
+    let cP' = whnf_bctx sign cP in
+    Snoc (cP', x, rewrite sign cP' t)
+
+let rec whnf_stel sign cP = function
+  | [] -> []
+  | (i, x, t) :: tel -> (i, x, rewrite sign cP t) :: (whnf_stel sign (Snoc(cP, x, t)) tel)
+
+let rec normalize sign (e : exp) =
+  let norm e = normalize sign e in
+  match whnf sign e with
+  | Set n -> Set n
+  | Pi (tel, t) ->
+    let tel' = List.map (fun (i, x, t) -> i, x, norm t) tel in
+    let t' = norm t in
+    Pi (tel', t')
+  | Box (cP, e) ->
+    let cP' = normalize_bctx sign cP in
+    Box (cP', normalize_syn sign cP e)
+  | Ctx  -> Ctx
+  | Const n -> Const n
+  | Dest n -> Dest n
+  | Var x -> Var x
+  | Fn (xs, e) -> Fn (xs, norm e)
+  | App (e, es) -> App(norm e, List.map norm es)
+  | BCtx cP -> BCtx (normalize_bctx sign cP)
+  | Annot (e, t) -> Annot (norm e, norm t)
+  | Hole i -> Hole i
+  | TermBox (cP, e) ->
+    let cP' = normalize_bctx sign cP in
+    Box (cP', normalize_syn sign cP e)
+
+and normalize_syn sign cP e =
+  let norm e = normalize_syn sign cP e in
+   match rewrite sign cP e with
+   | Lam (xs, t) -> Lam (xs, normalize_syn sign (bctx_from_lam cP xs) t)
+   | AppL (e, es) -> AppL (norm e, List.map norm es)
+   | SConst n -> SConst n
+   | BVar i -> BVar i
+   | Clos (e, s, cP') ->
+     let cP'' = normalize_bctx sign cP' in
+     Clos (normalize_syn sign cP'' e, norm s, cP'')
+   | Empty -> Empty
+   | Dot (s,e) -> Dot (norm s, norm e)
+   | Comp (e1, cP, e2) ->
+     let cP' = normalize_bctx sign cP in
+     Comp(norm e1, cP', normalize_syn sign cP' e2)
+   | Shift n -> Shift n
+   | ShiftS (n, s) -> ShiftS (n, normalize_syn sign (drop_suffix cP n) s)
+   | Star  -> Star
+   | SPi (tel, t) ->
+     let f (tel, cP) (i, x, t) =
+       let t' = normalize_syn sign cP t in
+       (tel @ [i, x, t']), Snoc(cP, x, t')
+     in
+     let tel', cP' = List.fold_left f ([], cP) tel in
+     SPi (tel', normalize_syn sign cP' t)
+   | SBCtx cP -> SBCtx (normalize_bctx sign cP)
+   | SCtx  -> SCtx
+   | Unbox (e,s, cP') ->
+     let cP'' = normalize_bctx sign cP' in
+     Unbox (normalize sign e, norm s, cP'')
+
+and normalize_bctx sign cP =
+  match cP with
+  | CtxVar n -> CtxVar n
+  | Nil -> Nil
+  | Snoc(cP, x, t) ->
+    let cP' = normalize_bctx sign cP in
+    Snoc(cP', x, normalize_syn sign cP' t)

@@ -151,9 +151,12 @@ and fmt_exp cG pps = function
             (fmt_syn_exp cG cP) e
 
   | TermBox (cP, e) ->
-     Fmt.pf pps "(%a :> %a)"
-            (fmt_bctx cG) cP
+     Fmt.pf pps "%a"
             (fmt_syn_exp cG cP) e
+
+     (* Fmt.pf pps "(%a :> %a)" *)
+     (*        (fmt_bctx cG) cP *)
+     (*        (fmt_syn_exp cG cP) e *)
 
   | Fn (xs, e) ->
      let cG' = (List.map (fun x -> x, dt) xs) @ cG in
@@ -184,18 +187,19 @@ and fmt_syn_exp cG cP pps = function
             (fmt_syn_exp cG cP) e2
 
   | Unbox (e1, e2, cP') ->
+     (* Fmt.pf pps "%a" *)
+     (*        (fmt_exp cG) e1 *)
      Fmt.pf pps "%a[%a]"
             (fmt_exp cG) e1
             (fmt_syn_exp cG cP) e2
 
-
   | Comp(e1, _, e2) ->
-     Fmt.pf pps "%a o %a"
+     Fmt.pf pps "(%a) o (%a)"
             (fmt_syn_exp cG cP) e1
             (fmt_syn_exp cG cP) e2
 
   | ShiftS (n, e) ->
-     Fmt.pf pps "⇑%d %a"
+     Fmt.pf pps "⇑%d (%a)"
             n
             (fmt_syn_exp cG cP) e
 
@@ -209,11 +213,13 @@ and fmt_syn_exp cG cP pps = function
             (list ~sep:nbsp (fmt_syn_exp cG cP)) es
 
   | BVar i ->
-     begin match beautify_idx i cP with
-     | None -> Fmt.pf pps "i%a"
-                      bound_var i
-     | Some n -> bound_name pps n
-     end
+    Fmt.pf pps "i%a"
+      bound_var i
+     (* begin match beautify_idx i cP with *)
+     (* | None -> Fmt.pf pps "i%a" *)
+     (*                  bound_var i *)
+     (* | Some n -> bound_name pps n *)
+     (* end *)
   | Lam (xs, e) ->
      let xs' = List.map fst xs in
      let cP' = bctx_of_names xs' cP in
@@ -493,3 +499,5 @@ let print_ctx cP = produce_string fmt_ctx cP
 let print_syn_exp cG cP e = produce_string (fmt_syn_exp cG cP) e
 let print_tel_entry cG te = produce_string (fmt_tel_entry cG) te
 let print_tel cG tel = produce_string (fmt_tel cG) tel
+let print_stel_entry cG cP te = produce_string (fmt_stel_entry cG cP) te
+let print_stel cG cP tel t = produce_string (fmt_stel cG cP) (tel, t)

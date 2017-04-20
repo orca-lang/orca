@@ -85,7 +85,7 @@ let compute_wkn (sign, cG) cP cP' =
 
 (* infers the type and returns the internal term and its type *)
 let rec infer (sign, cG : signature * I.ctx) (e : A.exp) : I.exp * I.exp =
-  Debug.print (fun () -> "Infer called with: " ^ AP.print_exp e ^ " in context: " ^ IP.print_ctx cG);
+  Debug.print (fun () -> "Infer called with: " ^ AP.print_exp e ^ " in context: " ^ PP.print_ctx (Whnf.whnf_ctx sign cG));
   Debug.indent() ;
   let res_e, res_t  =
     match e with
@@ -143,11 +143,12 @@ and infer_type (sign, cG : signature * I.ctx) (s : A.exp) : I.exp * I.universe =
      raise (Error.Error "Not a universe.")
 
 and check (sign , cG : signature * I.ctx) (e : A.exp) (t : I.exp) : I.exp =
+  let t' = Whnf.whnf sign t in
   Debug.print (fun () ->
       "Checking " ^ AP.print_exp e ^ "\nagainst "
-      ^ Pretty.print_exp cG t ^ "\nin context: " ^ IP.print_ctx cG);
+      ^ Pretty.print_exp cG t' ^ "\nin context: " ^ Pretty.print_ctx (Whnf.whnf_ctx sign cG));
   Debug.indent();
-  let res_e = match e, Whnf.whnf sign t with
+  let res_e = match e, t' with
     (* checkable terms *)
     | A.Hole n, _ -> I.Hole n  (* holes are always of the right type *)
     | A.Fn (fs, e), I.Pi(tel, t) ->
@@ -234,7 +235,7 @@ and check_pi (sign, cG) tel t =
 
 and check_syn_type (sign, cG) cP (e : A.exp) : I.syn_exp =
   Debug.print (fun () -> "Checking syntactic type " ^ AP.print_exp e
-                         ^ "\nin context " ^ IP.print_ctx cG);
+                         ^ "\nin context " ^ PP.print_ctx (Whnf.whnf_ctx sign cG));
   Debug.indent ();
   let res =
     match e with
@@ -275,12 +276,13 @@ and check_ctx (sign, cG) g =
 
 
 and check_syn (sign, cG) cP (e : A.exp) (t : I.syn_exp) =
+  let t' = Whnf.rewrite sign cP t in
   Debug.print (fun () -> "Checking syntactic expression " ^ AP.print_exp e
-    ^ "\nagainst type " ^ Pretty.print_syn_exp cG cP t ^ "\nin bound context "
-    ^ IP.print_bctx cP ^ "\nand context " ^ IP.print_ctx cG);
+    ^ "\nagainst type " ^ Pretty.print_syn_exp cG cP t' ^ "\nin bound context "
+    ^ PP.print_bctx cG (Whnf.whnf_bctx sign cP) ^ "\nand context " ^ PP.print_ctx (Whnf.whnf_ctx sign cG));
   Debug.indent ();
   let res =
-    match e, Whnf.rewrite sign cP t with
+    match e, t' with
     | A.Lam (fs, e), I.SPi (tel, t) ->
        let cP', tel' = bctx_of_lam_stel fs tel cP in
        let rec lam_tel fs tel =
@@ -319,8 +321,8 @@ and check_syn (sign, cG) cP (e : A.exp) (t : I.syn_exp) =
           Unify.unify_syn (sign, cG) cP t t'
       with
         Unify.Unification_failure prob ->
-          raise (Error.Error ("Checking syntactic term " ^ AP.print_exp e ^ " against type " ^ IP.print_syn_exp t
-                              ^ "\nIn context " ^ IP.print_bctx cP
+          raise (Error.Error ("Checking syntactic term " ^ AP.print_exp e ^ " against type " ^ PP.print_syn_exp cG cP t'
+                              ^ "\nIn context " ^ PP.print_bctx cG (Whnf.whnf_bctx sign cP)
                             ^ "\nFailed with unification problem:\n" ^ Unify.print_unification_problem prob))
       in
       simul_subst_syn sigma e'
@@ -332,7 +334,7 @@ and check_syn (sign, cG) cP (e : A.exp) (t : I.syn_exp) =
 
 and infer_syn (sign, cG) cP (e : A.exp) =
   Debug.print (fun () -> "Inferring type of syntactic expression " ^ AP.print_exp e
-    ^ "\nin bound context " ^ IP.print_bctx cP ^ "\nand context " ^ IP.print_ctx cG);
+    ^ "\nin bound context " ^ PP.print_bctx cG (Whnf.whnf_bctx sign cP) ^ "\nand context " ^ PP.print_ctx (Whnf.whnf_ctx sign cG));
   Debug.indent ();
   let res =
     match e with
@@ -367,8 +369,17 @@ and infer_syn (sign, cG) cP (e : A.exp) =
       end
 
     | A.Var x ->
-       Debug.print (fun () -> "Variable " ^ print_name x ^ " is being looked up in context " ^ IP.print_ctx cG);
-       begin match lookup_ctx_fail cG x with
+       Debug.print (fun () -> "Variable " ^ print_name x ^ " is being looked up in context " ^ PP.print_ctx (Whnf.whnf_ctx sign cG));
+      begin match lookup_ctx_fail cG x with
+      (* | I.Box(cP', I.SPi(tel, t')) -> *)
+      (*   let xs = List.map (fun (_, x, t) -> x, t) tel in *)
+      (*   let rec eta_tail = function *)
+      (*     | 0 -> [] *)
+      (*     | m -> I.BVar m :: eta_tail (m-1) *)
+      (*   in *)
+      (*   let cP'' = bctx_from_lam cP' xs in *)
+      (*   let sigma = compute_wkn (sign, cG) cP cP'' in *)
+      (*   I.Lam(xs, I.AppL(I.Unbox(I.Var x, sigma, cP''), eta_tail (List.length xs))), I.Clos(t', sigma, cP'') *)
        | I.Box(cP', t') ->
           let sigma = compute_wkn (sign, cG) cP cP' in
           I.Unbox(I.Var x, sigma, cP'), I.Clos(t', sigma, cP')
@@ -387,8 +398,8 @@ and infer_syn (sign, cG) cP (e : A.exp) =
 
     | A.BVar i ->
        let t = lookup_bound cP i in
-       Debug.print (fun () -> "Looking bound variable " ^ string_of_int i ^ " resulted in type " ^ IP.print_syn_exp t
-                              ^ "\n Context is " ^ IP.print_bctx cP);
+       Debug.print (fun () -> "Looking bound variable " ^ string_of_int i ^ " resulted in type " ^ PP.print_syn_exp cG cP t
+                              ^ "\n Context is " ^ PP.print_bctx cG (Whnf.whnf_bctx sign cP));
        I.BVar i, t
     | A.Clos (e, s) ->
       begin
@@ -409,7 +420,7 @@ and infer_syn (sign, cG) cP (e : A.exp) =
 
 and check_syn_spine (sign, cG) cP sp tel t =
   Debug.print (fun () -> "Checking syn spine:\nsp = " ^ AP.print_exps sp
-                         ^ "\ntel = " ^ IP.print_stel tel);
+                         ^ "\ntel = " ^ PP.print_stel cG cP (Whnf.whnf_stel sign cP tel) (Whnf.rewrite sign cP t));
   Debug.indent ();
   let rec check_spine sp tel t sl cP' =
     let sigma = List.fold_right (fun x sigma -> I.Dot(sigma, x)) sl (I.Shift (List.length sl)) in

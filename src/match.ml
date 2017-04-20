@@ -614,6 +614,8 @@ let check_clause (sign : signature) (f : def_name) (p : A.pats) (telG : I.tel) (
     ^ "\nRHS: " ^ AP.print_rhs rhs);
   try
     let cD, sigma = check_lhs sign p (ctx_of_tel telG) in
+    (* cD is currently a telescope so it's in reverse of what we want elsewhere *)
+    let cD = List.rev cD in
     Debug.print (fun () -> "LHS was checked:\n cD = " ^ IP.print_ctx cD ^ "\n sigma = "^ IP.print_pats sigma ^ "\n telG = " ^ IP.print_tel telG);
     match rhs with
     | A.Just e ->
