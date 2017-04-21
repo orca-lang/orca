@@ -60,7 +60,10 @@ let compute_wkn (sign, cG) cP cP' =
     in
     check_lists ts1 ts2 cP1
   else
-    raise (Error.Error ("Cannot infer the substitution"))
+    if b2 = None && ts2 = [] then
+      I.Empty
+    else
+      raise (Error.Error ("Cannot infer the substitution"))
 
 
 
