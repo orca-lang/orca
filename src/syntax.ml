@@ -29,7 +29,7 @@ module Ext = struct
     | Ident of name
     | BVar of int
     | Clos of exp * exp
-    | EmptyS
+    | Empty
     | Shift of int
     | Comma of exp * exp
     | Semicolon of exp * exp
@@ -44,7 +44,7 @@ module Ext = struct
     | PPar of name
     | PConst of name * pat list
     | PClos of name * exp
-    | PEmptyS
+    | PEmpty
     | PShift of int
     | PDot of pat * pat
     | PNil
@@ -90,7 +90,7 @@ module Apx = struct
     | AppL of exp * exp list
     | BVar of index
     | Clos of exp * exp
-    | EmptyS
+    | Empty
     | Shift of int
     | Dot of exp * exp
     | Snoc of exp * string * exp
@@ -112,7 +112,7 @@ module Apx = struct
     | PConst of def_name * pat list
     | PClos of name * pat_subst
     | SInacc of exp * pat_subst
-    | PEmptyS
+    | PEmpty
     | PShift of int
     | PDot of pat * pat
     | PNil

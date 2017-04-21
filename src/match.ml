@@ -88,7 +88,7 @@ let matching (p : I.pat) (q : pat) : pats =
        | I.PUnbox (n, s, cP'), A.PClos (m, s') when s = s' -> [Int (I.PTBox (cP, (I.PUnbox (m, s, cP'))))]
        | I.PUnbox (n, s, cP'), _ -> [Apx q] (* need to apply inverse sub to q *)
        | I.SInacc _, _ -> []
-       | I.PEmpty, A.PEmptyS -> []
+       | I.PEmpty, A.PEmpty -> []
        | I.PShift n, A.PShift n' when n = n' -> []
        | I.PBVar i, A.PBVar i' when i = i' -> []
        | I.PSConst (n, ps), A.PConst (n', qs) when n = n' -> List.concat (List.map2 (syn_apx_match cP) ps qs)

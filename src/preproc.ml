@@ -177,7 +177,7 @@ let rec pproc_exp (s : sign) (cG : ctx) (cP : bctx) (e : E.exp) : A.exp =
                              ^ "\n Faild with: " ^  msg))
      in
      A.Clos(e1' , f e2)
-  | E.EmptyS -> A.EmptyS
+  | E.Empty -> A.Empty
   | E.Shift n -> A.Shift n
   | E.Semicolon (e1, e2) -> A.Dot(f e1, f e2)
   | E.Comma (e1, e2) ->
@@ -307,7 +307,7 @@ let rec collect_pat_vars (s : sign) cG cP p =
   | E.PConst (c, ps) ->
     List.fold_left (fun cG p -> collect_pat_vars s cG cP p) cG ps
   | E.PClos (x, e) -> collect_pat_ctx s cG cP x
-  | E.PEmptyS -> cG
+  | E.PEmpty -> cG
   | E.PShift i -> cG
   | E.PDot (p1, p2) ->
     let cG' = collect_pat_vars s cG cP p1 in
@@ -337,7 +337,7 @@ let rec pproc_pat (s : sign) cG cP p =
      end
   | E.PClos (x, e) ->
     let rec pat_subst_of_exp = function
-      | E.EmptyS -> CEmpty
+      | E.Empty -> CEmpty
       | E.Shift n -> CShift n
       | E.Semicolon (sigma, P(_,E.Ident n)) ->
         let n' = match find_name_pat s cG cP n with
@@ -359,7 +359,7 @@ let rec pproc_pat (s : sign) cG cP p =
   | E.PConst (c, ps) ->
     let ps' = List.map (pproc_pat s cG cP) ps in
     A.PConst (c, ps')
-  | E.PEmptyS -> A.PEmptyS
+  | E.PEmpty -> A.PEmpty
   | E.PShift i -> A.PShift i
   | E.PDot (p1, p2) ->
     A.PDot (f p1, f p2)

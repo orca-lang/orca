@@ -28,7 +28,7 @@ module Ext = struct
     | Ident n -> n
     | BVar i -> "i" ^ string_of_int i
     | Clos (e1, e2) -> "([] " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
-    | EmptyS -> "^"
+    | Empty -> "^"
     | Shift n -> "^" ^ string_of_int n
     | Comma (e1, e2) -> "(, " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
     | Semicolon (e1, e2) -> "(; " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
@@ -45,7 +45,7 @@ module Ext = struct
     | PConst (n, ps) -> "(" ^ n ^ " " ^ (String.concat " " (List.map (fun p -> "(" ^ print_pat p ^ ")") ps)) ^ ")"
     | PClos (n, e) -> "([] " ^ n ^ " " ^ print_exp e ^ ")"
     | PBox (p1, p2) -> "(:> " ^ print_pat p1 ^ " " ^ print_pat p2 ^ ")"
-    | PEmptyS -> "^"
+    | PEmpty -> "^"
     | PShift i -> "(^ " ^ string_of_int i ^ ")"
     | PDot (p1, p2) -> "(; " ^ print_pat p1 ^ " " ^ print_pat p2 ^ ")"
     | PNil -> "0"
@@ -96,7 +96,7 @@ module Apx = struct
     | Var n -> Name.print_name n
     | BVar i -> "i" ^ string_of_int i
     | Clos (e1, e2) -> "(" ^ print_exp e1 ^ " [" ^ print_exp e2 ^ "])"
-    | EmptyS -> "^"
+    | Empty -> "^"
     | Shift n -> "^" ^ string_of_int n
     | Dot (e1, e2) -> "(" ^ print_exp e1 ^ " ; " ^ print_exp e2 ^ ")"
     | Snoc (e1, x, e2) -> "(" ^ print_exp e1 ^ ", " ^ x ^ " : " ^ print_exp e2 ^ ")"
@@ -123,7 +123,7 @@ module Apx = struct
     | PConst (n, ps) -> "(" ^ n ^ " " ^ (String.concat " " (List.map (fun p -> "(" ^ print_pat p ^ ")") ps)) ^ ")"
     | PClos (n, s) -> print_name n ^ "[" ^ print_pat_subst s ^ "]"
     | SInacc (e, s) -> "." ^ print_exp e ^ "[" ^ print_pat_subst s ^ "]"
-    | PEmptyS -> "^"
+    | PEmpty -> "^"
     | PShift i -> "^ " ^ string_of_int i
     | PDot (p1, p2) -> "(" ^ print_pat p1 ^ " ; " ^ print_pat p2 ^ ")"
     | PNil -> "0"

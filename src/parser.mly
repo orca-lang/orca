@@ -104,7 +104,7 @@ raw_simple_exp:
 | n = SET {Set n}
 | s = HOLE { Hole s }
 | s = IDENT {Ident s}
-| EMPTYS {EmptyS}
+| EMPTYS {Empty}
 | n = SHIFT {Shift n}
 | n = INDEX {BVar n}
 | NIL {Nil}
@@ -116,7 +116,7 @@ simple_pattern:
 | x = IDENT {PIdent x}
 | DOT e = simple_exp {Inacc e}
 | LPAREN p = pattern RPAREN {p}
-| EMPTYS {PEmptyS}
+| EMPTYS {PEmpty}
 | n = SHIFT {PShift n}
 | NIL {PNil}
 | UNDERSCORE {PUnder}

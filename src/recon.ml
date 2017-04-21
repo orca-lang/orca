@@ -19,7 +19,7 @@ let is_syntax = function
   | A.Var _
   | A.BVar _
   | A.Clos _
-  | A.EmptyS
+  | A.Empty
   | A.Shift _
   | A.Dot _
   | A.Snoc _
@@ -302,7 +302,7 @@ and check_syn (sign, cG) cP (e : A.exp) (t : I.syn_exp) =
        end
 
     | _, I.SCtx -> I.SBCtx(check_ctx (sign, cG) e)
-    | A.EmptyS, I.SBCtx I.Nil -> I.Empty
+    | A.Empty, I.SBCtx I.Nil -> I.Empty
     | A.Shift n, I.SBCtx cP' ->
       let cP'' = drop_suffix cP n in
       let _ = try Unify.unify_bctx (sign, cG) cP' cP''

@@ -64,7 +64,7 @@ and match_syn_pat sign cP p e =
 
 (* | PAnnot (p, e) -> *)
 (* | PClos (n, p) -> *)
-(* | PEmptyS -> *)
+(* | PEmpty -> *)
 (* | PShift i -> *)
 (* | PSubst (p1, p2) -> *)
 (* | PNil -> *)
