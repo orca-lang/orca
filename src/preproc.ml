@@ -301,7 +301,7 @@ let pproc_param s cG (icit, n, e) =
 let rec collect_pat_vars (s : sign) cG cP p =
   match p with
   | E.PIdent n -> collect_pat_ctx s cG cP n
-  | E.Innac e -> cG
+  | E.Inacc e -> cG
   | E.PLam (xs, p) ->
      collect_pat_vars s cG (xs@cP) p
   | E.PConst (c, ps) ->
@@ -351,9 +351,9 @@ let rec pproc_pat (s : sign) cG cP p =
       | _ -> raise (Error.Error ("Closures in patterns can only be applied to meta variables"))
     in
     A.PClos (x', pat_subst_of_exp (content e))
-  | E.Innac e ->
+  | E.Inacc e ->
      Debug.print (fun () -> "Preprocessing inaccessible pattern " ^ EP.print_exp e ^ " in context " ^ print_ctx cG);
-     A.Innac (pproc_exp s cG [] e)
+     A.Inacc (pproc_exp s cG [] e)
   | E.PLam (xs, p) ->
     A.PLam (xs, pproc_pat s cG (xs@cP) p)
   | E.PConst (c, ps) ->

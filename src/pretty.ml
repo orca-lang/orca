@@ -272,7 +272,7 @@ let rec fmt_pat cG pps = function
   | PPar n ->
      Fmt.pf pps "<:%a"
             (comp_var cG) n
-  | Innac e ->
+  | Inacc e ->
      Fmt.pf pps ".%a"
             (fmt_exp cG) e
 
@@ -319,11 +319,11 @@ and fmt_syn_pat cG cP pps = function
             (comp_var cG) n
             fmt_pat_subst psub
 
-  | SInnac (e, CShift 0, _) ->
+  | SInacc (e, CShift 0, _) ->
     Fmt.pf pps ".%a"
       (fmt_exp cG) e
 
-  | SInnac (e, psub, _) ->
+  | SInacc (e, psub, _) ->
      Fmt.pf pps ".%a[%a]"
             (fmt_exp cG) e
             fmt_pat_subst psub

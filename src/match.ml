@@ -78,7 +78,7 @@ let matching (p : I.pat) (q : pat) : pats =
        | I.PConst (n, ps), A.PConst (n', qs) when n = n' -> List.concat (List.map2 apx_match ps qs)
        | I.PConst (n, ps), A.PConst (n', qs) -> raise(Error.Error "Pattern matching does not
  match. (A)")
-       | I.Innac _, _ -> []
+       | I.Inacc _, _ -> []
        | I.PBCtx cP, _ -> assert false
        | I.PTBox (cP, p), q -> syn_apx_match cP p q
        | _ -> assert false
@@ -87,7 +87,7 @@ let matching (p : I.pat) (q : pat) : pats =
        | I.PLam (xs, p), A.PLam (ys, q) -> syn_apx_match (bctx_from_lam cP xs) p q
        | I.PUnbox (n, s, cP'), A.PClos (m, s') when s = s' -> [Int (I.PTBox (cP, (I.PUnbox (m, s, cP'))))]
        | I.PUnbox (n, s, cP'), _ -> [Apx q] (* need to apply inverse sub to q *)
-       | I.SInnac _, _ -> []
+       | I.SInacc _, _ -> []
        | I.PEmpty, A.PEmptyS -> []
        | I.PShift n, A.PShift n' when n = n' -> []
        | I.PBVar i, A.PBVar i' when i = i' -> []
@@ -104,7 +104,7 @@ let matching (p : I.pat) (q : pat) : pats =
        | I.PPar n, I.PPar n' -> [Int(I.PVar n')]
        | I.PConst (n, ps), I.PConst (n', qs) when n = n' -> List.concat (List.map2 int_match ps qs)
        | I.PConst (n, ps), I.PConst (n', qs) -> raise (Error.Error "Pattern matching does not match. (I)")
-       | I.Innac _, _ -> []
+       | I.Inacc _, _ -> []
        | I.PBCtx cP, I.PBCtx cP' -> assert false
        | I.PTBox (cP, p), I.PTBox (cP', q) when cP = cP' -> syn_int_match cP p q
        | _ -> assert false
@@ -112,7 +112,7 @@ let matching (p : I.pat) (q : pat) : pats =
        match p, q with
        | I.PLam (xs, p), I.PLam (ys, q) -> syn_int_match (bctx_from_lam cP xs) p q
        | I.PUnbox (n, s, cP'), _ -> [Int (I.PTBox(cP, q))]
-       | I.SInnac _, _ -> []
+       | I.SInacc _, _ -> []
        | I.PEmpty, I.PEmpty -> []
        | I.PShift n, I.PShift n' when n = n' -> []
        | I.PBVar i, I.PBVar i' when i = i' -> []
@@ -132,16 +132,16 @@ let rec matchings (sigma : I.pats) (p : pats) : pats =
 let rec flexible (p : pats)(cG : I.ctx) : name list =
   match p, cG with
     | [], [] -> []
-    | Int (I.Innac _)::ps, (x, t)::cG'
-    | Int (I.PTBox (_, I.SInnac _))::ps, (x, t)::cG'
-    | Apx (A.SInnac _)::ps, (x, t)::cG'
-    | Apx (A.Innac _)::ps, (x, t)::cG'
+    | Int (I.Inacc _)::ps, (x, t)::cG'
+    | Int (I.PTBox (_, I.SInacc _))::ps, (x, t)::cG'
+    | Apx (A.SInacc _)::ps, (x, t)::cG'
+    | Apx (A.Inacc _)::ps, (x, t)::cG'
     | Apx (A.PWildcard)::ps, (x, t)::cG' -> x::(flexible ps cG')
     | p::ps, (x, t)::cG' -> flexible ps cG'
     | _ -> raise (Error.Violation ("Flexible: length violation."))
 
-let inac_ctx = List.map (fun (_, t) -> I.Innac t)
-let inac_subst = List.map (fun (x, e) -> x, I.Innac e)
+let inac_ctx = List.map (fun (_, t) -> I.Inacc t)
+let inac_subst = List.map (fun (x, e) -> x, I.Inacc e)
 
 let split_flex_unify (sign : signature) sigma0 maybe_g (p1 : pats) (thetatel : I.tel) (ps : pats)
                      (cD1 : I.ctx) (vs : comp_or_syn) (ws : comp_or_syn) =
@@ -351,8 +351,8 @@ let split_rec (sign : signature) (ps : pats) (cD : I.ctx) : I.ctx * I.pats =
     | A.PVar y, (x, t) :: cD2 ->
        search (p1 @ [Apx(A.PVar y)]) ps (cD1 @ [y, t]) (ctx_subst (x, I.Var y) cD2)
 
-    | A.Innac e, (x, t) :: cD2 ->
-      search (p1 @ [Apx(A.Innac e)]) ps (cD1 @ [x, t]) cD2
+    | A.Inacc e, (x, t) :: cD2 ->
+      search (p1 @ [Apx(A.Inacc e)]) ps (cD1 @ [x, t]) cD2
     | A.PWildcard,  (x, t) :: cD2 ->
       search (p1 @ [Apx(A.PWildcard)]) ps (cD1 @ [x, t]) cD2
     | A.PPar y, (x, t) :: cD2 ->
@@ -360,8 +360,8 @@ let split_rec (sign : signature) (ps : pats) (cD : I.ctx) : I.ctx * I.pats =
     | A.PClos (y, s), (x, t) :: cD2 ->
        Debug.print (fun () -> "Hello!");
        split_clos sign p1 (y, s) cD1 (x, t) cD2
-    | A.SInnac (e, s), (x, t) :: cD2 ->
-       search (p1 @ [Apx(A.SInnac (e, s))]) ps (cD1 @ [x, t]) cD2
+    | A.SInacc (e, s), (x, t) :: cD2 ->
+       search (p1 @ [Apx(A.SInacc (e, s))]) ps (cD1 @ [x, t]) cD2
     | A.PLam (xs, p), (x, t) :: cD2 ->
        split_lam sign p1 (xs, Apx p) cD1 (x, t) cD2
 
@@ -371,8 +371,8 @@ let split_rec (sign : signature) (ps : pats) (cD : I.ctx) : I.ctx * I.pats =
     match p, cD2 with
     | I.PVar y, (x, t) :: cD2 ->
        search (p1 @ [Int(I.PVar y)]) ps (cD1 @ [y, t]) (ctx_subst (x, I.Var y) cD2)
-    | I.Innac e, (x, t) :: cD2 ->
-       search (p1 @ [Int(I.Innac e)]) ps (cD1 @ [x, t]) cD2
+    | I.Inacc e, (x, t) :: cD2 ->
+       search (p1 @ [Int(I.Inacc e)]) ps (cD1 @ [x, t]) cD2
     | I.PTBox (cP1, I.PUnbox(n, s, cP2)), (x, t) :: cD2 ->
        search (p1 @ [Int(I.PTBox (cP1, I.PUnbox(n, s, cP2)))]) ps (cD1 @ [x, t]) cD2
     | _ -> raise (Error.Violation ("I bet this will never be raised. p = " ^ IP.print_pat p))
@@ -383,8 +383,8 @@ let split_rec (sign : signature) (ps : pats) (cD : I.ctx) : I.ctx * I.pats =
   (*   | I.PVar y, (x, t) :: cD2 -> *)
   (*      search (p1 @ [Int(I.PVar y)]) ps (cD1 @ [y, t]) (ctx_subst (x, I.Var y) cD2) *)
 
-  (*   | I.Innac e, (x, t) :: cD2 -> *)
-  (*      search (p1 @ [Int(I.Innac e)]) ps (cD1 @ [x, t]) cD2 *)
+  (*   | I.Inacc e, (x, t) :: cD2 -> *)
+  (*      search (p1 @ [Int(I.Inacc e)]) ps (cD1 @ [x, t]) cD2 *)
   (*   | I.PPar y, (x, t) :: cD2 -> *)
   (*      check_ppar sign p1 y cD1 (x, t) cD2 *)
   (*   | I.PTBox(cP, p), cD2 -> *)
@@ -453,8 +453,8 @@ let check_pats (sign : signature) (p : pats) (cG : I.ctx) : I.ctx * I.pats =
   let is_Pvar = function
     | Int (I.PVar _)
     | Int (I.PTBox (_, I.PUnbox _))
-    | Apx (A.SInnac _)
-    | Apx (A.Innac _)
+    | Apx (A.SInacc _)
+    | Apx (A.Inacc _)
     | Apx (A.PVar _) -> true
     | _ -> false
   in
@@ -517,9 +517,9 @@ and check_inacs_syn (sign, cD : signature * I.ctx) (cP : I.bctx) (p : A.pats) (s
 
 and check_inac (sign, cD : signature * I.ctx) (p : A.pat) (q : I.pat) (t : I.exp) : I.pat =
   match p, q with
-  | A.PWildcard, I.Innac e -> I.Innac e
+  | A.PWildcard, I.Inacc e -> I.Inacc e
 
-  | A.Innac ep, I.Innac eq ->
+  | A.Inacc ep, I.Inacc eq ->
      Debug.indent ();
      let ep' = check (sign, cD) ep t in
      let _, sigma = try Unify.unify (sign, cD) ep' eq
@@ -527,7 +527,7 @@ and check_inac (sign, cD : signature * I.ctx) (p : A.pat) (q : I.pat) (t : I.exp
                raise (Error.Error ("Inaccessible pattern check failed with:\n" ^ Unify.print_unification_problem prob))
      in
      Debug.deindent ();
-     I.Innac (simul_subst sigma ep')
+     I.Inacc (simul_subst sigma ep')
   | A.PVar x, I.PVar y when x = y -> I.PVar x
   | A.PPar x, I.PPar y when x = y -> I.PPar x
   | A.PConst (n, sp), I.PConst (n', sq) when n = n' ->
@@ -550,17 +550,17 @@ and check_inac (sign, cD : signature * I.ctx) (p : A.pat) (q : I.pat) (t : I.exp
          | I.Box (cP', t') when cP = cP' -> I.PTBox(cP, check_inac_syn (sign, cD) cP p q t')
          | _ -> raise (Error.Error ("Syntactic pattern was used against a non boxed type: " ^ Pretty.print_exp cD t))
          end
-  | A.Innac _, _ -> raise (Error.Error ("Failed to infer the value of inaccessible pattern when checking that the pattern "
+  | A.Inacc _, _ -> raise (Error.Error ("Failed to infer the value of inaccessible pattern when checking that the pattern "
                                         ^ AP.print_pat p ^ " has type " ^ IP.print_exp t))
-  | A.SInnac _, _ -> raise (Error.Error ("Failed to infer the value of inaccessible pattern when checking that the pattern "
+  | A.SInacc _, _ -> raise (Error.Error ("Failed to infer the value of inaccessible pattern when checking that the pattern "
                                          ^ AP.print_pat p ^ " has type " ^ IP.print_exp t))
 
   | _ -> raise (Error.Violation ("Not implemented\np = " ^ AP.print_pat p ^ "\nq = " ^ IP.print_pat q))
 
 and check_inac_syn (sign, cD : signature * I.ctx) (cP : I.bctx) (p : A.pat) (q : I.syn_pat) (t : I.syn_exp) : I.syn_pat =
   match p, q with
-  | A.PWildcard, I.SInnac (eq, s, cP') -> I.SInnac (eq, s, cP')
-  | A.Innac ep, I.SInnac (eq, s, cP') ->
+  | A.PWildcard, I.SInacc (eq, s, cP') -> I.SInacc (eq, s, cP')
+  | A.Inacc ep, I.SInacc (eq, s, cP') ->
      Debug.indent ();
      let ep' = check_syn (sign, cD) cP ep t in
      let s' = exp_of_pat_subst s in
@@ -569,7 +569,7 @@ and check_inac_syn (sign, cD : signature * I.ctx) (cP : I.bctx) (p : A.pat) (q :
                raise (Error.Error ("Inaccessible pattern check failed with:\n" ^ Unify.print_unification_problem prob))
      in
      Debug.deindent ();
-     I.SInnac (simul_subst sigma eq, s, simul_subst_on_bctx sigma cP')
+     I.SInacc (simul_subst sigma eq, s, simul_subst_on_bctx sigma cP')
   | A.PConst (n, sp), I.PSConst (n', sq) when n = n' ->
      begin match lookup_sign_entry sign n with
      | Constructor (_, tel, _) -> raise (Error.Error ("Used a data type constructor inside a syntactic pattern"))
@@ -596,9 +596,9 @@ and check_inac_syn (sign, cD : signature * I.ctx) (cP : I.bctx) (p : A.pat) (q :
   | A.PBVar i, I.PBVar i' when i = i' ->
      I.PBVar i
 
-  | A.Innac _, _ -> raise (Error.Error ("Failed to infer the value of inaccessible pattern when checking that the pattern "
+  | A.Inacc _, _ -> raise (Error.Error ("Failed to infer the value of inaccessible pattern when checking that the pattern "
                                         ^ AP.print_pat p ^ " has type " ^ IP.print_syn_exp t))
-  | A.SInnac _, _ -> raise (Error.Error ("Failed to infer the value of inaccessible pattern when checking that the pattern "
+  | A.SInacc _, _ -> raise (Error.Error ("Failed to infer the value of inaccessible pattern when checking that the pattern "
                                         ^ AP.print_pat p ^ " has type " ^ IP.print_syn_exp t))
   (* In the syntax cases, we might need to grow cP *)
   | p, q -> raise (Error.Error ("Pattern matching on this syntax term is not yet supported.\np = "

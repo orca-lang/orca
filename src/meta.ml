@@ -69,7 +69,7 @@ let rec fv_pat =
   function
   | PVar n -> [n]
   | PPar _ -> []
-  | Innac _ -> []
+  | Inacc _ -> []
   | PConst (n, ps) -> fv_pats ps
   | PBCtx cP -> fv_pat_bctx cP
   | PUnder -> []
@@ -81,7 +81,7 @@ and fv_syn_pat =
   | PLam (f, p) -> fv_syn_pat p
   | PSConst (n, ps) -> fv_syn_pats ps
   | PUnbox (n, _, _) -> [n]
-  | SInnac (_, _, _) -> []
+  | SInacc (_, _, _) -> []
   | PEmpty -> []
   | PShift i -> []
   | PDot (p1, p2) -> fv_syn_pat p1 @ fv_syn_pat p2

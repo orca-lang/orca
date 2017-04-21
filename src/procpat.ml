@@ -42,7 +42,7 @@ let print_psubst c = "[" ^ (String.concat "," (List.map (fun (x, e) -> print_nam
 let rec psubst sign (x, p') = function
   | I.PVar n when n = x -> p'
   | I.PVar n -> I.PVar n
-  | I.Innac e -> I.Innac (subst (x, I.exp_of_pat p') e)
+  | I.Inacc e -> I.Inacc (subst (x, I.exp_of_pat p') e)
   | I.PConst (n, ps) -> I.PConst (n, List.map (psubst sign (x, p')) ps)
   | I.PPar n when n = x -> raise (Error.Violation "Don't think this can happen")
   | I.PPar n -> I.PPar n
@@ -57,7 +57,7 @@ and syn_psubst sign cP (x, p') = function
   | I.PUnbox (n, s, cP') when n = x ->
      begin match p' with
        | I.PVar m -> I.PUnbox (m, s, cP')
-       | I.Innac e -> I.SInnac (e, s, cP')
+       | I.Inacc e -> I.SInacc (e, s, cP')
        | I.PTBox (cP'', q) ->  (* cP' should be equal to cP'' *)
           let rec push_unbox (s, cP') = function
             | I.PBVar i ->
@@ -66,8 +66,8 @@ and syn_psubst sign cP (x, p') = function
             | I.PSConst (n,ps) -> I.PSConst (n, List.map (push_unbox (s, cP')) ps)
             | I.PUnbox (m, s', cP'') ->
                I.PUnbox (m, comp_pat_subst ("Mismatching substitution from term " ^ IP.print_syn_pat q) s s', cP'')
-            | I.SInnac (e, s', cP'') ->
-               I.SInnac (e, comp_pat_subst ("Mismatching substitution from term " ^ IP.print_syn_pat q) s s', cP'')
+            | I.SInacc (e, s', cP'') ->
+               I.SInacc (e, comp_pat_subst ("Mismatching substitution from term " ^ IP.print_syn_pat q) s s', cP'')
             | I.PEmpty  -> I.PEmpty
             | I.PShift n ->
                let rec comp s n =
@@ -90,7 +90,7 @@ and syn_psubst sign cP (x, p') = function
        | _ -> assert false
      end
   | I.PUnbox (n, s, cP) -> I.PUnbox (n, s, cP)
-  | I.SInnac (e, s, cP) -> I.SInnac (subst (x, I.exp_of_pat p') e, s, cP)
+  | I.SInacc (e, s, cP) -> I.SInacc (subst (x, I.exp_of_pat p') e, s, cP)
   | I.PEmpty -> I.PEmpty
   | I.PShift n -> I.PShift n
   | I.PDot (s, p) -> I.PDot (syn_psubst sign cP (x, p') s, syn_psubst sign cP (x, p') p)
@@ -109,7 +109,7 @@ and bctx_psubst sign (x, p') = function
   (*                                    ^ print_name n ^ " which we believe should have not occured due to linearity")) *)
   (*      | A.PVar n when n = x -> raise (Error.Violation ("Pattern substitution done on variable " *)
   (*                                    ^ print_name n ^ " which we believe should have not occured due to linearity")) *)
-  (*      | A.Innac e -> raise (Error.Violation "Pattern substitution applied to approximate inaccessible pattern") *)
+  (*      | A.Inacc e -> raise (Error.Violation "Pattern substitution applied to approximate inaccessible pattern") *)
   (*      | A.PLam (xs, p) -> A.PLam (xs, sanity_check p) *)
   (*      | A.PConst (n, ps) -> A.PConst (n, List.map sanity_check ps) *)
   (*      | A.PDot (p1, p2) -> A.PDot (sanity_check p1, sanity_check p2) *)

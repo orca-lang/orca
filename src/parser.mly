@@ -114,7 +114,7 @@ raw_simple_exp:
 
 simple_pattern:
 | x = IDENT {PIdent x}
-| DOT e = simple_exp {Innac e}
+| DOT e = simple_exp {Inacc e}
 | LPAREN p = pattern RPAREN {p}
 | EMPTYS {PEmptyS}
 | n = SHIFT {PShift n}

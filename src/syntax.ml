@@ -39,7 +39,7 @@ module Ext = struct
 
   type pat =
     | PIdent of name
-    | Innac of exp
+    | Inacc of exp
     | PLam of string list * pat
     | PPar of name
     | PConst of name * pat list
@@ -107,11 +107,11 @@ module Apx = struct
   type pat =
     | PVar of name
     | PBVar of index
-    | Innac of exp
+    | Inacc of exp
     | PLam of string list * pat
     | PConst of def_name * pat list
     | PClos of name * pat_subst
-    | SInnac of exp * pat_subst
+    | SInacc of exp * pat_subst
     | PEmptyS
     | PShift of int
     | PDot of pat * pat
@@ -198,7 +198,7 @@ module Int = struct
 
   type pat =
     | PVar of name
-    | Innac of exp
+    | Inacc of exp
     | PConst of def_name * pat list
     | PBCtx of pat_bctx
     | PPar of name
@@ -210,7 +210,7 @@ module Int = struct
     | PLam of (string * syn_exp) list * syn_pat
     | PSConst of def_name * syn_pat list
     | PUnbox of name * pat_subst * bctx
-    | SInnac of exp * pat_subst * bctx
+    | SInacc of exp * pat_subst * bctx
     | PEmpty
     | PShift of int
     | PDot of syn_pat * syn_pat
@@ -259,7 +259,7 @@ module Int = struct
              | PVar n -> Var n
              | PPar n -> Var n           (* MMMMM *)
 
-             | Innac e -> e
+             | Inacc e -> e
 
              | PConst (n, ps) ->
                 App (Const n, List.map (exp_of_pat) ps)
@@ -277,7 +277,7 @@ module Int = struct
     | PSConst (n, ps) ->
        AppL (SConst n, List.map (syn_exp_of_pat) ps)
     | PUnbox (n, s, cP) -> Unbox (Var n, syn_exp_of_pat_subst s, cP)
-    | SInnac (e, s, cP) -> Unbox (e, syn_exp_of_pat_subst s, cP)
+    | SInacc (e, s, cP) -> Unbox (e, syn_exp_of_pat_subst s, cP)
     | PEmpty -> Empty
     | PShift i -> Shift i
     | PDot (p1, p2) -> Dot (syn_exp_of_pat p1, syn_exp_of_pat p2)

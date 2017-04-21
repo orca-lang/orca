@@ -40,7 +40,7 @@ module Ext = struct
 
   let rec print_pat (p : pat) : string = match p with
     | PIdent n -> n
-    | Innac e -> "(. " ^ print_exp e ^ ")"
+    | Inacc e -> "(. " ^ print_exp e ^ ")"
     | PLam (f, p) -> "(\ " ^ String.concat " " f ^ " " ^ print_pat p ^ ")"
     | PConst (n, ps) -> "(" ^ n ^ " " ^ (String.concat " " (List.map (fun p -> "(" ^ print_pat p ^ ")") ps)) ^ ")"
     | PClos (n, e) -> "([] " ^ n ^ " " ^ print_exp e ^ ")"
@@ -118,11 +118,11 @@ module Apx = struct
     | PVar n -> print_name n
     | PPar n -> "(<: " ^ print_name n ^ ")"
     | PBVar n -> "i" ^ string_of_int n
-    | Innac e -> "." ^ print_exp e
+    | Inacc e -> "." ^ print_exp e
     | PLam (fs, p) -> "(\ " ^ String.concat " " fs ^ " " ^ print_pat p ^ ")"
     | PConst (n, ps) -> "(" ^ n ^ " " ^ (String.concat " " (List.map (fun p -> "(" ^ print_pat p ^ ")") ps)) ^ ")"
     | PClos (n, s) -> print_name n ^ "[" ^ print_pat_subst s ^ "]"
-    | SInnac (e, s) -> "." ^ print_exp e ^ "[" ^ print_pat_subst s ^ "]"
+    | SInacc (e, s) -> "." ^ print_exp e ^ "[" ^ print_pat_subst s ^ "]"
     | PEmptyS -> "^"
     | PShift i -> "^ " ^ string_of_int i
     | PDot (p1, p2) -> "(" ^ print_pat p1 ^ " ; " ^ print_pat p2 ^ ")"
@@ -253,7 +253,7 @@ module Int = struct
   let rec print_pat (p : pat) : string = match p with
     | PVar n -> print_name n
     | PPar n -> "(<: " ^ print_name n ^ ")"
-    | Innac e -> "." ^ print_exp e
+    | Inacc e -> "." ^ print_exp e
 
     | PConst (n, ps) -> "(" ^ n ^ " " ^ (String.concat " " (List.map (fun p -> "(" ^ print_pat p ^ ")") ps)) ^ ")"
     | PBCtx cP -> print_pat_bctx cP
@@ -265,7 +265,7 @@ module Int = struct
     | PLam (fs, p) -> "(\ " ^ String.concat " " (List.map (fun (x, t) -> "("^ x ^ " : " ^ print_syn_exp t ^ ")") fs) ^ " " ^ print_syn_pat p ^ ")"
     | PSConst (n, ps) -> "(" ^ n ^ " " ^ (String.concat " " (List.map (fun p -> "(" ^ print_syn_pat p ^ ")") ps)) ^ ")"
     | PUnbox (n, s, cP) -> "(u " ^ print_name n ^ "[" ^ print_pat_subst s ^ " : " ^ print_bctx cP ^ "])"
-    | SInnac (e, s, cP) -> "(s. " ^ print_exp e ^ "[" ^ print_pat_subst s ^ " : " ^ print_bctx cP ^ "])"
+    | SInacc (e, s, cP) -> "(s. " ^ print_exp e ^ "[" ^ print_pat_subst s ^ " : " ^ print_bctx cP ^ "])"
     | PEmpty -> "^"
     | PShift i -> "^ " ^ string_of_int i
     | PDot (p1, p2) -> "(" ^ print_syn_pat p1 ^ " ; " ^ print_syn_pat p2 ^ ")"

@@ -35,7 +35,7 @@ let rec match_pat sign p e =
   let e = whnf sign e in
   Debug.print ~verbose:true  (fun () -> "Matching pattern " ^ print_pat p ^ " against term " ^ print_exp e);
   match p, e with
-  | Innac _, _ -> []
+  | Inacc _, _ -> []
   | PVar n, e -> [n, e]
   | PConst (n, []), Const n' when n = n' -> []
   | PConst (n, ps), App(Const n', sp) when n = n' ->
