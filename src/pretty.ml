@@ -104,6 +104,8 @@ and fmt_tel cG pps (tel, e) =
   fmt_tel' cG true false pps (tel, e)
 
 and fmt_stel_entry cG cP pps = function
+  | Explicit, "_", t ->
+     fmt_syn_exp cG cP pps t
   | Explicit, n, t ->
      Fmt.pf pps "(%a : %a)"
             bound_name n
@@ -115,9 +117,9 @@ and fmt_stel_entry cG cP pps = function
 
 and fmt_stel cG cP pps (tel, e) =
   match tel with
-  | (_, n, t) :: tel ->
+  | (_, n, t) as se :: tel ->
      Fmt.pf pps "%a ->> %a"
-            (fmt_syn_exp cG cP) t
+            (fmt_stel_entry cG cP) se
             (fmt_stel cG (Snoc(cP, n, dst))) (tel, e)
   | [] -> fmt_syn_exp cG cP pps e
 
@@ -217,13 +219,11 @@ and fmt_syn_exp cG cP pps = function
             (list ~sep:nbsp (fmt_syn_exp cG cP)) es
 
   | BVar i ->
-    Fmt.pf pps "i%a"
-      bound_var i
-     (* begin match beautify_idx i cP with *)
-     (* | None -> Fmt.pf pps "i%a" *)
-     (*                  bound_var i *)
-     (* | Some n -> bound_name pps n *)
-     (* end *)
+     begin match beautify_idx i cP with
+     | None -> Fmt.pf pps "i%a"
+                      bound_var i
+     | Some n -> bound_name pps n
+     end
   | Lam (xs, e) ->
      let xs' = List.map fst xs in
      let cP' = bctx_of_names xs' cP in
@@ -393,9 +393,15 @@ let rec fmt_pat_decls cG pps = function
 
 
 let rec fmt_sdecl pps (n, stel, (tn, es)) =
-  Fmt.pf pps "| %a : %a"
-         def n
-         (fmt_stel [] Nil) (stel, AppL(SConst tn, es))
+  match es with
+  | [] ->
+    Fmt.pf pps "| %a : %a"
+      def n
+      (fmt_stel [] Nil) (stel, SConst tn)
+  | _ ->
+    Fmt.pf pps "| %a : %a"
+      def n
+      (fmt_stel [] Nil) (stel, AppL(SConst tn, es))
 
 
 let rec fmt_sdecls pps = function
