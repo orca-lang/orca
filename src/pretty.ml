@@ -281,7 +281,6 @@ let rec fmt_pat cG pps = function
             (fmt_pats cG) pats
   | PBCtx(cP) -> fmt_syn_pat_bctx cG pps cP
   | PUnder -> string pps "_"
-  | PWildcard -> string pps "._"
   | PTBox(cP, p) ->
      fmt_syn_pat cG cP pps p
 

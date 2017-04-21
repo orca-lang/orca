@@ -76,7 +76,8 @@ let matching (p : I.pat) (q : pat) : pats =
        | I.PVar n, _ -> [Apx q]
        | I.PPar n, A.PPar n' -> [Int (I.PPar n')]
        | I.PConst (n, ps), A.PConst (n', qs) when n = n' -> List.concat (List.map2 apx_match ps qs)
-       | I.PConst (n, ps), A.PConst (n', qs) -> raise(Error.Error "Pattern matching does not match. (A)")
+       | I.PConst (n, ps), A.PConst (n', qs) -> raise(Error.Error "Pattern matching does not
+ match. (A)")
        | I.Innac _, _ -> []
        | I.PBCtx cP, _ -> assert false
        | I.PTBox (cP, p), q -> syn_apx_match cP p q
@@ -134,7 +135,8 @@ let rec flexible (p : pats)(cG : I.ctx) : name list =
     | Int (I.Innac _)::ps, (x, t)::cG'
     | Int (I.PTBox (_, I.SInnac _))::ps, (x, t)::cG'
     | Apx (A.SInnac _)::ps, (x, t)::cG'
-    | Apx (A.Innac _)::ps, (x, t)::cG' -> x::(flexible ps cG')
+    | Apx (A.Innac _)::ps, (x, t)::cG'
+    | Apx (A.PWildcard)::ps, (x, t)::cG' -> x::(flexible ps cG')
     | p::ps, (x, t)::cG' -> flexible ps cG'
     | _ -> raise (Error.Violation ("Flexible: length violation."))
 
@@ -350,7 +352,9 @@ let split_rec (sign : signature) (ps : pats) (cD : I.ctx) : I.ctx * I.pats =
        search (p1 @ [Apx(A.PVar y)]) ps (cD1 @ [y, t]) (ctx_subst (x, I.Var y) cD2)
 
     | A.Innac e, (x, t) :: cD2 ->
-       search (p1 @ [Apx(A.Innac e)]) ps (cD1 @ [x, t]) cD2
+      search (p1 @ [Apx(A.Innac e)]) ps (cD1 @ [x, t]) cD2
+    | A.PWildcard,  (x, t) :: cD2 ->
+      search (p1 @ [Apx(A.PWildcard)]) ps (cD1 @ [x, t]) cD2
     | A.PPar y, (x, t) :: cD2 ->
        check_ppar sign p1 y cD1 (x, t) cD2
     | A.PClos (y, s), (x, t) :: cD2 ->
@@ -513,6 +517,8 @@ and check_inacs_syn (sign, cD : signature * I.ctx) (cP : I.bctx) (p : A.pats) (s
 
 and check_inac (sign, cD : signature * I.ctx) (p : A.pat) (q : I.pat) (t : I.exp) : I.pat =
   match p, q with
+  | A.PWildcard, I.Innac e -> I.Innac e
+
   | A.Innac ep, I.Innac eq ->
      Debug.indent ();
      let ep' = check (sign, cD) ep t in
@@ -547,11 +553,13 @@ and check_inac (sign, cD : signature * I.ctx) (p : A.pat) (q : I.pat) (t : I.exp
   | A.Innac _, _ -> raise (Error.Error ("Failed to infer the value of inaccessible pattern when checking that the pattern "
                                         ^ AP.print_pat p ^ " has type " ^ IP.print_exp t))
   | A.SInnac _, _ -> raise (Error.Error ("Failed to infer the value of inaccessible pattern when checking that the pattern "
-                                        ^ AP.print_pat p ^ " has type " ^ IP.print_exp t))
+                                         ^ AP.print_pat p ^ " has type " ^ IP.print_exp t))
+
   | _ -> raise (Error.Violation ("Not implemented\np = " ^ AP.print_pat p ^ "\nq = " ^ IP.print_pat q))
 
 and check_inac_syn (sign, cD : signature * I.ctx) (cP : I.bctx) (p : A.pat) (q : I.syn_pat) (t : I.syn_exp) : I.syn_pat =
   match p, q with
+  | A.PWildcard, I.SInnac (eq, s, cP') -> I.SInnac (eq, s, cP')
   | A.Innac ep, I.SInnac (eq, s, cP') ->
      Debug.indent ();
      let ep' = check_syn (sign, cD) cP ep t in

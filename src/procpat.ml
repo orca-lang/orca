@@ -48,7 +48,6 @@ let rec psubst sign (x, p') = function
   | I.PPar n -> I.PPar n
   | I.PBCtx cP -> I.PBCtx (bctx_psubst sign (x, p') cP)
   | I.PUnder -> I.PUnder
-  | I.PWildcard -> I.PWildcard
   | I.PTBox (cP, p) -> let cP' = subst_bctx (x, I.exp_of_pat p') cP in
                        I.PTBox (cP', syn_psubst sign cP' (x, p') p)
 and syn_psubst sign cP (x, p') = function

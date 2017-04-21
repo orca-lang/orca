@@ -324,7 +324,8 @@ and check_syn (sign, cG) cP (e : A.exp) (t : I.syn_exp) =
           Unify.unify_syn (sign, cG) cP t t'
       with
         Unify.Unification_failure prob ->
-          raise (Error.Error ("Checking syntactic term " ^ AP.print_exp e ^ " against type " ^ PP.print_syn_exp cG cP t'
+          raise (Error.Error ("Checking syntactic term " ^ AP.print_exp e ^ " against type "
+                              ^ PP.print_syn_exp cG cP (Whnf.normalize_syn sign cP t)
                               ^ "\nIn context " ^ PP.print_bctx cG (Whnf.whnf_bctx sign cP)
                             ^ "\nFailed with unification problem:\n" ^ Unify.print_unification_problem prob))
       in

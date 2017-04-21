@@ -258,7 +258,6 @@ module Int = struct
     | PConst (n, ps) -> "(" ^ n ^ " " ^ (String.concat " " (List.map (fun p -> "(" ^ print_pat p ^ ")") ps)) ^ ")"
     | PBCtx cP -> print_pat_bctx cP
     | PUnder -> "_"
-    | PWildcard -> "._"
     | PTBox (cP, p) -> "(" ^ print_bctx cP ^ " " ^ print_syn_pat p ^ ")"
 
   and print_syn_pat = function

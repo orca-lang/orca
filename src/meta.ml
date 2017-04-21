@@ -73,7 +73,6 @@ let rec fv_pat =
   | PConst (n, ps) -> fv_pats ps
   | PBCtx cP -> fv_pat_bctx cP
   | PUnder -> []
-  | PWildcard -> []
   | PTBox (cP, p) -> fv_syn_pat p (* MMMM *)
 
 and fv_syn_pat =

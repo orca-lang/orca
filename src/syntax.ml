@@ -203,7 +203,6 @@ module Int = struct
     | PBCtx of pat_bctx
     | PPar of name
     | PUnder
-    | PWildcard
     | PTBox of bctx * syn_pat
 
   and syn_pat =
@@ -270,7 +269,6 @@ module Int = struct
 
              | PBCtx cP -> BCtx (bctx_of_pat_ctx cP)
              | PUnder -> raise (Error.Violation "We'd be very surprised if this were to happen.")
-             | PWildcard -> raise (Error.Violation "We'd also be very surprised if this were to happen.")
 
   and syn_exp_of_pat =
     function
