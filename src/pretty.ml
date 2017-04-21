@@ -181,14 +181,18 @@ and fmt_syn_exp cG cP pps = function
 
   | SPi (stel, e) -> Fmt.pf pps "(%a)" (fmt_stel cG cP) (stel, e)
 
+  | Clos (e1, Shift 0, cP') ->
+    fmt_syn_exp cG cP' pps e1
+
   | Clos (e1, e2, cP') ->
      Fmt.pf pps "%a[%a]"
             (fmt_syn_exp cG cP') e1
             (fmt_syn_exp cG cP) e2
 
-  | Unbox (e1, e2, cP') ->
-     (* Fmt.pf pps "%a" *)
-     (*        (fmt_exp cG) e1 *)
+  | Unbox (e1, Shift 0, _) ->
+    fmt_exp cG pps e1
+
+  | Unbox (e1, e2, _) ->
      Fmt.pf pps "%a[%a]"
             (fmt_exp cG) e1
             (fmt_syn_exp cG cP) e2
@@ -254,7 +258,7 @@ let rec fmt_ctx pps = function
 
 let rec fmt_pat_subst pps = function
   | CShift 0 ->
-     Fmt.pf pps "id"
+     Fmt.pf pps "^0"
   | CShift n ->
      Fmt.pf pps "^%d" n
   | CEmpty -> string pps "^"
@@ -307,10 +311,17 @@ and fmt_syn_pat cG cP pps = function
             (list bound_name) (beautify_bound_names xs' cP)
             (fmt_syn_pat cG cP') p
 
+  | PUnbox (n, CShift 0, _) ->
+    comp_var cG pps n
+
   | PUnbox (n, psub, _) ->
-     Fmt.pf pps "%a[%a]"
+    Fmt.pf pps "%a[%a]"
             (comp_var cG) n
             fmt_pat_subst psub
+
+  | SInnac (e, CShift 0, _) ->
+    Fmt.pf pps ".%a"
+      (fmt_exp cG) e
 
   | SInnac (e, psub, _) ->
      Fmt.pf pps ".%a[%a]"
