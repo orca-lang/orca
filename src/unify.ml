@@ -84,7 +84,7 @@ and occur_check_syn sign cP n e =
   match Whnf.rewrite sign cP e with
   | SPi (tel, t) -> occur_check_stel sign cP n tel || f cP t
   | AppL (e, es) -> f cP e || List.fold_left (||) false (List.map (f cP) es)
-  | Lam (xs, e) -> f (bctx_from_lam cP xs) e
+  | Lam (xs, e) -> f (bctx_of_lam_pars cP xs) e
   | Clos (e1, e2, cP') ->
      f cP' e1 || f cP e2 || occur_check_bctx sign n cP
   | Dot (e1, e2) -> f cP e1 || f cP e2
@@ -180,7 +180,7 @@ and unify_flex_syn (sign, cG) cP flex e1 e2 =
     ^ "\ne2' = " ^ Pretty.print_syn_exp cG cP e2');
   match e1', e2' with
   | SPi (tel, t), SPi(tel', t') -> unify_spi tel t tel' t'
-  | Lam(_,e), Lam(xs, e') -> unify_flex_syn (sign, cG) (bctx_from_lam cP xs) flex e e'
+  | Lam(_,e), Lam(xs, e') -> unify_flex_syn (sign, cG) (bctx_of_lam_pars cP xs) flex e e'
   | AppL(e1, es), AppL(e1', es') -> unify_many_syn (e1::es) (e1'::es')
   | BVar i, BVar i' when i = i' -> cG, []
   | Clos(e1, s1, cP1), Clos(e2, s2, cP2) ->
@@ -210,7 +210,7 @@ and unify_flex_syn (sign, cG) cP flex e1 e2 =
       | _ -> false
     in
     if is_eta (n-1) es then
-      unify_flex_syn (sign, cG) cP flex s' (Comp (Shift n, bctx_from_lam cP xs, s))
+      unify_flex_syn (sign, cG) cP flex s' (Comp (Shift n, bctx_of_lam_pars cP xs, s))
     else
       raise (Unification_failure(Expressions_dont_unify_syn (flex, e1', e2')))
   | Lam (xs, (AppL (Unbox (Var m, s', _), es))), Unbox(Var n, s, _) when n = m  ->
@@ -223,7 +223,7 @@ and unify_flex_syn (sign, cG) cP flex e1 e2 =
       | _ -> false
     in
     if is_eta (n-1) es then
-      unify_flex_syn (sign, cG) cP flex s' (Comp (Shift n, bctx_from_lam cP xs, s))
+      unify_flex_syn (sign, cG) cP flex s' (Comp (Shift n, bctx_of_lam_pars cP xs, s))
     else
       raise (Unification_failure(Expressions_dont_unify_syn (flex, e1', e2')))
 

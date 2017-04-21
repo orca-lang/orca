@@ -84,7 +84,7 @@ let matching (p : I.pat) (q : pat) : pats =
        | _ -> assert false
      and syn_apx_match cP p q =
        match p, q with
-       | I.PLam (xs, p), A.PLam (ys, q) -> syn_apx_match (bctx_from_lam cP xs) p q
+       | I.PLam (xs, p), A.PLam (ys, q) -> syn_apx_match (bctx_of_lam_pars cP xs) p q
        | I.PUnbox (n, s, cP'), A.PClos (m, s') when s = s' -> [Int (I.PTBox (cP, (I.PUnbox (m, s, cP'))))]
        | I.PUnbox (n, s, cP'), _ -> [Apx q] (* need to apply inverse sub to q *)
        | I.SInacc _, _ -> []
@@ -110,7 +110,7 @@ let matching (p : I.pat) (q : pat) : pats =
        | _ -> assert false
      and syn_int_match cP p q =
        match p, q with
-       | I.PLam (xs, p), I.PLam (ys, q) -> syn_int_match (bctx_from_lam cP xs) p q
+       | I.PLam (xs, p), I.PLam (ys, q) -> syn_int_match (bctx_of_lam_pars cP xs) p q
        | I.PUnbox (n, s, cP'), _ -> [Int (I.PTBox(cP, q))]
        | I.SInacc _, _ -> []
        | I.PEmpty, I.PEmpty -> []
@@ -240,7 +240,7 @@ let split_lam (sign : signature) (p1 : pats) (xs, p : string list * pat) (cD1 : 
     | _ -> raise (Error.Violation ("Split_lam obtained more than one parameter out of td (" ^ IP.print_ctx td ^ ")"))
   in
   let xs' = List.map2 (fun x (_,_,t) -> x, t) xs tel0 in
-  let ss = x, I.TermBox (g, I.Lam (xs', I.Unbox(e, I.id_sub, bctx_from_lam g xs'))) in
+  let ss = x, I.TermBox (g, I.Lam (xs', I.Unbox(e, I.id_sub, bctx_of_lam_pars g xs'))) in
   let p' = match simul_syn_psubst_on_list sign g pdelta (punbox_list_of_ctx g cT) with
     | [p'] -> p'
     | _ -> raise (Error.Violation ("Split_lam obtained more than one parameter out of substituting in cT"))

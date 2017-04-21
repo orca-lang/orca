@@ -381,7 +381,7 @@ and infer_syn (sign, cG) cP (e : A.exp) =
       (*     | 0 -> [] *)
       (*     | m -> I.BVar m :: eta_tail (m-1) *)
       (*   in *)
-      (*   let cP'' = bctx_from_lam cP' xs in *)
+      (*   let cP'' = bctx_of_lam_pars cP' xs in *)
       (*   let sigma = compute_wkn (sign, cG) cP cP'' in *)
       (*   I.Lam(xs, I.AppL(I.Unbox(I.Var x, sigma, cP''), eta_tail (List.length xs))), I.Clos(t', sigma, cP'') *)
        | I.Box(cP', t') ->

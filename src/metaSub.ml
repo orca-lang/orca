@@ -87,7 +87,7 @@ let drop_suffix cP n =
 (*   let tel', sigma' = syn_subst_stel sigma tel in *)
 (*   tel', Clos(t, sigma') *)
 
-let bctx_from_lam cP xs = List.fold_left (fun cP (x, t) -> Snoc(cP, x, t)) cP xs
+let bctx_of_lam_pars cP xs = List.fold_left (fun cP (x, t) -> Snoc(cP, x, t)) cP xs
 
 let rec wkn_pat_subst_by_n s =
   let rec shift = function

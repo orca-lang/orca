@@ -51,7 +51,7 @@ and match_pats sign ps es =
 and match_syn_pat sign cP p e =
   match p, rewrite sign cP e with
   | PBVar i, BVar i' when i = i' -> []
-  | PLam (_, p), Lam (xs, e) -> match_syn_pat sign (bctx_from_lam cP xs) p e
+  | PLam (_, p), Lam (xs, e) -> match_syn_pat sign (bctx_of_lam_pars cP xs) p e
   | PSConst (n, []), SConst n' when n = n' -> []
   | PSConst (n, ps), AppL(SConst n', sp) when n = n' ->
      match_syn_pats sign cP ps sp
@@ -196,7 +196,7 @@ and rewrite (sign : signature) cP (e : syn_exp) : syn_exp =
           | [] -> Shift 0
           | e :: es -> Dot (f es, e)
         in
-        w (dmsg "beta reduction" (fun () -> (Clos(e1, f es, bctx_from_lam cP xs))))
+        w (dmsg "beta reduction" (fun () -> (Clos(e1, f es, bctx_of_lam_pars cP xs))))
       | e -> AppL(e, es)
       end
 
@@ -296,7 +296,7 @@ and rewrite (sign : signature) cP (e : syn_exp) : syn_exp =
   | Clos (AppL(e, es), s, cP) -> w (dmsg "CongClosAppL" (fun () -> (AppL(Clos(e, s, cP), List.map (fun e-> Clos(e, s, cP)) es))))
   | Clos (Lam (xs, e), s, cP) ->
      (dmsg "CongClosLam"
-           (fun () -> (Lam (xs, Clos (e, fst (List.fold_left (fun (s, i) _ -> ShiftS (i+1, s), i+1) (s, 0) xs), bctx_from_lam cP xs)))))
+           (fun () -> (Lam (xs, Clos (e, fst (List.fold_left (fun (s, i) _ -> ShiftS (i+1, s), i+1) (s, 0) xs), bctx_of_lam_pars cP xs)))))
   | Clos (Star, s, _) -> (dmsg "CongClosStar" (fun () -> Star))
   | Clos (SPi(tel, t), s, cP) ->
      let tel', s, cP' = cong_stel tel s cP in
@@ -405,7 +405,7 @@ let rec normalize sign (e : exp) =
 and normalize_syn sign cP e =
   let norm e = normalize_syn sign cP e in
    match rewrite sign cP e with
-   | Lam (xs, t) -> Lam (xs, normalize_syn sign (bctx_from_lam cP xs) t)
+   | Lam (xs, t) -> Lam (xs, normalize_syn sign (bctx_of_lam_pars cP xs) t)
    | AppL (e, es) -> AppL (norm e, List.map norm es)
    | SConst n -> SConst n
    | BVar i -> BVar i

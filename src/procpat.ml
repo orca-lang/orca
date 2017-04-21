@@ -52,7 +52,7 @@ let rec psubst sign (x, p') = function
                        I.PTBox (cP', syn_psubst sign cP' (x, p') p)
 and syn_psubst sign cP (x, p') = function
   | I.PBVar i -> I.PBVar i
-  | I.PLam (xs, p) -> I.PLam (xs, syn_psubst sign (bctx_from_lam cP xs) (x, p') p) (* What about shifts in p'? *)
+  | I.PLam (xs, p) -> I.PLam (xs, syn_psubst sign (bctx_of_lam_pars cP xs) (x, p') p) (* What about shifts in p'? *)
   | I.PSConst (n, ps) -> I.PSConst (n, List.map (syn_psubst sign cP (x, p')) ps)
   | I.PUnbox (n, s, cP') when n = x ->
      begin match p' with
@@ -62,7 +62,7 @@ and syn_psubst sign cP (x, p') = function
           let rec push_unbox (s, cP') = function
             | I.PBVar i ->
                I.PBVar (lookup_pat_subst ("Expected term " ^ IP.print_syn_pat q ^ " to be closed") i s)
-            | I.PLam (xs , p) -> I.PLam(xs, push_unbox (wkn_pat_subst_by_n s (List.length xs), bctx_from_lam cP' xs) p)
+            | I.PLam (xs , p) -> I.PLam(xs, push_unbox (wkn_pat_subst_by_n s (List.length xs), bctx_of_lam_pars cP' xs) p)
             | I.PSConst (n,ps) -> I.PSConst (n, List.map (push_unbox (s, cP')) ps)
             | I.PUnbox (m, s', cP'') ->
                I.PUnbox (m, comp_pat_subst ("Mismatching substitution from term " ^ IP.print_syn_pat q) s s', cP'')
