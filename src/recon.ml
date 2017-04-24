@@ -355,22 +355,24 @@ and infer_syn (sign, cG) cP (e : A.exp) =
        end
     (* App of Spi type get translated to AppL *)
     | A.App (e, es) ->
-      begin match infer_syn (sign, cG) cP e with
-      | e', I.SPi (tel, t) ->
-         let es', t' = check_syn_spine (sign, cG) cP es tel t in
-         I.AppL (e', es'), t'
-      | e', t -> raise (Error.Error ("Term " ^ AP.print_exp e
-                                     ^ " in function position is not of function type. Instead:\n" ^ IP.print_syn_exp t))
-      end
+       let e', t' = infer_syn (sign, cG) cP e in
+       begin match Whnf.rewrite sign cP t' with
+       | I.SPi (tel, t) ->
+          let es', t' = check_syn_spine (sign, cG) cP es tel t in
+          I.AppL (e', es'), t'
+       | t -> raise (Error.Error ("Term " ^ AP.print_exp e
+                                  ^ " in function position is not of function type. Instead:\n"
+                                  ^ IP.print_syn_exp t))
+       end
 
     | A.AppL (e, es) ->
        let e', t' = infer_syn (sign, cG) cP e in
-      begin match Whnf.rewrite sign cP t' with
-      | I.SPi (tel, t) ->
-         let es', t' = check_syn_spine (sign, cG) cP es tel t in
-         I.AppL(e', es'), t'
-      | t -> raise (Error.Error ("Term in function position is not of function type. Instead " ^ IP.print_syn_exp t))
-      end
+       begin match Whnf.rewrite sign cP t' with
+       | I.SPi (tel, t) ->
+          let es', t' = check_syn_spine (sign, cG) cP es tel t in
+          I.AppL(e', es'), t'
+       | t -> raise (Error.Error ("Term in function position is not of function type. Instead " ^ IP.print_syn_exp t))
+       end
 
     | A.Var x ->
        Debug.print (fun () -> "Variable " ^ print_name x ^ " is being looked up in context " ^ PP.print_ctx (Whnf.whnf_ctx sign cG));

@@ -12,16 +12,16 @@ syn oft : tm ->> tp ->> * where
 | t-app: (f: tm) ->> (e : tm) ->> (s: tp) ->> (t: tp)
          ->> oft f (arr s t) ->> oft e s ->> oft (app f e) t
 | t-lam: (s:tp) ->> (t:tp) ->> (e:tm ->> tm)
-         ->> ((x:tm) ->> oft x s ->> oft (e ' x) t) ->> oft (lam e) (arr s t)
+         ->> ((x:tm) ->> oft x s ->> oft (e x) t) ->> oft (lam e) (arr s t)
 
 syn step : tm ->> tm ->> * where
 | s-app1 : (m : tm) ->> (n : tm) ->> (m' : tm) ->> step m m' ->> step (app m n) (app m' n)
-| s-app2 : (a : tm ->> tm) ->> (b : tm) ->> step (app (lam a) b) (a ' b)
+| s-app2 : (a : tm ->> tm) ->> (b : tm) ->> step (app (lam a) b) (a b)
 
 thm tps : (m n : (|- tm)) (t : (|- tp)) -> (|- oft m t) -> (|- step m n) -> (|- oft n t) where
 | (app m n) (app m' .n) t (t-app .m .n s .t d1 d2) (s-app1 .m .n .m' e) =>
   t-app m' n s t (tps m m' (arr s t) d1 e) d2
-| (app ._ n) .(m ' n) t
+| (app ._ n) .(m n) t
   (t-app (lam .m) .n s .t (t-lam .s .t .m (\x.(\u.d1))) d2) (s-app2 m .n) =>
   d1[^ ; n ; d2]
 
