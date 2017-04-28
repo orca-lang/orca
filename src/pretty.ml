@@ -89,19 +89,29 @@ let rec fmt_tel_entry cG pps = function
             (fmt_exp cG) t
 
 and fmt_tel cG pps (tel, e) =
-  let rec fmt_tel' cG beginning floating pps (tel, e) =
+  let maybe_lparen = function
+    | Pi _ -> "("
+    | _ -> ""
+  in
+  let maybe_rparen = function
+    | Pi _ -> ")"
+    | _ -> ""
+  in
+  let rec fmt_tel' cG floating pps (tel, e) =
     match tel with
     | (Explicit, n, t) :: tel when Name.is_name_floating n ->
-      Fmt.pf pps (if not floating && not beginning then "-> %a -> %a" else "%a -> %a")
+      Fmt.pf pps (if floating then "%s%a%s -> %a" else "-> %s%a%s -> %a")
+        (maybe_lparen t)
         (fmt_exp cG) t
-        (fmt_tel' ((n, dt)::cG) false true) (tel, e)
+        (maybe_rparen t)
+        (fmt_tel' ((n, dt)::cG) true) (tel, e)
     | (_, n, _ as entry) :: tel ->
       Fmt.pf pps "%a %a"
         (fmt_tel_entry cG) entry
-        (fmt_tel' ((n, dt)::cG) false false) (tel, e)
+        (fmt_tel' ((n, dt)::cG) false) (tel, e)
     | [] -> fmt_exp cG pps e
   in
-  fmt_tel' cG true false pps (tel, e)
+  fmt_tel' cG true pps (tel, e)
 
 and fmt_stel_entry cG cP pps = function
   | Explicit, "_", t ->
