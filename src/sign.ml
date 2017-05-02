@@ -114,7 +114,7 @@ let lookup_syn_sign sign n =
      in
      Debug.print (fun () -> "Looked up constructor " ^ n ^ " which has type " ^ print_syn_exp t');
      t'
-  | _ -> raise (Error.Error ("Name " ^ n ^ " is syntactic"))
+  | _ -> raise (Error.Error ("Name " ^ n ^ " is not syntactic"))
 
 type lookup_result
   = D of exp                    (* A definition without pattern matching *)

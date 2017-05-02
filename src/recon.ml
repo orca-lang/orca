@@ -40,7 +40,9 @@ let compute_wkn (sign, cG) cP cP' =
   in
   let b1, ts1 = listify cP in
   let b2, ts2 = listify cP' in
-  if b1 = b2 then
+  if b2 = None && ts2 = [] then
+      I.Empty
+  else if b1 = b2 then
     let rec check_lists ts1 ts2 cP =
       match ts1, ts2 with
       | xs, [] -> I.Shift (List.length xs)
@@ -52,7 +54,7 @@ let compute_wkn (sign, cG) cP cP' =
              raise (Error.Error ("Types in contexts cannot unify"))
          in
          check_lists xs ys (I.Snoc(cP, n, simul_subst_syn sigma x))
-      | _ -> raise (Error.Error "Term cannot be of larger context than ambiant one")
+      | _ -> raise (Error.Error "Term cannot be of larger context than ambient one")
     in
     let cP1 = match b1 with
       | None -> I.Nil
@@ -60,10 +62,7 @@ let compute_wkn (sign, cG) cP cP' =
     in
     check_lists ts1 ts2 cP1
   else
-    if b2 = None && ts2 = [] then
-      I.Empty
-    else
-      raise (Error.Error ("Cannot infer the substitution"))
+    raise (Error.Error ("Cannot infer the substitution"))
 
 
 

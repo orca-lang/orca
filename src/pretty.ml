@@ -193,16 +193,16 @@ and fmt_syn_exp cG cP pps = function
 
   | SPi (stel, e) -> Fmt.pf pps "(%a)" (fmt_stel cG cP) (stel, e)
 
-  | Clos (e1, Shift 0, cP') ->
-    fmt_syn_exp cG cP' pps e1
+  (* | Clos (e1, Shift 0, cP') -> *)
+  (*   fmt_syn_exp cG cP' pps e1 *)
 
   | Clos (e1, e2, cP') ->
      Fmt.pf pps "%a[%a]"
             (fmt_syn_exp cG cP') e1
             (fmt_syn_exp cG cP) e2
 
-  | Unbox (e1, Shift 0, _) ->
-    fmt_exp cG pps e1
+  (* | Unbox (e1, Shift 0, _) -> *)
+  (*   fmt_exp cG pps e1 *)
 
   | Unbox (e1, e2, _) ->
      Fmt.pf pps "%a[%a]"

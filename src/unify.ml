@@ -193,6 +193,8 @@ and unify_flex_syn (sign, cG) cP flex e1 e2 =
      cG''', sigma'' @ sigma0
   | Empty, Empty -> cG, []
   | Shift n, Shift n' when n = n' -> cG, []
+  | Shift 0, Empty when cP = Nil -> cG, []
+  | Empty, Shift 0 when cP = Nil -> cG, []
   | ShiftS (n, e), ShiftS (n', e') when n = n' -> unify_flex_syn (sign, cG) (drop_suffix cP n) flex e e'
   | Dot(e1, e2), Dot(e1', e2') -> unify_many_syn [e1;e2] [e1';e2']
   | Comp (e1, cP, e2), Comp(e1', cP', e2') -> (* unify_many cG [e1;e2] [e1';e2'] *) assert false
