@@ -95,14 +95,16 @@ and reduce_with_clauses sign sp cls =
        | otw -> otw
        end
   in
-  let cl_l = List.length (fst (List.hd cls)) in
-  if List.length sp < cl_l then
-    None
+  if cls = [] then None
   else
-    let sp1, sp2 = split_first cl_l sp in
-    match reduce (List.map (whnf sign) sp1) cls with
-    | None -> None
-    | Some e -> Some (e, sp2)
+    let cl_l = List.length (fst (List.hd cls)) in
+    if List.length sp < cl_l then
+      None
+    else
+      let sp1, sp2 = split_first cl_l sp in
+      match reduce (List.map (whnf sign) sp1) cls with
+      | None -> None
+      | Some e -> Some (e, sp2)
 
 and whnf (sign : signature) (e : exp) : exp =
   (* Debug.print ~verbose:true  (fun () -> "Computing the whnf of " ^ print_exp e) ; *)
@@ -132,7 +134,7 @@ and whnf (sign : signature) (e : exp) : exp =
         Debug.print ~verbose:true  (fun () -> "Head of application was a constant " ^ print_exp (Const n));
         begin match lookup_sign_def sign n with
         | D e -> whnf sign (App (e, sp))
-        | P cls ->
+        | P cls -> Debug.print (fun () -> "Definition " ^ n ^ " has clause list " ^ String.concat "\n" (List.map (fun cl -> print_pats (fst cl)) cls));
           begin match reduce_with_clauses sign sp cls with
           | None -> App (Const n, sp)
           | Some (e, []) -> whnf sign e
@@ -283,6 +285,8 @@ and rewrite (sign : signature) cP (e : syn_exp) : syn_exp =
   (* Added rules for confluence *)
   | Clos (e, Comp (s, _, Empty), _) -> w (dmsg "CompEmpty" (fun () -> e))
 
+  | Comp (s, cP', Empty) -> Empty
+
   (* Congruence rules *)
   | Clos (SConst n, _, _) -> dmsg "CongClosConst" (fun () -> (SConst n))
   | Clos (Clos (e, s1, cP1), s2, cP2) -> w (dmsg "CongClosClos" (fun () -> (Clos (e, Comp(s2, cP2, s1), cP1))))
@@ -302,23 +306,27 @@ and rewrite (sign : signature) cP (e : syn_exp) : syn_exp =
   (* | Clos (Nil, s) -> Nil *)
 
   (* Not quite weak head normalisation *)
-  | Clos (e, s, cP) -> let s' = w s in
-                   let e' = w e in
-                   if s = s' && e' = e then
-                     Clos (e, s, cP)
-                   else w (dmsg "DeepClosRew" (fun () -> (Clos (e', s', cP))))
+  | Clos (e, s, cP) ->
+     dmsg "DeepClosRew" (fun () ->
+            let s' = w s in
+            let e' = w e in
+            if s = s' && e' = e then
+              Clos (e, s, cP)
+            else w (Clos (e', s', cP)))
   | Comp (e1, cP, e2) ->
-    let e1' = w e1 in
-    let e2' = w e2 in
-    if e1 = e1' && e2 = e2' then
-      Comp (e1, cP, e2)
-    else w (dmsg "DeepCompRew" (fun () -> (Comp (e1', cP, e2'))))
-  | Dot(e, s) ->
+     dmsg "DeepCompRew"
+          (fun () ->
+            let e1' = w e1 in
+            let e2' = w e2 in
+            if e1 = e1' && e2 = e2' then
+              Comp (e1, cP, e2)
+            else w (Comp (e1', cP, e2')))
+  | Dot(e, s) -> (dmsg "DeepDotRew" (fun () ->
     let e' = w e in
     let s' = w s in
     if e = e' && s = s' then
       Dot (e, s)
-    else w (dmsg "DeepDotRew" (fun () -> (Dot (e', s'))))
+    else w (Dot (e', s'))))
 
   (* IDK what to do with these *)
   (* | Clos (Box(g, t), s) -> assert false *)

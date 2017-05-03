@@ -4,21 +4,25 @@ open Print.Int
 open Name
 open MetaSub
 
+type reducible
+  = Reduces
+  | Stuck
+
 type signature_entry
-  = Definition of def_name * tel * exp * exp (* the name, the type, and the definition *)
+  = Definition of def_name * tel * exp * exp * reducible (* the name, the type, and the definition *)
   (* name, parameters, constructed type *)
   | Constructor of def_name * tel * dsig
   | SConstructor of def_name * stel * syn_dsig
   (* name, parameters, indices, resulting universe *)
   | DataDef of def_name * tel * tel * universe
   | SynDef of def_name * stel
-  | Program of def_name * tel * exp * pat_decls
+  | Program of def_name * tel * exp * pat_decls * reducible
 
 type signature = signature_entry list
 
 let signature_entry_name = function
-    | Definition (n', _, _, _)
-    | Program (n', _, _, _)
+    | Definition (n', _, _, _, _)
+    | Program (n', _, _, _, _)
     | DataDef (n', _, _, _)
     | SynDef (n', _)
     | SConstructor (n', _, _)
@@ -72,8 +76,8 @@ let lookup_syn_cons_entry (sign : signature) (c : def_name) (cP : bctx) : tel * 
 
 let lookup_sign sign n =
   match lookup_sign_entry sign n with
-  | Definition (_, [], t, _) -> t
-  | Definition (_, tel, t, _) -> Pi(tel, t)
+  | Definition (_, [], t, _, _) -> t
+  | Definition (_, tel, t, _, _) -> Pi(tel, t)
 
   | DataDef (_, ps, is, u) ->
      let tel = ps @ is in
@@ -92,7 +96,7 @@ let lookup_sign sign n =
      in
      Debug.print (fun () -> "Looked up constructor " ^ n ^ " which has type " ^ print_exp t');
      t'
-  | Program (_,tel,t, _) -> if tel = [] then t else Pi (tel, t)
+  | Program (_,tel,t, _, _) -> if tel = [] then t else Pi (tel, t)
 
   | _ -> raise (Error.Error ("Name " ^ n ^ " is syntactic"))
 
@@ -123,12 +127,14 @@ type lookup_result
 
 let lookup_sign_def sign n =
   match lookup_sign_entry sign n with
-  | Definition (_, _, _, e) -> D e
+  | Definition (_, _, _, _, Stuck) -> N (* if it is stuck it does not reduce *)
+  | Definition (_, _, _, e, _) -> D e
   | Constructor _ -> N
   | DataDef _ -> N
   | SConstructor _ -> N
   | SynDef _ -> N
-  | Program (_, _, _, ds) -> P ds
+  | Program (_, _, _, _, Stuck) -> N (* if it is stuck it does not reduce *)
+  | Program (_, _, _, ds, _) -> P ds
 
 (* returns all the constructors of type n *)
 let lookup_constructors sign n =

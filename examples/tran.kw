@@ -32,5 +32,11 @@ data rel: ctx -> ctx -> set where
 | cons : (g : ctx) -> (h : ctx) -> (t : |- stp) -> rel g h -> rel (g, x: stm t) (h, y: ttm (tran_tp t))
 
 def tran : (g : ctx) -> (h : ctx) -> rel g h -> (st : |- stp) -> (g |- stm st) -> (h |- ttm (tran_tp st)) where
-| g h r t (app s[^] .t m n) => tapp (tran_tp s)[^] (tran_tp t)[^] (tran g h r (arr s t) m) (tran g h r s n)
-| g h r st tm => ?toto
+| g h r t (app s[^] .t m n) => tapp (tran_tp s) (tran_tp t) (tran g h r (arr s t) m) (tran g h r s n)
+| g h r (arr s t) (lam .s .t m) => tlam (tran_tp s) (tran_tp t) (\x. tran (g,x:stm s) (h,x:ttm (tran_tp s)) (cons g h s r) t (m x))
+| g h r bool tt => tinl tunit tunit tone
+| g h r bool ff => tinr tunit tunit tone
+| g h r t (if .t b e1 e2) => tcase tunit tunit (tran_tp t) (tran g h r bool b)
+                              (\x. tran g h r t e1) (\x. tran g h r t e2)
+
+(*) | g h r st tm => ?toto

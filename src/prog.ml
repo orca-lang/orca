@@ -119,4 +119,4 @@ let tc_program (sign : signature) : program -> signature * I.program =
      in
      let e' = check (sign, []) e t' in
      Debug.deindent ();
-     (Definition (n, tel, t'', e'))::sign, I.Def(n, t', e')
+     (Definition (n, tel, t'', e', Reduces))::sign, I.Def(n, t', e')
