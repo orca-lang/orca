@@ -1,0 +1,36 @@
+syn stp where
+| bool : stp
+| arr : stp ->> stp ->> stp
+
+syn stm : stp ->> * where
+| app : (s : stp) ->> (t : stp) ->> stm (arr s t) ->> stm s ->> stm t
+| lam : (s : stp) ->> (t : stp) ->> (stm s ->> stm t) ->> stm (arr s t)
+| tt : stm bool
+| ff : stm bool
+| if : (t : stp) ->> stm bool ->> stm t ->> stm t ->> stm t
+
+syn ttp where
+| tunit : ttp
+| tsum : ttp ->> ttp ->> ttp
+| tarr : ttp ->> ttp ->> ttp
+
+syn ttm : ttp ->> * where
+| tapp : (s : ttp) ->> (t : ttp) ->> ttm (tarr s t) ->> ttm s ->> ttm t
+| tlam : (s : ttp) ->> (t : ttp) ->> (ttm s ->> ttm t) ->> ttm (tarr s t)
+| tone : ttm tunit
+| tinl : (s : ttp) ->> (t : ttp) ->> ttm s ->> ttm (tsum s t)
+| tinr : (s : ttp) ->> (t : ttp) ->> ttm t ->> ttm (tsum s t)
+| tcase : (s : ttp) ->> (t : ttp) ->> (r : ttp) ->
+          ttm (tsum s t) ->> (ttm s ->> ttm r) ->> (ttm t ->> ttm r) ->> ttm r
+
+def tran_tp : (|- stp) -> (|- ttp) where
+| bool => tsum tunit tunit
+| (arr s t) => tarr (tran_tp s) (tran_tp t)
+
+data rel: ctx -> ctx -> set where
+| empty : rel \0 \0
+| cons : (g : ctx) -> (h : ctx) -> (t : |- stp) -> rel g h -> rel (g, x: stm t) (h, y: ttm (tran_tp t))
+
+def tran : (g : ctx) -> (h : ctx) -> rel g h -> (st : |- stp) -> (g |- stm st) -> (h |- ttm (tran_tp st)) where
+| g h r t (app s[^] .t m n) => tapp (tran_tp s)[^] (tran_tp t)[^] (tran g h r (arr s t) m) (tran g h r s n)
+| g h r st tm => ?toto
