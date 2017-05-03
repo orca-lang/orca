@@ -120,7 +120,7 @@ let rec get_bound_var_ctx_no_annot (e : E.exp) : ctx =
 
 let rec get_bound_var_ctx_in_pat (p : E.pat) : bctx =
   match p with
-  | E.PComma (g, E.PIdent n) -> n :: (get_bound_var_ctx_in_pat g)
+  | E.PComma (g, Some n, _) -> n :: (get_bound_var_ctx_in_pat g)
   | E.PNil -> []
   | E.PIdent _ -> []            (* MMMM *)
   | p -> raise (Error.Error (EP.print_pat p ^ " is a forbidden pattern on the left hand side of :>"))
@@ -313,7 +313,10 @@ let rec collect_pat_vars (s : sign) cG cP p =
     let cG' = collect_pat_vars s cG cP p1 in
     collect_pat_vars s cG' cP p2
   | E.PNil -> cG
-  | E.PComma (p1, p2) -> assert false
+  | E.PComma (p1, _, p2) ->
+     let cG' = collect_pat_vars s cG [] p1 in
+     let cP' = get_bound_var_ctx_in_pat p1 in
+     collect_pat_vars s cG' cP' p2
   | E.PBox (g, p) ->
     if cP = [] then
       let cP' = get_bound_var_ctx_in_pat g in
@@ -364,7 +367,16 @@ let rec pproc_pat (s : sign) cG cP p =
   | E.PDot (p1, p2) ->
     A.PDot (f p1, f p2)
   | E.PNil -> A.PNil
-  | E.PComma (p1, p2) -> assert false
+  | E.PComma (p1, x, p2) ->
+     let x = match x with
+       | None -> "_"
+       | Some x -> x
+     in
+     Debug.print(fun () -> "Preprocessing comma\np1 = " ^ EP.print_pat p1 ^ "\np2 = " ^ EP.print_pat p2);
+     let p1' = pproc_pat s cG [] p1 in
+     let p2' = pproc_pat s cG (get_bound_var_ctx_in_pat p1) p2 in
+     Debug.print(fun () -> "resulting in \np1' = " ^ AP.print_pat p1' ^ "\np2' = " ^ AP.print_pat p2');
+     A.PSnoc(p1', x, p2')
   | E.PBox (g, p) ->
     if cP = [] then
       let cP' = get_bound_var_ctx_in_pat g in

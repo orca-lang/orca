@@ -49,7 +49,8 @@ module Ext = struct
     | PShift i -> "(^ " ^ string_of_int i ^ ")"
     | PDot (p1, p2) -> "(; " ^ print_pat p1 ^ " " ^ print_pat p2 ^ ")"
     | PNil -> "0"
-    | PComma (p1, p2) -> "(, " ^ print_pat p1 ^ " " ^ print_pat p2 ^ ")"
+    | PComma (p1, None, p2) -> "(, " ^ print_pat p1 ^ " " ^ print_pat p2 ^ ")"
+    | PComma (p1, Some x, p2) -> "(, " ^ print_pat p1 ^ " " ^ x ^ " : " ^ print_pat p2 ^ ")"
     | PPar x -> "(<:" ^ x ^ ")"
     | PUnder -> "_"
     | PWildcard -> "._"
@@ -127,7 +128,7 @@ module Apx = struct
     | PShift i -> "^ " ^ string_of_int i
     | PDot (p1, p2) -> "(" ^ print_pat p1 ^ " ; " ^ print_pat p2 ^ ")"
     | PNil -> "0"
-    | PSnoc (p1, x, p2) -> "(" ^ print_pat p1 ^ " , " ^ x ^ ":" ^ print_pat p1 ^ ")"
+    | PSnoc (p1, x, p2) -> "(" ^ print_pat p1 ^ " , " ^ x ^ ":" ^ print_pat p2 ^ ")"
     | PUnder -> "_"
     | PWildcard -> "._"
 
@@ -237,7 +238,6 @@ module Int = struct
     in
     "{" ^ print cP ^ "}"
 
-
   and print_pi tel t = match tel with
     | [] -> print_exp t
     | (_, x, e) :: tel when is_name_floating x ->
@@ -272,7 +272,7 @@ module Int = struct
 
   and print_pat_bctx = function
     | PNil -> "0"
-    | PSnoc (cP, x, p) -> "(" ^ print_pat_bctx cP ^ " , " ^ x ^ ":" ^ print_syn_pat p ^ ")"
+    | PSnoc (cP, x, t) -> "(" ^ print_pat_bctx cP ^ " , " ^ x ^ print_syn_exp t ^ ")"
     | PCtxVar n -> print_name n
 
   let print_ctx = function

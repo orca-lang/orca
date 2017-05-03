@@ -97,8 +97,13 @@ and syn_psubst sign cP (x, p') = function
 
 and bctx_psubst sign (x, p') = function
   | I.PNil -> I.PNil
-  | I.PSnoc (cP, s, p) -> I.PSnoc (bctx_psubst sign (x, p') cP, s, syn_psubst sign (I.bctx_of_pat_ctx cP) (x, p') p)
-  | I.PCtxVar n when n = x -> raise (Error.Violation "Why?")
+  | I.PSnoc (cP, s, t) -> I.PSnoc (bctx_psubst sign (x, p') cP, s, subst_syn (x, I.exp_of_pat p') t)
+  | I.PCtxVar n when n = x ->
+     begin match p' with
+     | I.PBCtx p -> p
+     | I.PVar m -> I.PCtxVar m
+     | _ -> raise (Error.Violation ("Why not?" ^ IP.print_pat p'))
+     end
   | I.PCtxVar n -> I.PCtxVar n
 
 (* let psubst sign (x, p') (p : I.pat) : I.pat = *)

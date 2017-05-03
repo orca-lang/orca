@@ -48,7 +48,7 @@ module Ext = struct
     | PShift of int
     | PDot of pat * pat
     | PNil
-    | PComma of pat *  pat
+    | PComma of pat * name option * pat
     | PBox of pat * pat
     | PUnder
     | PWildcard                 (* Inaccessible pattern wildcard *)
@@ -153,7 +153,7 @@ module Int = struct
     = Set of universe
     | Pi of tel * exp  (* A pi type *)
     | Box of bctx * syn_exp
-    | Ctx (* of exp *) (* Let's think about it *)
+    | Ctx
     | Const of def_name (* The name of a constant *)
     | Dest of def_name
     | Var of name
@@ -217,7 +217,7 @@ module Int = struct
 
   and pat_bctx =
     | PNil
-    | PSnoc of pat_bctx * string * syn_pat
+    | PSnoc of pat_bctx * string * syn_exp
     | PCtxVar of name
 
   type pats = pat list
@@ -284,7 +284,7 @@ module Int = struct
 
   and bctx_of_pat_ctx = function
     | PNil -> Nil
-    | PSnoc (cP, x, p2) -> Snoc (bctx_of_pat_ctx cP, x, syn_exp_of_pat p2)
+    | PSnoc (cP, x, t) -> Snoc (bctx_of_pat_ctx cP, x, t)
     | PCtxVar n -> CtxVar n
 
 end

@@ -79,7 +79,7 @@ let matching (p : I.pat) (q : pat) : pats =
        | I.PConst (n, ps), A.PConst (n', qs) -> raise(Error.Error "Pattern matching does not
  match. (A)")
        | I.Inacc _, _ -> []
-       | I.PBCtx cP, _ -> assert false
+       | I.PBCtx p, _ -> bctx_apx_match p q
        | I.PTBox (cP, p), q -> syn_apx_match cP p q
        | _ -> assert false
      and syn_apx_match cP p q =
@@ -95,6 +95,12 @@ let matching (p : I.pat) (q : pat) : pats =
        | I.PSConst (n, ps), A.PConst (n', qs) -> raise(Error.Error "Pattern matching does not match. (A)")
        | I.PDot (s, p), A.PDot (s', p') -> syn_apx_match cP s s' @ syn_apx_match cP p p'
        | _ -> raise (Error.Violation "Something will happen")
+     and bctx_apx_match p q =
+       match p, q with
+       | I.PCtxVar x, A.PVar y  -> [Int (I.PBCtx (I.PCtxVar y))]
+       | I.PSnoc (p1, _, p2), A.PSnoc (q1, _, q2) -> (bctx_apx_match p1 q1) (* @ (syn_apx_match (I.bctx_of_pat_ctx p1) p2 q2) *)
+       | I.PNil, A.PNil -> []
+       | _ -> assert false
      in
      apx_match p a
   | Int i ->
@@ -336,6 +342,26 @@ let split_clos (sign : signature) (p1 : pats) (n, s : name * pat_subst) (cD1 : I
   | None -> raise (Error.Error ("Cannot check pattern matching clause " ^ print_name n ^ "[" ^ print_pat_subst s ^ "] "
                                ^ " because it was not possible to compute an inverse substitution for " ^ print_pat_subst s))
 
+(* let split_snoc (sign : signature) (p1 : pats) (g, y, p : pat * string * pat) (cD1 : I.ctx) *)
+(*     (x, t : name * I.exp) (cD2 : I.ctx) : I.ctx * I.pats = *)
+(*   let _ = match Whnf.whnf sign t with *)
+(*     | I.Ctx -> () *)
+(*     | _ -> *)
+(*        match g, p with *)
+(*        | Apx g, Apx p -> raise (Error.Error ("Pattern " ^ AP.print_pat (A.PSnoc(g, y, p)) *)
+(*                                              ^ " was a context while expecting a pattern for type " ^ IP.print_exp t)) *)
+(*        | Int (I.PBCtx g), Int (I.PTBox (_, p)) -> *)
+(*           raise (Error.Error ("Pattern " ^ IP.print_pat (I.PBCtx (I.PSnoc(g, y, p))) *)
+(*                               ^ " was a context while expecting a pattern for type " ^ IP.print_exp t)) *)
+(*        | _ -> assert false *)
+(*   in *)
+(*   let g' = gen_floating_name () in *)
+(*   let p' = gen_floating_name () in *)
+(*   let ss = x, I.BCtx (I.Snoc (I.CtxVar g', y, I.Unbox(I.Var p', I.id_sub, I.CtxVar g'))) in *)
+(*   let pss = x, I.PBCtx (I.PSnoc (I.PCtxVar g', y, I.PUnbox (p', pid_sub, I.CtxVar g'))) in *)
+(*   compute_split_map sign ss pss cD1 x cD2 [] [] (cD1 @ [g', I.Ctx]) *)
+
+
 let split_rec (sign : signature) (ps : pats) (cD : I.ctx) : I.ctx * I.pats =
   let rec search p1 p2 cD1 cD2 =
     match p2 with
@@ -364,7 +390,8 @@ let split_rec (sign : signature) (ps : pats) (cD : I.ctx) : I.ctx * I.pats =
        search (p1 @ [Apx(A.SInacc (e, s))]) ps (cD1 @ [x, t]) cD2
     | A.PLam (xs, p), (x, t) :: cD2 ->
        split_lam sign p1 (xs, Apx p) cD1 (x, t) cD2
-
+    (* | A.PSnoc (g, y, p), (x, t) :: cD2 -> *)
+    (*    split_snoc sign p1 (Apx g, y, Apx p) cD1 (x, t) cD2 *)
     | _ -> raise (Error.Error ("Search: not implemented\np = " ^ AP.print_pat p ^ "\ncD2 = " ^ IP.print_ctx cD2))
 
   and search_int p1 p ps cD1 cD2 =
@@ -375,6 +402,10 @@ let split_rec (sign : signature) (ps : pats) (cD : I.ctx) : I.ctx * I.pats =
        search (p1 @ [Int(I.Inacc e)]) ps (cD1 @ [x, t]) cD2
     | I.PTBox (cP1, I.PUnbox(n, s, cP2)), (x, t) :: cD2 ->
        search (p1 @ [Int(I.PTBox (cP1, I.PUnbox(n, s, cP2)))]) ps (cD1 @ [x, t]) cD2
+    (* | I.PBCtx (I.PSnoc (g, y, p)), (x, t) :: cD2 -> *)
+    (*    split_snoc sign p1 (Int (I.PBCtx g), y, Int (I.PTBox (I.bctx_of_pat_ctx g, p))) cD1 (x, t) cD2 *)
+    | I.PBCtx (I.PCtxVar y), (x, t) :: cD2 ->
+       search (p1 @ [Int (I.PBCtx (I.PCtxVar y))]) ps (cD1 @ [y, t]) (ctx_subst (x, I.Var y) cD2)
     | _ -> raise (Error.Violation ("I bet this will never be raised. p = " ^ IP.print_pat p))
   (*   match p, cD2 with *)
   (*   | I.PConst (c, sp), (x, t) :: cD2 -> *)

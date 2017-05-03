@@ -301,11 +301,11 @@ let rec fmt_pat cG pps = function
 and fmt_syn_pat_bctx cG pps = function
   | PNil -> string pps "0"
   | PCtxVar n -> comp_var cG pps n
-  | PSnoc (cP', n, p) ->
+  | PSnoc (cP', n, t) ->
      Fmt.pf pps "%a, %a: %a"
             (fmt_syn_pat_bctx cG) cP'
             bound_name n
-            (fmt_syn_pat cG (bctx_of_pat_ctx cP')) p
+            (fmt_syn_exp cG (bctx_of_pat_ctx cP')) t
 
 and fmt_syn_pat cG cP pps = function
   | PBVar i ->

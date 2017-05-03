@@ -89,7 +89,7 @@ and fv_syn_pat =
 and fv_pat_bctx =
   function
   | PNil -> []
-  | PSnoc (cP, _, p) -> fv_pat_bctx cP @ fv_syn_pat p
+  | PSnoc (cP, _, _) -> fv_pat_bctx cP
   | PCtxVar n -> [n]
 
 and fv_pats ps = List.concat(List.map fv_pat ps)

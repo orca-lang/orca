@@ -127,7 +127,8 @@ pattern:
 | LAM x = IDENT+ DOT p = pattern {PLam (x, p)}
 | c = IDENT ps = simple_pattern+ {PConst (c, ps)}
 | p1 = pattern SEMICOLON p2 = pattern {PDot (p1, p2)}
-| s = pattern COMMA e = pattern {PComma (s, e)}
+| s = pattern COMMA e = pattern {PComma (s, None, e)}
+| s = pattern COMMA x = IDENT COLON e = pattern {PComma (s, Some x, e)}
 | p1 = pattern TTS p2 = pattern {PBox (p1, p2)}
 | STT x = IDENT {PPar x}
 | p = simple_pattern {p}
