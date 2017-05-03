@@ -32,6 +32,8 @@ let rec match_pat sign p e =
      match_pats sign ps sp
   | PConst (n, _), App(Const n', _) ->
      raise (Matching_failure (p, e))
+  | PTBox (cP, p), TermBox(cP', e) ->
+     match_syn_pat sign cP' p e
   | _ -> raise (Matching_failure (p, e))
 
 and match_pats sign ps es =
@@ -46,7 +48,11 @@ and match_syn_pat sign cP p e =
      match_syn_pats sign cP ps sp
   | PSConst (n, _), AppL(SConst n', _) ->
      raise (Matching_syn_failure (p, e))
-
+  | PUnbox (n, s, cP'), e  ->
+     begin match apply_inv_pat_subst e s with
+     | None -> raise (Matching_syn_failure (p, e))
+     | Some e' -> [n, TermBox (cP', e')]
+     end
   (* | PPar n, BVar i -> [n, BVar i] *)
   | _ -> raise (Matching_syn_failure (p, e))
 
