@@ -8,7 +8,6 @@ open Util
 
 exception Matching_failure of pat * exp
 exception Matching_syn_failure of syn_pat * syn_exp
-exception Stuck
 
 let cong_stel tel s cP =
   let rec ninja tel i cP' =
@@ -22,15 +21,6 @@ let cong_stel tel s cP =
   let tel', i, cP' = ninja tel 0 cP in
   tel', (ShiftS (i, s)), cP'
 
-let check_stuck = function (* MMMMM *)
-  | Var _ -> true
-  | _ -> false
-
-let rec check_syn_stuck = function (* MMMMM *)
-  | AppL(e, _)
-  | Clos(e, _, _) -> true (* check_stuck e *)
-  | _ -> false
-
 let rec match_pat sign p e =
   let e = whnf sign e in
   Debug.print ~verbose:true  (fun () -> "Matching pattern " ^ print_pat p ^ " against term " ^ print_exp e);
@@ -42,7 +32,6 @@ let rec match_pat sign p e =
      match_pats sign ps sp
   | PConst (n, _), App(Const n', _) ->
      raise (Matching_failure (p, e))
-  | _ when check_stuck e -> raise Stuck
   | _ -> raise (Matching_failure (p, e))
 
 and match_pats sign ps es =
@@ -59,7 +48,6 @@ and match_syn_pat sign cP p e =
      raise (Matching_syn_failure (p, e))
 
   (* | PPar n, BVar i -> [n, BVar i] *)
-  | _ when check_syn_stuck e -> raise Stuck
   | _ -> raise (Matching_syn_failure (p, e))
 
 (* | PAnnot (p, e) -> *)
@@ -86,6 +74,9 @@ and reduce_with_clause sign sp (pats, rhs) =
       Matching_failure (p, e) ->
       Debug.print ~verbose:true  (fun () -> "Term " ^ print_exp e ^ " failed to match against pattern " ^ print_pat p);
       None
+    | Matching_syn_failure (p, e) ->
+      Debug.print ~verbose:true  (fun () -> "Term " ^ print_syn_exp e ^ " failed to match against pattern " ^ print_syn_pat p);
+      None
   end
 
 and reduce_with_clauses sign sp cls =
@@ -103,12 +94,9 @@ and reduce_with_clauses sign sp cls =
     None
   else
     let sp1, sp2 = split_first cl_l sp in
-    try
-      match reduce (List.map (whnf sign) sp1) cls with
-      | None -> raise (Error.Error ("Coverage error")) (* Maybe we don't want to fail here, and just be stuck *)
-      | Some e -> Some (e, sp2)
-    with Stuck -> None
-
+    match reduce (List.map (whnf sign) sp1) cls with
+    | None -> None
+    | Some e -> Some (e, sp2)
 
 and whnf (sign : signature) (e : exp) : exp =
   (* Debug.print ~verbose:true  (fun () -> "Computing the whnf of " ^ print_exp e) ; *)
