@@ -1,0 +1,19 @@
+data ⋆ : set where
+| ∘ : ⋆
+
+data list : set where
+| nil : list
+| cons : ⋆ -> list -> list
+
+data var : list -> set where
+| top : (a : ⋆) -> (g : list) -> var (cons a g)
+| pop : (a : ⋆) -> (g : list) -> var g -> var (cons a g)
+
+data rel : list -> list -> set where
+| empty : rel nil nil
+| rcons : (a : ⋆) -> (g : list) -> (h : list) -> rel g h -> rel (cons a g) (cons a h)
+
+def lookup : (g : list) -> (h : list) -> rel g h -> var g -> var h where
+| .nil .nil empty v => ?
+| .(cons a g) .(cons a h) (rcons .a .g h r) (top a g) => ?
+| .(cons a g) .(cons a h) (rcons .a g h r) (pop a .g v) => ?

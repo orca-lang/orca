@@ -81,7 +81,8 @@ let matching (p : I.pat) (q : pat) : pats =
        | I.Inacc _, _ -> []
        | I.PBCtx p, _ -> bctx_apx_match p q
        | I.PTBox (cP, p), q -> syn_apx_match cP p q
-       | _ -> assert false
+       | _ -> Debug.print (fun () -> "Failed to match\np = " ^ IP.print_pat p ^ ", q = " ^ AP.print_pat q);
+              raise (Error.Error ("Failed to match\np = " ^ IP.print_pat p ^ ", q = " ^ AP.print_pat q));
      and syn_apx_match cP p q =
        match p, q with
        | I.PLam (xs, p), A.PLam (ys, q) -> syn_apx_match (bctx_of_lam_pars cP xs) p q
@@ -361,6 +362,19 @@ let split_clos (sign : signature) (p1 : pats) (n, s : name * pat_subst) (cD1 : I
 (*   let pss = x, I.PBCtx (I.PSnoc (I.PCtxVar g', y, I.PUnbox (p', pid_sub, I.CtxVar g'))) in *)
 (*   compute_split_map sign ss pss cD1 x cD2 [] [] (cD1 @ [g', I.Ctx]) *)
 
+let split_bvar (sign : signature) (p1 : pats) (y : I.index) (cD1 : I.ctx)
+    (x, t : name * I.exp) (cD2 : I.ctx) : I.ctx * I.pats =
+  let cP, t = match Whnf.whnf sign t with
+    | I.Box(cP, t) -> cP, t
+    | _ -> raise (Error.Error "Bound variable needs to be of boxed type")
+  in
+  let t' = lookup_bound cP y in
+  Debug.print (fun () -> "Splitting bvars.\nExpected type " ^ IP.print_syn_exp t ^ "\nInfered type " ^ IP.print_syn_exp t');
+  let cD', _, delta, pdelta, _ = split_flex_unify sign [] (Some cP) p1 [] [] cD1 (Syn [t]) (Syn [t']) in
+  let cP' = simul_subst_on_bctx delta cP in
+  let ss = x, I.TermBox(cP', I.BVar y) in
+  let pss = x, I.PTBox(cP', I.PBVar y) in
+  compute_split_map sign ss pss cD1 x cD2 delta pdelta cD'
 
 let split_rec (sign : signature) (ps : pats) (cD : I.ctx) : I.ctx * I.pats =
   let rec search p1 p2 cD1 cD2 =
@@ -368,7 +382,9 @@ let split_rec (sign : signature) (ps : pats) (cD : I.ctx) : I.ctx * I.pats =
     | Apx p :: ps -> search_apx p1 p ps cD1 cD2
 
     | Int p :: ps -> search_int p1 p ps cD1 cD2
-    | [] -> raise (Error.Violation ("Search concluded and didn't choose a pattern to split on."))
+    | [] ->
+       Debug.print (fun () -> "Search couldn't find a pattern to split on among " ^ print_pats ps);
+       raise (Error.Violation ("Search concluded and didn't choose a pattern to split on."))
   and search_apx p1 p ps cD1 cD2 =
     match p, cD2 with
     | A.PConst (c, sp), (x, t) :: cD2 ->
@@ -390,6 +406,8 @@ let split_rec (sign : signature) (ps : pats) (cD : I.ctx) : I.ctx * I.pats =
        search (p1 @ [Apx(A.SInacc (e, s))]) ps (cD1 @ [x, t]) cD2
     | A.PLam (xs, p), (x, t) :: cD2 ->
        split_lam sign p1 (xs, Apx p) cD1 (x, t) cD2
+    | A.PBVar y, (x, t) :: cD2 ->
+       split_bvar sign p1 y cD1 (x, t) cD2
     (* | A.PSnoc (g, y, p), (x, t) :: cD2 -> *)
     (*    split_snoc sign p1 (Apx g, y, Apx p) cD1 (x, t) cD2 *)
     | _ -> raise (Error.Error ("Search: not implemented\np = " ^ AP.print_pat p ^ "\ncD2 = " ^ IP.print_ctx cD2))
@@ -464,18 +482,14 @@ let split_set sign (x : name) (cG : I.ctx) : I.pats =
 
 let refine (sign : signature) (p : pats) (cD : I.ctx) (sigma : I.pats) : pats * I.ctx * I.pats =
   Debug.indent ();
-  Debug.print (fun () -> "Refined called: p = " ^ print_pats p
-                         ^ "\ncD = " ^ IP.print_ctx cD
-                         ^ "\nsigma = " ^ IP.print_pats sigma);
   let cD', delta = split_rec sign p cD in
-  Debug.print (fun () -> "Calling split_rec with cD = " ^ IP.print_ctx cD
-                         ^ "\np = " ^ print_pats p
-                         ^ "\nresulting in delta = " ^ IP.print_pats delta
-                         ^ "\nand ctx cD' = " ^ IP.print_ctx cD' ^ ".");
   let p' = matchings delta p in
-  Debug.print (fun () -> "Calling matchings with delta = " ^ IP.print_pats delta
-                         ^ "\np = " ^ print_pats p ^ "\nresulting in " ^ print_pats p' ^ ".");
   let sd = compose_maps sign sigma cD delta in
+  Debug.print (fun () -> "Refine report:\nInput:\n\tp = "^ print_pats p ^ "\n\tsigma = " ^ IP.print_pats sigma
+                         ^ "\n\tcD = "  ^ IP.print_ctx cD
+                         ^ "\ndelta = " ^ IP.print_pats delta
+                         ^ "\nOutput:\n\tp' = " ^ print_pats p' ^ "\n\tsigma o delta " ^ IP.print_pats sd
+                         ^ "\n\tcD' = "  ^ IP.print_ctx cD');
   Debug.deindent ();
   p' , cD', sd
 
@@ -486,6 +500,7 @@ let check_pats (sign : signature) (p : pats) (cG : I.ctx) : I.ctx * I.pats =
     | Int (I.PTBox (_, I.PUnbox _))
     | Apx (A.SInacc _)
     | Apx (A.Inacc _)
+    | Apx (A.PWildcard)
     | Apx (A.PVar _) -> true
     | _ -> false
   in
@@ -504,15 +519,6 @@ let check_pats (sign : signature) (p : pats) (cG : I.ctx) : I.ctx * I.pats =
       cD, sigma
     else
       let p', cD', sigma' = refine sign p cD sigma in
-      Debug.print (fun () -> "Check pats on"
-                             ^ "\np = " ^ print_pats p
-                             ^ "\nsigma = " ^ IP.print_pats sigma
-                             ^ "\ncD = " ^ IP.print_ctx cD);
-      Debug.print (fun () -> "Getting from refine"
-                             ^ "\np' = " ^ print_pats p'
-                             ^ "\nsigma' = " ^ IP.print_pats sigma'
-                             ^ "\ncD' = " ^ IP.print_ctx cD');
-
       check_pats p' sigma' cD'
   in
   let res = check_pats p (List.map (fun (x, _) -> I.PVar x) cG) cG in
@@ -547,6 +553,8 @@ and check_inacs_syn (sign, cD : signature * I.ctx) (cP : I.bctx) (p : A.pats) (s
   in make_subst_tel p sigma tel cP I.id_sub
 
 and check_inac (sign, cD : signature * I.ctx) (p : A.pat) (q : I.pat) (t : I.exp) : I.pat =
+  Debug.print (fun () -> "Checking inaccessible\n\tp = "
+                         ^ AP.print_pat p ^ "\n\tq = " ^ IP.print_pat q ^ "\n\tcD = " ^ IP.print_ctx cD);
   match p, q with
   | A.PWildcard, I.Inacc e -> I.Inacc e
 
@@ -578,7 +586,9 @@ and check_inac (sign, cD : signature * I.ctx) (p : A.pat) (q : I.pat) (t : I.exp
      | _ -> raise (Error.Violation ("It should have been a constructor."))
      end
   | _, I.PTBox (cP, q) -> begin match t with
-         | I.Box (cP', t') when cP = cP' -> I.PTBox(cP, check_inac_syn (sign, cD) cP p q t')
+         | I.Box (cP', t') when (Whnf.normalize_bctx sign cP) = (Whnf.normalize_bctx sign cP') ->
+            I.PTBox(cP, check_inac_syn (sign, cD) cP p q t')
+         | I.Box (cP', t') -> raise (Error.Error ("cP = " ^ IP.print_bctx cP ^"\ncP' = " ^ IP.print_bctx cP'))
          | _ -> raise (Error.Error ("Syntactic pattern was used against a non boxed type: " ^ Pretty.print_exp cD t))
          end
   | A.Inacc _, _ -> raise (Error.Error ("Failed to infer the value of inaccessible pattern when checking that the pattern "

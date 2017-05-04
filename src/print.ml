@@ -278,7 +278,7 @@ module Int = struct
   let print_ctx = function
     | [] -> "[]"
     | [x, e] -> "[" ^ print_name x ^ " : " ^ print_exp e ^ "]"
-    | c -> "[" ^ (String.concat "," (List.map (fun (x, e) -> print_name x ^ ": " ^ print_exp e ^ "\n") c)) ^ "]"
+    | c -> "[" ^ (String.concat ", " (List.map (fun (x, e) -> print_name x ^ ": " ^ print_exp e) c)) ^ "]"
 
   let print_tel (tel : tel) : string =
     String.concat ", " (List.map (fun (_, x, e) -> "(" ^ print_name x
