@@ -210,15 +210,18 @@ and pproc_comma (s : sign) (cG : ctx) (cP : bctx) (g : E.exp) : bctx * A.exp =
   | _ -> raise (Error.Error_loc (loc g, "Left hand side of comma should be a context. Instead found: " ^ EP.print_exp g))
 
 and pproc_tel (s : sign) (cG : ctx) (cP : bctx) (e : E.exp) : A.tel * A.exp =
-  let rec g cG e t0 = match content e with
-    | E.App (P(_, E.Ident n), e') ->
-      let cG', n' = add_name_ctx cG n in
-      let cG'', tel = g cG' e' t0 in
-      cG'', (Syntax.Explicit, n', t0) :: tel
-    | E.Ident n ->
-      let cG'', n' = add_name_ctx cG n in
-      cG'', [Syntax.Explicit, n', t0]
-    | _ -> raise (Error.Error_loc (loc e, "Left hand side of arrow was not a series of identifiers annotated by a type."))
+  (* f and g are respectively here to allow types of the form
+     (a : A) (b : B) -> ... and (a1 a2 : A) -> ... rather than
+     (a : A) -> (b : B) -> ... and (a1 : A) -> (a2 : A) -> ... *)
+  let g cG e t0 =
+    let rec extract_names ns = match content ns with
+      | E.Ident n -> [n]
+      | E.App (ns, P(_, E.Ident n)) -> n :: extract_names ns
+      | _ -> raise (Error.Error "Malformed arrow type")
+    in
+    let ns = extract_names e in
+    let cG', ns' = add_names_ctx cG ns in
+    cG', List.map (fun n -> Syntax.Explicit, n, t0) (List.rev ns')
   in
   let rec f cG e = match content e with
     | E.Annot (e, t0) ->
@@ -226,30 +229,64 @@ and pproc_tel (s : sign) (cG : ctx) (cP : bctx) (e : E.exp) : A.tel * A.exp =
       let cG', tel = g cG e t0' in
       Debug.print ~verbose:true (fun () -> "Calling f in pproc_tel\ntel = " ^ AP.print_tel tel);
       cG', tel
-    | E.App (P(_, E.Annot(e, t0)), t1) ->
-      let t0' = pproc_exp s cG cP t0 in
-      let cG', tel = g cG e t0' in
-      let cG'', tel'  = f cG' t1 in
+    | E.App (t0, P(_, E.Annot(e, t1))) ->
+      let cG', tel = f cG t0 in
+      let t1' = pproc_exp s cG' cP t1 in
+      let cG'', tel' = g cG' e t1' in
       Debug.print ~verbose:true (fun () -> "Calling f in pproc_tel\ntel = " ^ AP.print_tel tel ^ "\ntel' = " ^ AP.print_tel tel');
       cG'', tel @ tel'
-    | _ -> let tel = [Syntax.Explicit, Name.gen_floating_name (), pproc_exp s cG cP e] in
-           Debug.print ~verbose:true (fun () -> "Calling f in pproc_tel. Fall through, resulting in = " ^ AP.print_tel tel);
-      cG, tel
+    | _ -> raise (Error.Error "List of variable declarations was malformed")
   in
   match content e with
-  | E.Arr (t0, t1) ->
+  | E.Arr (P(_, E.Annot _) as t0, t1)
+  | E.Arr (P(_, E.App (_, P(_, E.Annot _))) as t0, t1) ->
     let cG', tel = f cG t0 in
     let tel', t = pproc_tel s cG' cP t1 in
-     tel @ tel' , t
+    tel @ tel' , t
+  | E.Arr (t0, t1) ->
+    let tel, t = pproc_tel s cG cP t1 in
+    (Syntax.Explicit, Name.gen_floating_name (), pproc_exp s cG cP t0) :: tel, t
   | _ -> Debug.print ~verbose:true (fun () -> "preproc tel matched against " ^ EP.print_exp e);
     [], pproc_exp s cG cP e
 
 and pproc_stel (s : sign) (cG : ctx) (cP : bctx) (e : E.exp) : A.stel * A.exp =
+  (* Just like in pproc_tel, f and g allow for a more condensed of pi types *)
+  let g cP e t0 = (* e should be a list of identifiers *)
+    let rec extract_names ns = match content ns with
+      | E.Ident n -> [n, pproc_exp s cG cP t0]
+      | E.App (ns, P(_, E.Ident n)) ->
+        let ns' = extract_names ns in
+        let cP' = add_name_bvars cP (List.map fst ns') in
+        (n, pproc_exp s cG cP' t0) :: ns'
+      | _ -> raise (Error.Error "Malformed arrow type")
+    in
+    (* Note: extract_names is not very nice. We preprocess t0 a number
+       of times equal to the number of identifiers in e. This is
+       because each new identifier has a type that depends on the
+       previous ones. Since everything is handled with DeBruijn
+       indices, we need to make sure the numbers are correct each
+       time. A more efficient solution could be to apply a shifting
+       traversal (or maybe just the term _[^1]?) successively. *)
+    let ns' = extract_names e in
+    add_name_bvars cP (List.map fst ns'), List.map (fun (n, t0) -> Syntax.Explicit, n, t0) (List.rev ns')
+  in
+  let rec f cP e = match content e with
+    | E.Annot (e, t0) ->
+      g cP e t0
+    | E.App (t0, P(_, E.Annot(e, t1))) ->
+      let cP', tel = f cP t0 in
+      let cP'', tel' = g cP' e t1 in
+      cP'', tel @ tel'
+    | _ -> raise (Error.Error "List of variable declarations was malformed")
+  in
   match content e with
-  | E.Arr (P(_, E.Annot (P(_, E.Ident n), t0)), t1)
-  | E.SArr (P(_, E.Annot (P(_, E.Ident n), t0)), t1) ->
-     let tel, t = pproc_stel s cG (add_name_bvars cP [n]) t1 in
-     (Syntax.Explicit, n, pproc_exp s cG cP t0) :: tel, t
+  | E.Arr (P(_, E.Annot _) as t0, t1)
+  | E.Arr (P(_, E.App (_, P(_, E.Annot _))) as t0, t1)
+  | E.SArr (P(_, E.Annot _) as t0, t1)
+  | E.SArr (P(_, E.App (_, P(_, E.Annot _))) as t0, t1) ->
+    let cP', tel = f cP t0 in
+    let tel', t = pproc_stel s cG cP' t1 in
+    tel @ tel', t
   | E.Arr (t0, t1)
   | E.SArr (t0, t1) ->
      let tel, t = pproc_stel s cG ("_"::cP) t1 in

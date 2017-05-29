@@ -3,13 +3,13 @@
 data eq (A : set) : A -> A -> set where
 | refl: (x : A) -> eq A x x
 
-def ref : (A : set) -> (x : A) -> eq A x x = fn A x => refl x
+def ref : (A : set) (x : A) -> eq A x x = fn A x => refl x
 
 (*) TODO consider this syntax
 (*) def ref (A : *) (x : A) : eq A x x = refl x
 
-def sym : (A : set) -> (x : A) -> (y : A) ->  eq A x y -> eq A y x where
+def sym : (A : set) (x y : A) -> eq A x y -> eq A y x where
 | A z .z (refl .z) => refl z
 
-def trans : (A : set) -> (x : A) -> (y : A) -> (z : A) -> eq A x y -> eq A y z -> eq A x z where
+def trans : (A : set) (x y z : A) -> eq A x y -> eq A y z -> eq A x z where
 | A x .x .x (refl .x) (refl .x) => refl x

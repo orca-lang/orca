@@ -3,5 +3,5 @@
 data eq (A : set) (x : A) : A -> set where
 | refl: eq A x x
 
-def k : (A : set) -> (a : A) -> (P : eq A a a -> set) -> (p : P refl) -> (e : eq A a a) -> P e where
+def k : (A : set) (a : A) (P : eq A a a -> set) (p : P refl) (e : eq A a a) -> P e where
 | A a P p refl => p

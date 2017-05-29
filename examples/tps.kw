@@ -9,14 +9,12 @@ syn tp where
 
 syn oft : tm ->> tp ->> * where
 | t-unit: oft one unit
-| t-app: (f: tm) ->> (e : tm) ->> (s: tp) ->> (t: tp)
-         ->> oft f (arr s t) ->> oft e s ->> oft (app f e) t
-| t-lam: (s:tp) ->> (t:tp) ->> (e:tm ->> tm)
-         ->> ((x:tm) ->> oft x s ->> oft (e x) t) ->> oft (lam e) (arr s t)
+| t-app: (f e : tm) (s t : tp) ->> oft f (arr s t) ->> oft e s ->> oft (app f e) t
+| t-lam: (s t : tp) (e:tm ->> tm) ->> ((x:tm) ->> oft x s ->> oft (e x) t) ->> oft (lam e) (arr s t)
 
 syn step : tm ->> tm ->> * where
-| s-app1 : (m : tm) ->> (n : tm) ->> (m' : tm) ->> step m m' ->> step (app m n) (app m' n)
-| s-app2 : (a : tm ->> tm) ->> (b : tm) ->> step (app (lam a) b) (a b)
+| s-app1 : (m n m' : tm) ->> step m m' ->> step (app m n) (app m' n)
+| s-app2 : (a : tm ->> tm) (b : tm) ->> step (app (lam a) b) (a b)
 
 thm tps : (m n : (|- tm)) (t : (|- tp)) -> (|- oft m t) -> (|- step m n) -> (|- oft n t) where
 | (app m n) (app m' .n) t (t-app .m .n s .t d1 d2) (s-app1 .m .n .m' e) =>
@@ -26,7 +24,7 @@ thm tps : (m n : (|- tm)) (t : (|- tp)) -> (|- oft m t) -> (|- step m n) -> (|- 
   d1[^ ; n ; d2]
 
 (*) And now with contexts (they are not necessary, but we tried it anyways!)
-thm tps' : (g : ctx) -> (m n : (g |- tm)) -> (t : |- tp) -> (g |- oft m t) -> (g |- step m n) -> (g |- oft n t) where
+thm tps' : (g : ctx) (m n : (g |- tm)) (t : |- tp) -> (g |- oft m t) -> (g |- step m n) -> (g |- oft n t) where
 | g (app m n) (app m' .n) t (t-app .m .n s[^] .t d1 d2) (s-app1 .m .n .m' e) =>
   t-app m' n s t (tps' g m m' (arr s t) d1 e) d2
 | g (app .(lam m) n) ._ t
