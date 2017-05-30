@@ -141,6 +141,17 @@ and fmt_stel cG cP pps (tel, e) =
   in
   fmt_stel' cG cP true pps (tel, e)
 
+(* parens is an integer computing precedence of enclosing expression.
+   If expression has lower precedence (higher number), parentheses
+   are added. Current values are
+   1 - Application
+   2 - Annotation
+   3 - Box
+   4 - Function
+   5 - Pi type
+   Note that term box are not being pretty printed so number is
+   passed simply to fmt_syn_exp which uses a different numbering scale.
+   This should be fixed *)
 and fmt_exp cG parens pps e =
   let open_paren p = if parens < p then "(" else "" in
   let close_paren p = if parens < p then ")" else "" in
@@ -206,6 +217,17 @@ and fmt_exp cG parens pps e =
 
   | BCtx cP -> fmt_bctx cG pps cP
 
+(* parens is an integer computing precedence of enclosing expression.
+   If expression has lower precedence (higher number), parentheses
+   are added. Current values are
+   1 - ShiftS
+   2 - Application
+   3 - Dot
+   4 - Composition
+   5 - Lam
+   6 - Spi
+   Closures use parentheses unless term is atomic
+*)
 and fmt_syn_exp cG cP parens pps e =
   let open_paren p = if parens < p then "(" else "" in
   let close_paren p = if parens < p then ")" else "" in
