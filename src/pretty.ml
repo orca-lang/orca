@@ -49,6 +49,7 @@ let def_color = `Blue
 
 (* Non-breakable space *)
 let nbsp : unit Fmt.t = fun pps () -> Fmt.pf pps " "
+let sapp : unit Fmt.t = fun pps () -> Fmt.pf pps " ' "
 
 (* Formatter pretty printers *)
 
@@ -142,16 +143,17 @@ and fmt_stel cG cP pps (tel, e) =
   fmt_stel' cG cP true pps (tel, e)
 
 (* parens is an integer computing precedence of enclosing expression.
-   If expression has lower precedence (higher number), parentheses
-   are added. Current values are
+   If expression has lower precedence (higher number), parentheses are
+   added. Current values are
    1 - Application
    2 - Annotation
    3 - Box
    4 - Function
    5 - Pi type
-   Note that term box are not being pretty printed so number is
-   passed simply to fmt_syn_exp which uses a different numbering scale.
-   This should be fixed *)
+   Note that term box are not being pretty printed so number passed
+   to fmt_syn_exp is simply incremented by one (so applications match in
+   precedence). This might need to be revised.
+*)
 and fmt_exp cG parens pps e =
   let open_paren p = if parens < p then "(" else "" in
   let close_paren p = if parens < p then ")" else "" in
@@ -192,7 +194,7 @@ and fmt_exp cG parens pps e =
 
   | TermBox (cP, e) ->
      Fmt.pf pps "%a"
-            (fmt_syn_exp cG cP parens) e
+            (fmt_syn_exp cG cP (parens+1)) e
 
      (* Fmt.pf pps "(%a :> %a)" *)
      (*        (fmt_bctx cG) cP *)
@@ -280,7 +282,7 @@ and fmt_syn_exp cG cP parens pps e =
     Fmt.pf pps "%s%a ' %a%s"
       (open_paren 2)
       (fmt_syn_exp cG cP 2) e
-      (list ~sep:nbsp (fmt_syn_exp cG cP 1)) es
+      (list ~sep:sapp (fmt_syn_exp cG cP 1)) es
       (close_paren 2)
 
   | BVar i ->
