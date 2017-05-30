@@ -109,7 +109,7 @@ and fmt_tel cG pps (tel, e) =
       Fmt.pf pps "%a %a"
         (fmt_tel_entry cG) entry
         (fmt_tel' ((n, dt)::cG) false) (tel, e)
-    | [] -> fmt_exp cG pps e
+    | [] -> Fmt.pf pps (if not floating then "-> %a" else "%a") (fmt_exp cG) e
   in
   fmt_tel' cG true pps (tel, e)
 
