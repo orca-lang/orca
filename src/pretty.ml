@@ -120,24 +120,24 @@ and fmt_stel_entry cG cP pps = function
   | Explicit, n, t ->
      Fmt.pf pps "(%a : %a)"
             bound_name n
-            (fmt_syn_exp cG cP) t
+            (fmt_syn_exp cG cP 3) t
   | Implicit, n, t ->
      Fmt.pf pps "{%a : %a}"
             bound_name n
-            (fmt_syn_exp cG cP) t
+            (fmt_syn_exp cG cP 3) t
 
 and fmt_stel cG cP pps (tel, e) =
   let rec fmt_stel' cG cP floating pps (tel, e) =
     match tel with
     | (Explicit, "_", t) :: tel ->
       Fmt.pf pps (if floating then "%a ->> %a" else "->> %a ->> %a")
-        (fmt_syn_exp cG cP) t
+        (fmt_syn_exp cG cP 5) t
         (fmt_stel' cG (Snoc(cP, "_", dst)) true) (tel, e)
     | (_, n, t) as se :: tel ->
       Fmt.pf pps "%a %a"
         (fmt_stel_entry cG cP) se
         (fmt_stel' cG (Snoc(cP, n, dst)) false) (tel, e)
-    | [] -> Fmt.pf pps (if not floating then "->> %a" else "%a") (fmt_syn_exp cG cP) e
+    | [] -> Fmt.pf pps (if not floating then "->> %a" else "%a") (fmt_syn_exp cG cP 6) e
   in
   fmt_stel' cG cP true pps (tel, e)
 
@@ -176,12 +176,12 @@ and fmt_exp cG parens pps e =
     Fmt.pf pps "%s%a |- %a%s"
       (open_paren 3)
       (fmt_bctx cG) cP
-      (fmt_syn_exp cG cP) e
+      (fmt_syn_exp cG cP 6) e
       (close_paren 3)
 
   | TermBox (cP, e) ->
      Fmt.pf pps "%a"
-            (fmt_syn_exp cG cP) e
+            (fmt_syn_exp cG cP parens) e
 
      (* Fmt.pf pps "(%a :> %a)" *)
      (*        (fmt_bctx cG) cP *)
@@ -206,21 +206,27 @@ and fmt_exp cG parens pps e =
 
   | BCtx cP -> fmt_bctx cG pps cP
 
-and fmt_syn_exp cG cP pps = function
+and fmt_syn_exp cG cP parens pps e =
+  let open_paren p = if parens < p then "(" else "" in
+  let close_paren p = if parens < p then ")" else "" in
+  match e with
   | Star -> string pps "*"
   | SCtx -> string pps "ctx"
 
   | SBCtx cP -> fmt_bctx cG pps cP
 
-  | SPi (stel, e) -> Fmt.pf pps "(%a)" (fmt_stel cG cP) (stel, e)
+  | SPi (stel, e) -> Fmt.pf pps "%s%a%s"
+    (open_paren 6)
+    (fmt_stel cG cP) (stel, e)
+    (close_paren 6)
 
   (* | Clos (e1, Shift 0, cP') -> *)
   (*   fmt_syn_exp cG cP' pps e1 *)
 
   | Clos (e1, e2, cP') ->
      Fmt.pf pps "%a[%a]"
-            (fmt_syn_exp cG cP') e1
-            (fmt_syn_exp cG cP) e2
+            (fmt_syn_exp cG cP' 0) e1
+            (fmt_syn_exp cG cP never_paren) e2
 
   (* | Unbox (e1, Shift 0, _) -> *)
   (*   fmt_exp cG pps e1 *)
@@ -228,26 +234,32 @@ and fmt_syn_exp cG cP pps = function
   | Unbox (e1, e2, _) ->
      Fmt.pf pps "%a[%a]"
             (fmt_exp cG 0) e1
-            (fmt_syn_exp cG cP) e2
+            (fmt_syn_exp cG cP never_paren) e2
 
   | Comp(e1, _, e2) ->
-     Fmt.pf pps "(%a) o (%a)"
-            (fmt_syn_exp cG cP) e1
-            (fmt_syn_exp cG cP) e2
+    Fmt.pf pps "%s%a o %a%s"
+      (open_paren 4)
+      (fmt_syn_exp cG cP 4) e1
+      (fmt_syn_exp cG cP 3) e2
+      (close_paren 4)
 
   | ShiftS (n, e) ->
-     Fmt.pf pps "⇑%d (%a)"
-            n
-            (fmt_syn_exp cG cP) e
+     Fmt.pf pps "%s ⇑%d %a%s"
+       (open_paren 1)
+       n
+       (fmt_syn_exp cG cP 1) e
+       (close_paren 1)
 
   | SConst n ->
      Fmt.pf pps "%a"
             const n
 
   | AppL(e, es) ->
-     Fmt.pf pps "(%a ' %a)"
-            (fmt_syn_exp cG cP) e
-            (list ~sep:nbsp (fmt_syn_exp cG cP)) es
+    Fmt.pf pps "%s%a ' %a%s"
+      (open_paren 2)
+      (fmt_syn_exp cG cP 2) e
+      (list ~sep:nbsp (fmt_syn_exp cG cP 1)) es
+      (close_paren 2)
 
   | BVar i ->
      begin match beautify_idx i cP with
@@ -258,25 +270,29 @@ and fmt_syn_exp cG cP pps = function
   | Lam (xs, e) ->
      let xs' = List.map fst xs in
      let cP' = bctx_of_names xs' cP in
-     Fmt.pf pps "(\\%a. %a)"
-            (list bound_name) (beautify_bound_names xs' cP')
-            (fmt_syn_exp cG cP') e
+     Fmt.pf pps "%s\\%a. %a%s"
+       (open_paren 5)
+       (list bound_name) (beautify_bound_names xs' cP')
+       (fmt_syn_exp cG cP' 5) e
+       (close_paren 5)
 
   | Empty -> string pps "^"
   | Shift n ->
      Fmt.pf pps "^%d" n
   | Dot (e1, e2) ->
-     Fmt.pf pps "%a; %a"
-            (fmt_syn_exp cG cP) e1
-            (fmt_syn_exp cG cP) e2
+    Fmt.pf pps "%s%a; %a%s"
+      (open_paren 3)
+      (fmt_syn_exp cG cP 3) e1
+      (fmt_syn_exp cG cP 2) e2
+      (close_paren 3)
 
 and fmt_bctx cG pps = function
   | Nil -> string pps "0"
   | Snoc (cP, n, e) ->
-    Fmt.pf pps "(%a, %a: %a)"
+    Fmt.pf pps "%a, %a : %a"
            (fmt_bctx cG) cP
            bound_name (beautify_bound_name n cP)
-           (fmt_syn_exp cG cP) e
+           (fmt_syn_exp cG cP 3) e
   | CtxVar n -> comp_var cG pps n
 
 let rec fmt_ctx pps = function
@@ -326,7 +342,7 @@ and fmt_syn_pat_bctx cG pps = function
      Fmt.pf pps "%a, %a: %a"
             (fmt_syn_pat_bctx cG) cP'
             bound_name n
-            (fmt_syn_exp cG (bctx_of_pat_ctx cP')) t
+            (fmt_syn_exp cG (bctx_of_pat_ctx cP') 3) t
 
 and fmt_syn_pat cG cP pps = function
   | PBVar i ->
@@ -543,7 +559,7 @@ let print_programs p = produce_string fmt_programs p
 let print_exp cG e = produce_string (fmt_exp cG never_paren) e
 let print_bctx cG cP = produce_string (fmt_bctx cG) cP
 let print_ctx cP = produce_string fmt_ctx cP
-let print_syn_exp cG cP e = produce_string (fmt_syn_exp cG cP) e
+let print_syn_exp cG cP e = produce_string (fmt_syn_exp cG cP never_paren) e
 let print_tel_entry cG te = produce_string (fmt_tel_entry cG) te
 let print_tel cG tel = produce_string (fmt_tel cG) tel
 let print_stel_entry cG cP te = produce_string (fmt_stel_entry cG cP) te
