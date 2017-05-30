@@ -114,8 +114,6 @@ and fmt_tel cG pps (tel, e) =
   fmt_tel' cG true pps (tel, e)
 
 and fmt_stel_entry cG cP pps = function
-  | Explicit, "_", t ->
-     fmt_syn_exp cG cP pps t
   | Explicit, n, t ->
      Fmt.pf pps "(%a : %a)"
             bound_name n
@@ -126,12 +124,19 @@ and fmt_stel_entry cG cP pps = function
             (fmt_syn_exp cG cP) t
 
 and fmt_stel cG cP pps (tel, e) =
-  match tel with
-  | (_, n, t) as se :: tel ->
-     Fmt.pf pps "%a ->> %a"
-            (fmt_stel_entry cG cP) se
-            (fmt_stel cG (Snoc(cP, n, dst))) (tel, e)
-  | [] -> fmt_syn_exp cG cP pps e
+  let rec fmt_stel' cG cP floating pps (tel, e) =
+    match tel with
+    | (Explicit, "_", t) :: tel ->
+      Fmt.pf pps (if floating then "%a ->> %a" else "->> %a ->> %a")
+        (fmt_syn_exp cG cP) t
+        (fmt_stel' cG (Snoc(cP, "_", dst)) true) (tel, e)
+    | (_, n, t) as se :: tel ->
+      Fmt.pf pps "%a %a"
+        (fmt_stel_entry cG cP) se
+        (fmt_stel' cG (Snoc(cP, n, dst)) false) (tel, e)
+    | [] -> Fmt.pf pps (if not floating then "->> %a" else "%a") (fmt_syn_exp cG cP) e
+  in
+  fmt_stel' cG cP true pps (tel, e)
 
 and fmt_exp cG pps = function
   | Set 0 -> Fmt.pf pps "set"
