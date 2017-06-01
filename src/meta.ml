@@ -26,7 +26,6 @@ let rec fv cG =
      List.fold_left (fun vars x -> vars -- x) (fv e) xs
   | App (e1, es) -> fv e1 @ List.concat (List.map fv es)
   | Const n -> []
-  | Dest n -> []
   | Var n when in_ctx n cG -> []
   | Var n -> [n]
   | Annot (e1, e2) -> fv e1 @ fv e2
@@ -115,7 +114,6 @@ let rec refresh_exp (rep : (name * name) list) : exp -> exp =
      Fn (xs', refresh_exp (extra @ rep) e)
   | App (e1, es) -> App(f e1, List.map f es)
   | Const n -> Const n
-  | Dest n -> Dest n
   | Var n ->
      begin try
          Var (List.assoc n rep)
@@ -189,7 +187,6 @@ let rec refresh_free_var (x , y : name * name) (e : exp) : exp =
   | Fn (xs, e) -> Fn (xs, f e)
   | App (e1, es) -> App(f e1, List.map f es)
   | Const n -> Const n
-  | Dest n -> Dest n
   | Var n when n = x -> Var y
   | Var n -> Var n
   | Annot (e1, e2) -> Annot(f e1, f e2)
@@ -269,7 +266,6 @@ let rec subst (x, es : single_subst) (e : exp) :  exp =
 
   | App (e1, es) -> App(f e1, List.map f es)
   | Const n -> Const n
-  | Dest n -> Dest n
   | Var n  when x = n -> refresh es
   | Var n -> Var n
   | Annot (e1, e2) -> Annot(f e1, f e2)

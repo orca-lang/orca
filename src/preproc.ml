@@ -319,6 +319,25 @@ let pproc_decl s cG (n, e) (d : def_name) =
   else
     raise (Error.Error_loc (loc e, "Return type of constructor " ^ n ^ " should be " ^ d))
 
+let pproc_codecl s cG (n, e) (d : def_name) =
+  Debug.print (fun () -> "Preprocessing declaration " ^ n
+                         ^ "\nCreating telescope out of " ^ EP.print_exp e);
+  Debug.indent ();
+  let tel, e' = pproc_tel s cG [] e in
+  let rec split_cotel acc = function
+    | [] -> raise (Error.Error ("Invalid observation declaration for " ^ n ^ ". It needs to eliminate " ^ d))
+    | (_, m, A.Const n) :: tel when n = d ->
+      List.rev acc, (m, n, []), tel
+    | (_, m, A.App (A.Const n, ds)) :: tel when n = d ->
+      List.rev acc, (m, n, ds), tel
+    | (Explicit, m, t) :: tel when Name.is_name_floating m ->
+      raise (Error.Error ("Observation " ^ n ^ " expected arrow type argument before codata term."))
+    | t :: tel -> split_cotel (t :: acc) tel
+  in
+  let tel0, dsig, tel1 = split_cotel [] tel in
+  (add_name_sign s n, (n, tel0, dsig, A.Pi (tel1, e')))
+
+
 let pproc_sdecl s cG (n, e) (d : def_name) =
   let tel, e' = pproc_stel s cG [] e in
   let (d', args) = match e' with
@@ -475,14 +494,13 @@ let pre_process s = function
     let cGa, ps' = fold_param [] ps in
     Debug.print ~verbose:true (fun () -> "ps' = " ^ AP.print_tel ps');
      let cG = params_to_ctx ps ps' in
-     let _is, _u = match pproc_tel s cG [] e with
+     let is, u = match pproc_tel s cG [] e with
        | tel, A.Set u -> tel, u
        | _, t -> raise (Error.Error_loc (loc e, "Expected universe but instead got expression " ^ AP.print_exp t))
      in
-     let _s' = add_name_sign s n in
-     assert false
-     (* let s'', ds' = List.fold_left (fun (s, dos) d -> let ss, dd = pproc_codecl s cG d n in ss, (dd :: dos)) (s', []) ds in *)
-     (* s'', A.Codata (n, ps', is, u, ds') *)
+     let s' = add_name_sign s n in
+     let s'', ds' = List.fold_left (fun (s, dos) d -> let ss, dd = pproc_codecl s cG d n in ss, (dd :: dos)) (s', []) ds in
+     s'', A.Codata (n, ps', is, u, ds')
   | E.Syn (n, e, ds) ->
     let tel, e' = pproc_stel s [] [] e in
     let _ = match e' with

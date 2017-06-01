@@ -45,6 +45,41 @@ let rec tc_constructors (sign , cG : signature * I.ctx) (u : I.universe) (tel : 
      let sign', ds' = tc_constructors (sign, cG) u tel ds in
      se::sign', d'::ds'
 
+let tc_observation (sign , cG : signature * I.ctx) (u : I.universe) (tel : I.tel)
+                   (n , tel', (m, n', es), e : def_name * tel * codsig * exp) : signature_entry * I.codecl =
+  Debug.print_string ("Typechecking constructor: " ^ n) ;
+  let tel'', uc = check_tel (sign, cG) u tel' in
+  if uc <= u then                       (* Note: Is that check needed for codatatypes? *)
+    begin
+      let rec check_indices es tel =
+        match es, tel with
+        | [], [] -> []
+        | e::es', (_, x, t)::tel' ->
+           let e' = check (sign, (ctx_of_tel tel'') @ cG) e t in
+           e'::check_indices es' (simul_subst_on_tel [x, e'] tel')
+        | _ -> raise (Error.Error ("Constructor " ^ n
+             ^ " does not return a term of the fully applied type for " ^ n'))
+      in
+      Debug.print (fun () -> "Checking indices applied to " ^ n' ^ " at the tail of signature of " ^ n
+        ^ "\nes = (" ^ String.concat ", " (List.map print_exp es) ^ ")\ntel = " ^ IP.print_tel tel);
+      let es' = check_indices es tel in
+      let e' = check (sign, (m, I.App (I.Const n', es')) :: ((ctx_of_tel tel'') @ cG)) e (I.Set u) in
+      Observation (n, tel'', (m, n', es'), e'), (n, tel'', (m, n', es'), e')
+    end
+  else
+    raise (Error.Error ("Constructor " ^ n ^ " has universe " ^ print_universe uc
+                        ^ " which does not fit in " ^ print_universe u
+                        ^ ", the universe of the data type " ^ n'))
+
+let rec tc_observations (sign , cG : signature * I.ctx) (u : I.universe) (tel : I.tel)
+           (ds : codecls) : signature * I.codecls =
+  match ds with
+  | [] -> sign, []
+  | d::ds ->
+     let se, d' = tc_observation (sign, cG) u tel d in
+     let sign', ds' = tc_observations (sign, cG) u tel ds in
+     se::sign', d'::ds'
+
 let tc_syn_constructor (sign , cG : signature * I.ctx) (tel : I.stel)
                        (n , tel', (n', es) : def_name * stel * dsig) : signature_entry * I.sdecl =
   Debug.print_string ("Typechecking syntax constructor: " ^ n) ;
@@ -86,7 +121,15 @@ let tc_program (sign : signature) : program -> signature * I.program =
      sign'', I.Data(n, ps', is', u'', List.rev ds')
      (* TODO Add positivity checking *)
 
-  | Codata (n, ps, is, u, ds) -> assert false
+  | Codata (n, ps, is, u, ds) ->
+    Debug.print_string ("Typechecking data declaration: " ^ n ^ "\nps = "
+                        ^ print_tel ps ^ "\nis = " ^ print_tel is);
+    let ps', u' = check_tel (sign, []) u ps in
+    let cG = ctx_of_tel ps' in
+    let is', u'' = check_tel (sign, cG) u' is in
+    let sign' = CodataDef (n, ps', is', u'') :: sign in
+    let sign'', ds' = tc_observations (sign', cG) u (ps' @ is') ds in
+    sign'', I.Codata(n, ps', is', u'', List.rev ds')
 
   | Syn (n, tel, ds) ->
     Debug.print_string ("Typechecking syn declaration: " ^ n);

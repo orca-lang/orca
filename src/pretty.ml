@@ -215,8 +215,6 @@ and fmt_exp cG parens pps e =
       (fmt_exp cG 2) e2
       (close_paren 2)
 
-  | Dest n -> string pps n
-
   | BCtx cP -> fmt_bctx cG pps cP
 
 (* parens is an integer computing precedence of enclosing expression.

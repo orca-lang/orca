@@ -93,7 +93,6 @@ module Apx = struct
     | App (e, es) -> "(" ^ print_exp e ^ " " ^ String.concat " " (List.map print_exp es) ^ ")"
     | AppL (e1, es) -> "(" ^ print_exp e1 ^ " ' " ^ String.concat " ' " (List.map print_exp es) ^ ")"
     | Const n -> n
-    | Dest n -> n
     | Var n -> Name.print_name n
     | BVar i -> "i" ^ string_of_int i
     | Clos (e1, e2) -> "(" ^ print_exp e1 ^ " [" ^ print_exp e2 ^ "])"
@@ -142,6 +141,7 @@ module Apx = struct
 
 
   let print_dsig ((d, es) : dsig) = "(" ^ d ^ " " ^ String.concat " " (List.map print_exp es) ^ ")"
+  let print_codsig ((m, d, es) : codsig) = "(" ^ print_name m ^ " : " ^ d ^ " " ^ String.concat " " (List.map print_exp es) ^ ")"
 
   let print_decls (decls : decls) : string =
     String.concat "\n"
@@ -156,7 +156,7 @@ module Apx = struct
   let print_codecls (decls : codecls) : string =
     String.concat "\n"
                   (List.map (fun (n, tel, dsig, e) -> "(" ^ n ^ " " ^ print_tel tel
-                    ^ " " ^ print_dsig dsig ^ " " ^ print_exp e ^ ")") decls)
+                    ^ " " ^ print_codsig dsig ^ " " ^ print_exp e ^ ")") decls)
 
   let print_pats pats = "(" ^ String.concat " ; "
                                             (List.map (fun p -> "" ^ print_pat p ^ "") pats)
@@ -206,7 +206,6 @@ module Int = struct
     | Fn (fs, e) -> "(fn " ^ (String.concat " " (List.map print_name fs)) ^ " " ^ print_exp e ^ ")"
     | App (e, es) -> "(" ^ print_exp e ^ " " ^ String.concat " " (List.map print_exp es) ^ ")"
     | Const n -> n
-    | Dest n -> n
     | Var n -> Name.print_name n
     | BCtx cP -> print_bctx cP
     | Annot (e1, e2) -> "(" ^ print_exp e1 ^ " : " ^ print_exp e2 ^ ")"
@@ -289,6 +288,7 @@ module Int = struct
 
 
   let print_dsig ((d, es) : dsig) = "(" ^ d ^ " " ^ String.concat " " (List.map print_exp es) ^ ")"
+  let print_codsig ((m, d, es) : codsig) = "(" ^ print_name m ^ " : " ^ d ^ " " ^ String.concat " " (List.map print_exp es) ^ ")"
 
   let print_syn_dsig ((d, es) : syn_dsig) = "(" ^ d ^ " " ^ String.concat " " (List.map print_syn_exp es) ^ ")"
 
@@ -305,7 +305,7 @@ module Int = struct
   let print_codecls (decls : codecls) : string =
     String.concat "\n"
                   (List.map (fun (n, tel, dsig, e) -> "(" ^ n ^ " " ^ print_tel tel
-                    ^ " " ^ print_dsig dsig ^ " " ^ print_exp e ^ ")") decls)
+                    ^ " " ^ print_codsig dsig ^ " " ^ print_exp e ^ ")") decls)
 
   let print_pats pats = "(" ^ String.concat " ; "
                                             (List.map (fun p -> "" ^ print_pat p ^ "") pats)
