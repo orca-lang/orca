@@ -393,7 +393,6 @@ let rec normalize sign (e : exp) =
     Box (cP', normalize_syn sign cP e)
   | Ctx  -> Ctx
   | Const n -> Const n
-  | Dest n -> Dest n
   | Var x -> Var x
   | Fn (xs, e) -> Fn (xs, norm e)
   | App (e, es) -> App(norm e, List.map norm es)

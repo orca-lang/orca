@@ -24,14 +24,14 @@ def append : (n m : nat) (A : set) -> vect A n -> vect A m -> vect A (plus n m) 
 | ._ m A nil ys => ys
 | ._ m A (cons n x xs) ys => cons (plus n m) x (append n m A xs ys)
 
-def zip : (n : nat) -> (D : set) -> (B : set) -> (C : set) -> (f : D -> B -> C) -> vect D n -> vect B n -> vect C n where
+def zip : (n : nat) (D B C : set) (f : D -> B -> C) -> vect D n -> vect B n -> vect C n where
 | zero A B C f nil nil => nil
 | ._ D B C f (cons n x xs) (cons ._ y ys) => cons n (f x y) (zip n D B C f xs ys)
 
 data eq (A : set) (x : A) : A -> set where
 | refl : eq A x x
 
-def eq_app_nil : (A : set) -> (n : nat) -> (x : vect A n) -> eq (vect A n) x (append zero n A nil x) = fn A n x => refl
+def eq_app_nil : (A : set) (n : nat) (x : vect A n) -> eq (vect A n) x (append zero n A nil x) = fn A n x => refl
 
 def l1 : vect nat (suc (suc zero)) = cons (suc zero) zero (cons zero (suc zero) nil)
 def l2 : vect nat (suc (suc zero)) = cons (suc zero) (suc (suc zero)) (cons zero (suc (suc (suc zero))) nil)

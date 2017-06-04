@@ -1,0 +1,7 @@
+data nat where
+| zero : nat
+| suc : nat
+
+codata stream where
+& head : stream -> nat
+& tail : stream -> stream

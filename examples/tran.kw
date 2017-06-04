@@ -29,14 +29,15 @@ def tran-tp : (|- s-tp) -> (|- t-tp) where
 
 data rel: ctx -> ctx -> set where
 | empty : rel \0 \0
-| cons : (g : ctx) -> (h : ctx) -> (t : |- s-tp) -> rel g h -> rel (g, x: s-tm t) (h, y: t-tm (tran-tp t))
+| cons : (g h : ctx) (t : |- s-tp) -> rel g h -> rel (g, x: s-tm t) (h, y: t-tm (tran-tp t))
+
 
 (*) This function was inlined in tran
 (*) def lookup : (g : ctx) -> (h : ctx) -> rel g h -> (st : |- s-tp) -> (g |- s-tm st) -> (h |- t-tm (tran-tp st)) where
 (*) | .(g, x:s-tm t) .(h, x:t-tm (tran-tp t)) (cons g h .t r) t (g, x: s-tm t :> x) => (h, x: t-tm (tran-tp t) :> x)
 (*) | .(g, x:s-tm t) .(h, x:t-tm (tran-tp t)) (cons g h t r) s (v[^1]) => lookup g h r s v
 
-def tran : (g : ctx) -> (h : ctx) -> rel g h -> (t : |- s-tp) -> (g |- s-tm t) -> (h |- t-tm (tran-tp t)) where
+def tran : (g h : ctx) -> rel g h -> (st : |- s-tp) -> (g |- s-tm st) -> (h |- t-tm (tran-tp st)) where
 | g h r t (app s[^] .t m n) => tapp (tran-tp s) (tran-tp t) (tran g h r (arr s t) m) (tran g h r s n)
 | g h r (arr s t) (lam .s .t m) => tlam (tran-tp s) (tran-tp t) (\x. tran (g,x:s-tm s) (h,x:t-tm (tran-tp s)) (cons g h s r) t (m x))
 | g h r bool tt => tinl tunit tunit tone

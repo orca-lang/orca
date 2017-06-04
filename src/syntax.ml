@@ -82,7 +82,6 @@ module Apx = struct
     | Box of exp * exp
     | Ctx (* of exp *) (* Let's think about it *)
     | Const of def_name (* The name of a constant *)
-    | Dest of def_name
     | Var of name
     | Fn of name list * exp
     | App of exp * exp list
@@ -128,7 +127,10 @@ module Apx = struct
   type decls = decl list
   type sdecl = (def_name * stel * dsig)
   type sdecls = sdecl list
-  type codecls = (def_name * tel * dsig * exp) list
+  (* name is variable referring to term being eliminated... Might not be usable. *)
+  type codsig = name * def_name * exp list
+  type codecl = def_name * tel * codsig * exp
+  type codecls = codecl list
   type rhs
     = Just of exp
     | Impossible of name
@@ -155,7 +157,6 @@ module Int = struct
     | Box of bctx * syn_exp
     | Ctx
     | Const of def_name (* The name of a constant *)
-    | Dest of def_name
     | Var of name
     | Fn of name list * exp
     | App of exp * exp list
@@ -231,7 +232,10 @@ module Int = struct
   type sdecl = (def_name * stel * syn_dsig)
   type sdecls = sdecl list
 
-  type codecls = (def_name * tel * dsig * exp) list
+  type codsig = name * def_name * exp list
+  type codecl = def_name * tel * codsig * exp
+  type codecls = codecl list
+
   type rhs
     = Just of exp
     | Impossible of name

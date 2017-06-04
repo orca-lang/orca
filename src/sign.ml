@@ -12,9 +12,12 @@ type signature_entry
   = Definition of def_name * tel * exp * exp * reducible (* the name, the type, and the definition *)
   (* name, parameters, constructed type *)
   | Constructor of def_name * tel * dsig
+  (* name, indices, type of codata type being eliminated, resulting type *)
+  | Observation of def_name * tel * codsig * exp
   | SConstructor of def_name * stel * syn_dsig
   (* name, parameters, indices, resulting universe *)
   | DataDef of def_name * tel * tel * universe
+  | CodataDef of def_name * tel * tel * universe
   | SynDef of def_name * stel
   | Program of def_name * tel * exp * pat_decls * reducible
 
@@ -24,6 +27,7 @@ let signature_entry_name = function
     | Definition (n', _, _, _, _)
     | Program (n', _, _, _, _)
     | DataDef (n', _, _, _)
+    | CodataDef (n', _, _, _)
     | SynDef (n', _)
     | SConstructor (n', _, _)
     | Constructor (n', _, _) -> n'
@@ -79,11 +83,13 @@ let lookup_sign sign n =
   | Definition (_, [], t, _, _) -> t
   | Definition (_, tel, t, _, _) -> Pi(tel, t)
 
-  | DataDef (_, ps, is, u) ->
+  | DataDef (_, ps, is, u)
+  | CodataDef (_, ps, is, u) ->
      let tel = ps @ is in
      if tel = []
      then Set u
      else Pi (tel, Set u)
+
   | Constructor (_, is, (n', pes)) ->
      let t =
        if pes = [] then
@@ -131,6 +137,7 @@ let lookup_sign_def sign n =
   | Definition (_, _, _, e, _) -> D e
   | Constructor _ -> N
   | DataDef _ -> N
+  | CodataDef _ -> N
   | SConstructor _ -> N
   | SynDef _ -> N
   | Program (_, _, _, _, Stuck) -> N (* if it is stuck it does not reduce *)

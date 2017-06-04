@@ -10,11 +10,11 @@ def 1 : nat = suc Z
 
 def hole : nat = ?fill_it
 
-def plus : (x : nat) -> (y : nat) -> nat where
+def plus : (x y : nat) -> nat where
 | zero m => m
 | (suc n) m => plus n (suc m)
 
-def plus' : (x : nat) -> (y : nat) -> nat where
+def plus' : (x y : nat) -> nat where
 | m zero => m
 | m (suc n) => plus' (suc m) n
 
@@ -35,7 +35,7 @@ data singl : nat -> set where
 (*) def singl_plus : (m : nat) -> (n : nat) -> singl m -> singl n -> singl m where
 (*) | zero n fZ singl_n => singl_n 	(*) singl_n is of the wrong type!!!
 
-def singl_plus : (m : nat) -> (n : nat) -> singl m -> singl n -> singl m where
+def singl_plus : (m n : nat) -> singl m -> singl n -> singl m where
 | zero n sZ singl_n => sZ
 
 (* finite numbers *)

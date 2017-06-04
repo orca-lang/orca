@@ -41,7 +41,7 @@ at that position.")
 
 (define-generic-mode 'orca-mode
   '("(*)") ;; comments
-  '("data" "syn" "thm" "lf" "def" "where" "|" "=>" "fn" "\\" ":>" "|-") ;; keywords
+  '("data" "codata" "syn" "thm" "lf" "def" "where" "|" "&" "=>" "fn" "\\" ":>" "|-") ;; keywords
   '()
   '("\\.kw$") ;; file extension
   (list 'orca-chars) ;; other functions to call
