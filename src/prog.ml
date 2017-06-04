@@ -131,14 +131,14 @@ let tc_program (sign : signature) : program -> signature * I.program =
     let sign'', ds' = tc_observations (sign', cG) u (ps' @ is') ds in
     sign'', I.Codata(n, ps', is', u'', List.rev ds')
 
-  | Syn (n, tel, ds) ->
+  | Spec (n, tel, ds) ->
     Debug.print_string ("Typechecking syn declaration: " ^ n);
     Debug.indent ();
     let tel' = check_stel (sign, []) I.Nil tel in
-    let sign' = SynDef (n, tel') :: sign in
+    let sign' = SpecDef (n, tel') :: sign in
     let sign'', ds' = tc_syn_constructors (sign', []) tel' ds in
     Debug.deindent ();
-    sign'', I.Syn(n, tel', List.rev ds')
+    sign'', I.Spec(n, tel', List.rev ds')
 
   | DefPM (n, tel, t, ds) ->
      Debug.print_string ("\nTypechecking pattern matching definition: " ^ n);

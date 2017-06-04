@@ -68,7 +68,7 @@ module Ext = struct
   let print_program = function
     | Data (n, ps, e, decls) -> "(data " ^ n ^ " " ^ print_params ps ^ "  " ^ print_exp e ^ "\n" ^ print_decls decls ^ ")"
     | Codata (n, ps, e, decls) -> "(data " ^ n ^ " " ^ print_params ps ^ "  " ^ print_exp e ^ "\n" ^ print_decls decls ^ ")"
-    | Syn (n, e, decls) -> "(syn " ^ n ^ " " ^ print_exp e ^ "\n" ^ print_decls decls ^ ")"
+    | Spec (n, e, decls) -> "(syn " ^ n ^ " " ^ print_exp e ^ "\n" ^ print_decls decls ^ ")"
     | DefPM (n, e, decls) -> "(def " ^ n ^ " " ^ print_exp e ^ "\n" ^ print_def_decls decls ^ ")"
     | Def (n, e1, e2) -> "(def " ^ n ^ " " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
 
@@ -183,7 +183,7 @@ module Apx = struct
     | Codata (n, ps, is, u, decls) ->
        "(data " ^ n ^ " (" ^ print_params ps ^ ") (" ^ print_params is ^ ") " ^ print_universe u  ^ "\n" ^ print_codecls decls ^ ")"
 
-    | Syn (n, tel, decls) -> "(syn " ^ n ^ " " ^ print_stel tel ^ "\n" ^ print_sdecls decls ^ ")"
+    | Spec (n, tel, decls) -> "(syn " ^ n ^ " " ^ print_stel tel ^ "\n" ^ print_sdecls decls ^ ")"
     | DefPM (n, tel, e, decls) -> "(def " ^ n ^ " (" ^ print_tel tel ^ ") " ^ print_exp e ^ "\n" ^ print_def_decls decls ^ ")"
     | Def (n, e1, e2) -> "(def " ^ n ^ " " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
   end
@@ -290,7 +290,7 @@ module Int = struct
   let print_dsig ((d, es) : dsig) = "(" ^ d ^ " " ^ String.concat " " (List.map print_exp es) ^ ")"
   let print_codsig ((m, d, es) : codsig) = "(" ^ print_name m ^ " : " ^ d ^ " " ^ String.concat " " (List.map print_exp es) ^ ")"
 
-  let print_syn_dsig ((d, es) : syn_dsig) = "(" ^ d ^ " " ^ String.concat " " (List.map print_syn_exp es) ^ ")"
+  let print_spec_dsig ((d, es) : spec_dsig) = "(" ^ d ^ " " ^ String.concat " " (List.map print_syn_exp es) ^ ")"
 
   let print_decls (decls : decls) : string =
     String.concat "\n"
@@ -300,7 +300,7 @@ module Int = struct
   let print_sdecls (decls : sdecls) : string =
     String.concat "\n"
                   (List.map (fun (n, tel, dsig) -> "(" ^ n ^ " " ^ print_stel tel
-                                                   ^ " " ^ print_syn_dsig dsig ^ ")") decls)
+                                                   ^ " " ^ print_spec_dsig dsig ^ ")") decls)
 
   let print_codecls (decls : codecls) : string =
     String.concat "\n"
@@ -333,7 +333,7 @@ module Int = struct
     | Codata (n, ps, is, u, decls) ->
        "(data " ^ n ^ " (" ^ print_params ps ^ ") (" ^ print_params is ^ ") " ^ print_universe u  ^ "\n" ^ print_codecls decls ^ ")"
 
-    | Syn (n, tel, decls) -> "(syn " ^ n ^ " " ^ print_stel tel ^ "\n" ^ print_sdecls decls ^ ")"
+    | Spec (n, tel, decls) -> "(syn " ^ n ^ " " ^ print_stel tel ^ "\n" ^ print_sdecls decls ^ ")"
     | DefPM (n, tel, e, decls) -> "(def " ^ n ^ " (" ^ print_tel tel ^ ") " ^ print_exp e ^ "\n" ^ print_def_decls decls ^ ")"
     | Def (n, e1, e2) -> "(def " ^ n ^ " " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
 end

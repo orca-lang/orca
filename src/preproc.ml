@@ -501,7 +501,7 @@ let pre_process s = function
      let s' = add_name_sign s n in
      let s'', ds' = List.fold_left (fun (s, dos) d -> let ss, dd = pproc_codecl s cG d n in ss, (dd :: dos)) (s', []) ds in
      s'', A.Codata (n, ps', is, u, ds')
-  | E.Syn (n, e, ds) ->
+  | E.Spec (n, e, ds) ->
     let tel, e' = pproc_stel s [] [] e in
     let _ = match e' with
       | A.Star -> ()
@@ -509,7 +509,7 @@ let pre_process s = function
     in
      let s' = add_name_sign s n in
      let s'', ds' = List.fold_left (fun (s, dos) d -> let ss, dd = pproc_sdecl s [] d n in ss, (dd :: dos)) (s', []) ds in
-     s'', A.Syn (n, tel, ds')
+     s'', A.Spec (n, tel, ds')
   | E.DefPM (n, e, ds) ->
      let s' = add_name_sign s n in
      let e' = pproc_exp s [] [] e in

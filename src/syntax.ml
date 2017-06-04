@@ -63,7 +63,7 @@ module Ext = struct
   type program =
     | Data of name * params * exp * decls
     | Codata of name * params * exp * decls
-    | Syn of name * exp * decls
+    | Spec of name * exp * decls
     | DefPM of name * exp * def_decls
     | Def of name * exp * exp
 end
@@ -140,7 +140,7 @@ module Apx = struct
     (* name, parameters, indices, universe *)
     | Data of def_name * tel * tel * universe * decls
     | Codata of def_name * tel * tel * universe * codecls
-    | Syn of def_name * stel * sdecls
+    | Spec of def_name * stel * sdecls
     | DefPM of def_name * tel * exp * pat_decls
     | Def of def_name * exp * exp
 end
@@ -225,11 +225,11 @@ module Int = struct
   type syn_pats = syn_pat list
   (* name of the constructed type, the type parameters, and the indices *)
   type dsig = def_name * exp list
-  type syn_dsig = def_name * syn_exp list
+  type spec_dsig = def_name * syn_exp list
 
   type decl = (def_name * tel * dsig)
   type decls = decl list
-  type sdecl = (def_name * stel * syn_dsig)
+  type sdecl = (def_name * stel * spec_dsig)
   type sdecls = sdecl list
 
   type codsig = name * def_name * exp list
@@ -245,7 +245,7 @@ module Int = struct
     (* name, parameters, indices, universe *)
     | Data of def_name * tel * tel * universe * decls
     | Codata of def_name * tel * tel * universe * codecls
-    | Syn of def_name * stel * sdecls
+    | Spec of def_name * stel * sdecls
     | DefPM of def_name * tel * exp * pat_decls
     | Def of def_name * exp * exp
 

@@ -540,16 +540,16 @@ let fmt_program pps = function
             (fmt_pat_decls []) pats
 
   (* printing specification types *)
-  | Syn (n, [], ds) ->
+  | Spec (n, [], ds) ->
      Fmt.pf pps "%a %a %a@,%a"
-            keyword "syn"
+            keyword "spec"
             const n
             keyword "where"
             fmt_sdecls ds
 
-  | Syn (n, tel, ds) ->
+  | Spec (n, tel, ds) ->
      Fmt.pf pps "%a %a : %a %a@,%a"
-            keyword "syn"
+            keyword "spec"
             const n
             (fmt_stel [] Nil) (tel, Star)
             keyword "where"

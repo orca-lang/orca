@@ -54,7 +54,8 @@ let rec main_scanner pos = lexer
 
   | "data" -> add_word pos (Ulexing.lexeme_length lexbuf), DATA
   | "codata" -> add_word pos (Ulexing.lexeme_length lexbuf), CODATA
-  | "syn" -> add_word pos (Ulexing.lexeme_length lexbuf), SYN
+  | "syn" -> add_word pos (Ulexing.lexeme_length lexbuf), SPEC
+  | "spec" -> add_word pos (Ulexing.lexeme_length lexbuf), SPEC
   | "def" | "thm" | "lem" -> add_word pos (Ulexing.lexeme_length lexbuf), DEF
   | "|" -> add_word pos (Ulexing.lexeme_length lexbuf), MID
   | "=>" -> add_word pos (Ulexing.lexeme_length lexbuf), RARR

@@ -39,7 +39,7 @@ let split_idx_param (sign : signature) (cG : I.ctx) (n : def_name) (es1 : comp_o
      let us2, vs2 = split (es2, ps) in
      let cD, sigma = Unify.unify_many (sign, cG) us1 us2 in
      cD, sigma, Comp (List.map (simul_subst sigma) us1), Comp (List.map (simul_subst sigma) vs1), Comp (List.map (simul_subst sigma) vs2)
-  | SynDef _ ->
+  | SpecDef _ ->
     cG, [], Syn [], es1, es2
   | _ -> raise (Error.Error ("split_idx_param expected a datatype."))
 

@@ -1,20 +1,20 @@
-syn s-tp where
+spec s-tp where
 | bool : s-tp
 | arr : s-tp ->> s-tp ->> s-tp
 
-syn s-tm : s-tp ->> * where
+spec s-tm : s-tp ->> * where
 | app : (s : s-tp) ->> (t : s-tp) ->> s-tm (arr s t) ->> s-tm s ->> s-tm t
 | lam : (s : s-tp) ->> (t : s-tp) ->> (s-tm s ->> s-tm t) ->> s-tm (arr s t)
 | tt : s-tm bool
 | ff : s-tm bool
 | if : (t : s-tp) ->> s-tm bool ->> s-tm t ->> s-tm t ->> s-tm t
 
-syn t-tp where
+spec t-tp where
 | tunit : t-tp
 | tsum : t-tp ->> t-tp ->> t-tp
 | tarr : t-tp ->> t-tp ->> t-tp
 
-syn t-tm : t-tp ->> * where
+spec t-tm : t-tp ->> * where
 | tapp : (s : t-tp) ->> (t : t-tp) ->> t-tm (tarr s t) ->> t-tm s ->> t-tm t
 | tlam : (s : t-tp) ->> (t : t-tp) ->> (t-tm s ->> t-tm t) ->> t-tm (tarr s t)
 | tone : t-tm tunit

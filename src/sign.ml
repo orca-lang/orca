@@ -14,11 +14,11 @@ type signature_entry
   | Constructor of def_name * tel * dsig
   (* name, indices, type of codata type being eliminated, resulting type *)
   | Observation of def_name * tel * codsig * exp
-  | SConstructor of def_name * stel * syn_dsig
+  | SConstructor of def_name * stel * spec_dsig
   (* name, parameters, indices, resulting universe *)
   | DataDef of def_name * tel * tel * universe
   | CodataDef of def_name * tel * tel * universe
-  | SynDef of def_name * stel
+  | SpecDef of def_name * stel
   | Program of def_name * tel * exp * pat_decls * reducible
 
 type signature = signature_entry list
@@ -28,9 +28,10 @@ let signature_entry_name = function
     | Program (n', _, _, _, _)
     | DataDef (n', _, _, _)
     | CodataDef (n', _, _, _)
-    | SynDef (n', _)
+    | SpecDef (n', _)
     | SConstructor (n', _, _)
     | Constructor (n', _, _) -> n'
+    | Observation _ -> raise (Error.Violation "Observation not implemented")
 
 let rec lookup_sign_entry (sign : signature) (n : def_name) : signature_entry =
   let el en = signature_entry_name en = n
@@ -48,7 +49,7 @@ let is_syn_con (sign : signature) (n : def_name) =
 
 let lookup_syn_def (sign : signature) (n : def_name) : stel =
   match lookup_sign_entry sign n with
-  | SynDef (_, tel) -> tel
+  | SpecDef (_, tel) -> tel
   | _ -> raise (Error.Error ("Constant " ^ n ^ " not a syntactic type"))
 
 let lookup_cons_entry (sign : signature) (c : def_name) : tel * dsig =
@@ -56,7 +57,7 @@ let lookup_cons_entry (sign : signature) (c : def_name) : tel * dsig =
   | Constructor (_, tel, dsig) -> tel, dsig
   | _ -> raise (Error.Error ("Constant " ^ c ^ " was expected to be a constructor."))
 
-let lookup_syn_cons_entry (sign : signature) (c : def_name) (cP : bctx) : tel * syn_dsig =
+let lookup_syn_cons_entry (sign : signature) (c : def_name) (cP : bctx) : tel * spec_dsig =
   match lookup_sign_entry sign c with
   | SConstructor (_, tel, (n, es)) ->
     let extract_sigma sl = List.fold_right (fun (_, _, x) sigma -> Dot(sigma, x)) sl (Shift (List.length sl)) in
@@ -108,7 +109,7 @@ let lookup_sign sign n =
 
 let lookup_syn_sign sign n =
   match lookup_sign_entry sign n with
-  | SynDef (_, tel) ->
+  | SpecDef (_, tel) ->
      if tel = []
      then Star
      else (SPi (tel, Star))
@@ -139,9 +140,10 @@ let lookup_sign_def sign n =
   | DataDef _ -> N
   | CodataDef _ -> N
   | SConstructor _ -> N
-  | SynDef _ -> N
+  | SpecDef _ -> N
   | Program (_, _, _, _, Stuck) -> N (* if it is stuck it does not reduce *)
   | Program (_, _, _, ds, _) -> P ds
+  | Observation _ -> raise (Error.Violation "Observation not implemented")
 
 (* returns all the constructors of type n *)
 let lookup_constructors sign n =

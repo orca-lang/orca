@@ -1,13 +1,13 @@
-syn tm where
+spec tm where
 | app: tm -> tm -> tm
 | lam: (tm ->> tm) -> tm
 | one : tm
 
-syn tp where
+spec tp where
 | unit : tp
 | arr : tp -> tp -> tp
 
-syn oft : tm -> tp -> * where
+spec oft : tm -> tp -> * where
 | t-unit: oft one unit
 | t-app: (f e : tm) (s t : tp) -> oft f (arr s t) -> oft e s -> oft (app f e) t
 | t-lam: (e : tm ->> tm) (s t : tp) -> ((x:tm) ->> oft x s ->> oft (e x) t) -> oft (lam e) (arr s t)
