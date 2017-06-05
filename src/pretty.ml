@@ -443,6 +443,18 @@ let rec fmt_decls cG pps = function
                     (fmt_decl cG) d
                     (fmt_decls cG) ds
 
+let fmt_codecl cG pps = function
+  | n, tel, (m, tn, es), e ->
+     Fmt.pf pps "| %a : %a"
+            const n
+            (fmt_tel cG) (tel @ [Explicit, m, if es = [] then Const tn else App(Const tn, es)], e)
+
+let rec fmt_codecls cG pps = function
+  | [] -> ()
+  | d::ds -> Fmt.pf pps "%a@,%a"
+                    (fmt_codecl cG) d
+                    (fmt_codecls cG) ds
+
 let fmt_rhs cG pps = function
   | Just e -> fmt_exp cG never_paren pps e
   | Impossible n ->
@@ -515,6 +527,36 @@ let fmt_program pps = function
             keyword "where"
             (fmt_decls cG)
             ds
+
+  | Codata (n, [], [], 0, ds) ->
+     Fmt.pf pps "%a %a %a@,%a"
+            keyword "codata"
+            def n
+            keyword "where"
+            (vbox (fmt_codecls []))
+            ds
+
+  | Codata (n, [], [], u, ds) ->
+     Fmt.pf pps "%a %a : %a %a@,%a"
+            keyword "codata"
+            def n
+            fmt_universe u
+            keyword "where"
+            (fmt_codecls [])
+            ds
+
+  | Codata (n, ps, is, u, ds) ->
+     let cG = List.map (fun (_, n, _) -> n, dt) ps in
+     Fmt.pf pps "%a %a %a: %a %a@,%a"
+            keyword "codata"
+            def n
+            (fmt_params []) ps
+            (fmt_tel cG) (is, Set u)
+            keyword "where"
+            (fmt_codecls cG)
+            ds
+
+
   (* printing definitions and theorems *)
   | Def (n, t, e) ->
      Fmt.pf pps "%a %a : %a = %a"
