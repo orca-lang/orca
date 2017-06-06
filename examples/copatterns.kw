@@ -5,3 +5,10 @@ data nat where
 codata stream where
 & head : stream -> nat
 & tail : stream -> stream
+
+data eq (A : set) (a : A) : A -> set where
+| refl : eq A a a
+
+codata bisim (s1 s2 : stream) : set where
+& b_head : bisim s1 s2 -> eq nat (head s1) (head s2)
+& b_tail : bisim s1 s2 -> bisim (tail s1) (tail s2)

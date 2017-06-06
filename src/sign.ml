@@ -30,8 +30,9 @@ let signature_entry_name = function
     | CodataDef (n', _, _, _)
     | SpecDef (n', _)
     | SConstructor (n', _, _)
+    | Observation (n', _, _, _)
     | Constructor (n', _, _) -> n'
-    | Observation _ -> raise (Error.Violation "Observation not implemented")
+
 
 let rec lookup_sign_entry (sign : signature) (n : def_name) : signature_entry =
   let el en = signature_entry_name en = n
@@ -103,6 +104,16 @@ let lookup_sign sign n =
      in
      Debug.print (fun () -> "Looked up constructor " ^ n ^ " which has type " ^ print_exp t');
      t'
+
+  | Observation (_, is, (m, n', es), e) ->
+    let t =
+      if es = [] then
+        Const n'
+      else
+        App (Const n', es)
+    in
+    Pi (is @ [Explicit, m, t], e)
+
   | Program (_,tel,t, _, _) -> if tel = [] then t else Pi (tel, t)
 
   | _ -> raise (Error.Error ("Name " ^ n ^ " is syntactic"))
