@@ -494,7 +494,7 @@ let rec fmt_sdecls pps = function
 let rec fmt_params cG pps = function
   | [] -> ()
   | (_,n,_ as p) ::ps ->
-     Fmt.pf pps "%a%a"
+     Fmt.pf pps "%a %a"
             (fmt_tel_entry cG) p
             (fmt_params ((n, dt):: cG)) ps
 
