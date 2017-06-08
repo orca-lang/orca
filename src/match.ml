@@ -147,7 +147,7 @@ let rec flexible (p : pats)(cG : I.ctx) : name list =
     | p::ps, (x, t)::cG' -> flexible ps cG'
     | _ -> raise (Error.Violation ("Flexible: length violation."))
 
-let inac_ctx = List.map (fun (_, t) -> I.Inacc t)
+(* let inac_ctx = List.map (fun (_, t) -> I.Inacc t) *)
 let inac_subst = List.map (fun (x, e) -> x, I.Inacc e)
 
 let split_flex_unify (sign : signature) sigma0 maybe_g (p1 : pats) (thetatel : I.tel) (ps : pats)
@@ -451,34 +451,34 @@ let split_rec (sign : signature) (ps : pats) (cD : I.ctx) : I.ctx * I.pats =
   in
   search [] ps [] cD
 
-let split_set sign (x : name) (cG : I.ctx) : I.pats =
-  let rec f = function
-    | [] -> raise (Error.Violation ("Variable " ^ print_name x ^ " appears free in context for pattern matching split."))
-    | (x', t) :: cG' when x = x' -> [], t, cG'
-    | (y, t) :: cG' -> let cG2, t', cG1 = f cG' in ((y, t) :: cG2), t', cG1
-  in
-  let cG2, t, cG1 = f cG in
-  match Whnf.whnf sign t with
-  | I.App(I.Const n, sp) ->
-     let constrs = lookup_constructors sign n in
-     let rec split_constrs constrs =
-       begin match constrs with
-       | [] -> []
-       | c :: constrs' ->
-          let thetatel, (n', sp) = lookup_cons_entry sign c in
-          let ps = (inac_ctx cG2) @ [I.PConst (c, inac_ctx (ctx_of_tel thetatel))] @ (inac_ctx cG1) in
-          let sigma =
-            try
-              snd (split_rec sign (List.map (fun p -> Int p) ps) (cG2 @ [(x, t)] @ cG1))
-            with
-            | Unify.Unification_failure _ -> []
-          in
-          sigma @ (split_constrs constrs')
-       end
-     in
-     split_constrs constrs
+(* let split_set sign (x : name) (cG : I.ctx) : I.pats = *)
+(*   let rec f = function *)
+(*     | [] -> raise (Error.Violation ("Variable " ^ print_name x ^ " appears free in context for pattern matching split.")) *)
+(*     | (x', t) :: cG' when x = x' -> [], t, cG' *)
+(*     | (y, t) :: cG' -> let cG2, t', cG1 = f cG' in ((y, t) :: cG2), t', cG1 *)
+(*   in *)
+(*   let cG2, t, cG1 = f cG in *)
+(*   match Whnf.whnf sign t with *)
+(*   | I.App(I.Const n, sp) -> *)
+(*      let constrs = lookup_constructors sign n in *)
+(*      let rec split_constrs constrs = *)
+(*        begin match constrs with *)
+(*        | [] -> [] *)
+(*        | c :: constrs' -> *)
+(*           let thetatel, (n', sp) = lookup_cons_entry sign c in *)
+(*           let ps = (inac_ctx cG2) @ [I.PConst (c, inac_ctx (ctx_of_tel thetatel))] @ (inac_ctx cG1) in *)
+(*           let sigma = *)
+(*             try *)
+(*               snd (split_rec sign (List.map (fun p -> Int p) ps) (cG2 @ [(x, t)] @ cG1)) *)
+(*             with *)
+(*             | Unify.Unification_failure _ -> [] *)
+(*           in *)
+(*           sigma @ (split_constrs constrs') *)
+(*        end *)
+(*      in *)
+(*      split_constrs constrs *)
 
-  | _ -> raise (Error.Error ("Type " ^ IP.print_exp t ^ " should be a data type."))
+(*   | _ -> raise (Error.Error ("Type " ^ IP.print_exp t ^ " should be a data type.")) *)
 
 let refine (sign : signature) (p : pats) (cD : I.ctx) (sigma : I.pats) : pats * I.ctx * I.pats =
   Debug.indent ();

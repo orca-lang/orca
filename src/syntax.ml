@@ -239,6 +239,12 @@ module Int = struct
   type rhs
     = Just of exp
     | Impossible of name
+
+  type split_tree
+    = Node of ctx * pats * name * split_tree list
+    | Incomplete of ctx * pats
+    | Leaf of ctx * pats * rhs
+
   type pat_decls = (pats * rhs) list
 
   type program =

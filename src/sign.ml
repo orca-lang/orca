@@ -157,11 +157,10 @@ let lookup_sign_def sign n =
   | Observation _ -> raise (Error.Violation "Observation not implemented")
 
 (* returns all the constructors of type n *)
-let lookup_constructors sign n =
-  let constructs_n = function
-    | Constructor(_, _, (n',_)) -> n = n'
-    | _ -> false
-  in
-  List.map signature_entry_name (List.filter constructs_n sign)
+let rec lookup_constructors sign n =
+  match sign with
+    | Constructor(c, tel, (n',ts)) :: sign' when n = n' -> (c, tel, ts) :: lookup_constructors sign' n
+    | _ :: sign' -> lookup_constructors sign' n
+    | [] -> []
 
 let rec print_signature sign = "[" ^ String.concat "; " (List.map signature_entry_name sign) ^ "]"
