@@ -129,25 +129,54 @@ and bctx_check_match q p =
 and check_all qs ps =
   Debug.print (fun () -> "Il entreprit un long voyage."); List.for_all2 check_match qs ps
 
+let rec rename (q : I.pat) (p : A.pat) : (name * name) list =
+  match q,p with
+  | I.PVar n, A.PVar m -> [n, m]
+  | I.PPar n, A.PPar m -> [n, m]
+  | I.PConst (_, qs), A.PConst (_, ps) -> rename_all qs ps
+  | I.PBCtx cP, p -> []
+  | I.PUnder, A.PUnder -> []
+  | I.PTBox (cP, q), p -> rename_syn q p
+  | _ -> raise (Error.Violation "Renaming of tree node expects matching pattern with tree node")
+
+and rename_syn (q : I.syn_pat) (p : A.pat) : (name * name) list =
+  match q, p with
+  | I.PBVar _, A.PBVar _ -> []
+  | I.PLam (es, q), A.PLam (sl, p) -> rename_syn q p
+  | I.PSConst (_, qs), A.PConst (_, ps) -> rename_all_syn qs ps
+  | I.PUnbox (n, _, _), A.PVar m -> [n, m]
+  | I.SInacc _, A.Inacc _ -> []
+  | I.PEmpty, A.PEmpty -> []
+  | I.PShift _, A.PShift _ -> []
+  | I.PDot(sq, q), A.PDot (sp, p) -> rename_syn sq sp @ rename_syn q p
+  | _ -> raise (Error.Violation "Renaming of tree node expects matching pattern with tree node")
+
+and rename_all (qs : I.pats) (ps : A.pats) : (name * name) list = List.concat (List.map2 rename qs ps)
+
+and rename_all_syn (qs : I.syn_pats) (ps : A.pats) : (name * name) list = List.concat (List.map2 rename_syn qs ps)
+
 let is_blocking = function
   | A.PVar _
   | A.PWildcard
   | A.Inacc _ -> false
   | _ -> true
 
-let rec choose_blocking_var (qs : I.pats) (ps : A.pats) : name option =
+let rec choose_blocking_var (qs : I.pats) (ps : A.pats) : (name * A.pat) option =
   match qs, ps with
   | [], [] -> None
-  | I.PVar n :: qs', p :: ps' when is_blocking p -> Some n
+  | I.PVar n :: qs', p :: ps' when is_blocking p -> Some (n, p)
   | q :: qs', p :: ps' -> choose_blocking_var qs' ps'
   | _ -> assert false
 
 let inac_subst = List.map (fun (x, e) -> x, I.Inacc e)
 let pvar_list_of_ctx : I.ctx -> I.pats = List.map (fun (x, _) -> I.PVar x)
+let psubst_of_names = List.map (fun (n, m) -> n, I.PVar m)
+let subst_of_names = List.map (fun (n, m) -> n, I.Var m)
 
-let rec get_splits (sign : signature) (cD : I.ctx) (qs : I.pats) (n : name) : (I.ctx * I.pats) option list =
+let rec get_splits (sign : signature) (cD : I.ctx) (qs : I.pats) (n, p : name * A.pat) : (I.ctx * I.pats * I.subst) option list =
   let t = try List.assoc n cD
-    with Not_found -> raise (Error.Violation "Pattern has name not in context")
+    with Not_found -> raise (Error.Violation ("Pattern " ^ IP.print_pats qs
+                             ^ " has name not in context " ^ IP.print_ctx cD))
   in
   let ct, sp = match Whnf.whnf sign t with
     | I.Box _ -> raise Error.NotImplemented
@@ -163,53 +192,92 @@ let rec get_splits (sign : signature) (cD : I.ctx) (qs : I.pats) (n : name) : (I
       let cD' = cD @ cG in
       let flex = List.map fst cD' in
       try let cD'', sigma = Unify.unify_flex_many (sign, cD') flex ts sp in
+          Debug.print (fun () -> "Unification of ts " ^ IP.print_exps ts
+            ^ "\nwith sp " ^ IP.print_exps sp
+            ^ "\nmoving context cD' = " ^ IP.print_ctx cD'
+            ^ "\nto context " ^ IP.print_ctx cD'');
           let psigma = inac_subst sigma in
+          let s = n, I.App (I.Const c, simul_subst_on_list sigma (var_list_of_ctx cG)) in
           let psigma' = (n, I.PConst (c, simul_psubst_on_list sign psigma (pvar_list_of_ctx cG))) :: psigma in
-          Some (cD'', simul_psubst_on_list sign psigma' qs) :: unify cs'
+          let cD''' = ctx_subst s (List.filter (fun (x, _) -> x <> n) cD'') in
+          Some (cD''', simul_psubst_on_list sign psigma' qs, s :: sigma) :: unify cs'
 
       with Unify.Unification_failure msg ->
-        Debug.print (fun () -> "Splitting on constructor " ^ c ^ " resulted in unification failure\n"
+        Debug.print (fun () -> "Splitting on constructor " ^ c
+          ^ " resulted in unification failure\n"
           ^ Unify.print_unification_problem msg);
         None :: unify cs'
   in
   unify cs
 
-let rec split (sign : signature) (cD : I.ctx) (qs : I.pats) (ps, rhs : A.pats * A.rhs) : I.split_tree =
-  Debug.print(fun () -> "Qui n'avait jamais navigué.");
+(* If type of pattern match function is tau, then
+   tau = cG * t for some spine cG.
+   cD |- sigma : cG
+   . |- qs => cD
+
+   cD' |- sigma' cD
+   . |- ps => cD'
+ *)
+let rec split (sign : signature) (cD : I.ctx) (qs : I.pats) (sigma : I.subst)
+    (ps, rhs : A.pats * A.rhs) (t : I.exp) : I.split_tree =
+  Debug.print(fun () -> "Splitting qs = " ^ IP.print_pats qs
+    ^ "\nagainst ps = " ^ AP.print_pats ps);
   match choose_blocking_var qs ps with
-  | None -> assert false (* Leaf (cD, qs, rhs) *) (* 1) Need to check inaccessible? 2) Need to check rhs *)
-  | Some n ->
-    let f = function
-      | None -> assert false            (* todo: figure out impossible branches for specific constructors *)
-      | Some (cD', qs') ->
-        if check_all qs' ps then
-          split sign cD' qs' (ps, rhs)
-        else
-          I.Incomplete (cD', qs')
+  | None ->
+    let s = rename_all qs ps in
+    let qs = simul_psubst_on_list sign (psubst_of_names s) qs in
+    let sigma' = subst_of_names s in
+    let sigma'' = sigma @ sigma' in  (* we apply sigma first, then sigma' *)
+    let rec subst_name n = function
+      | (n', m) :: sigma when n = n' -> m
+      | _ :: sigma -> subst_name n sigma
+      | [] -> n                         (* name stays the same *)
     in
-    I.Node (cD, qs, n, List.map f (get_splits sign cD qs n))
+    let rec subst_ctx = function
+      | (n, e) :: cD -> (subst_name n s, simul_subst sigma e) :: subst_ctx cD
+      | [] -> []
+    in
+    let cD' = subst_ctx cD in
+  (* Need to check inaccessible? *)
+    let rhs' = match rhs with
+      | A.Just e -> I.Just (Recon.check (sign, cD') e (simul_subst sigma'' t))
+      | A.Impossible n -> I.Impossible n (* Need to check if actually impossible *)
+    in
+    I.Leaf (cD', qs, sigma'', rhs')
+  | Some (n, p) ->
+    Debug.print (fun () -> "Found blocking variable " ^ print_name n);
+    let f = function
+      | None -> assert false
+      (* todo: figure out impossible branches for specific constructors *)
+      | Some (cD', qs', sigma') ->
+        if check_all qs' ps then
+          split sign cD' qs' sigma' (ps, rhs) (simul_subst sigma t)
+        else
+          I.Incomplete (cD', qs', sigma')
+    in
+    I.Node (cD, qs, sigma, n, List.map f (get_splits sign cD qs (n, p)))
 
 exception Backtrack
 
-let rec navigate (sign : signature) (tr : I.split_tree) (ps, rhs : A.pats * A.rhs) : I.split_tree =
+let rec navigate (sign : signature) (t : I.exp) (tr : I.split_tree) (ps, rhs : A.pats * A.rhs) : I.split_tree =
   Debug.print(fun () -> "Il était un petit navire.");
   match tr with
-  | I.Incomplete (cD, qs) ->
+  | I.Incomplete (cD, qs, sigma) ->
     if check_all qs ps then
-      split sign cD qs (ps, rhs)
+      split sign cD qs sigma (ps, rhs) t
     else
       raise Backtrack
-  | I.Node (cD, qs, n, tr') ->
+  | I.Node (cD, qs, sigma, n, tr') ->
     if check_all qs ps then
       let rec f = function
         | [] -> raise (Error.Error "No valid branch found")
         | tr :: trs ->
-          try navigate sign tr (ps, rhs)
+          try navigate sign (simul_subst sigma t) tr (ps, rhs)
           with Backtrack -> f trs
       in f tr'
     else
       raise Backtrack
-  | I.Leaf (cD, qs, _) ->
+  | I.Leaf (cD, qs, _, _) ->
     if check_all qs ps then
       raise (Error.Error ("Branch " ^ IP.print_pats qs ^ " cannot be reached."))
     else
@@ -217,7 +285,7 @@ let rec navigate (sign : signature) (tr : I.split_tree) (ps, rhs : A.pats * A.rh
 
 let check_clauses (sign : signature) (f : def_name) (telG : I.tel) (t : I.exp) (ds : A.pat_decls) : I.split_tree =
   (* we add a non-reducing version of f to the signature *)
-  (* let sign' =  (Program (f, telG, t, [], Stuck)) :: sign in *)
+  let sign' =  (PSplit (f, telG, t, EmptyTree, Stuck)) :: sign in
   let cD = ctx_of_tel telG in
   let qs = List.map (fun (n, t) -> I.PVar n) cD in
-  List.fold_left (navigate sign) (I.Incomplete (cD, qs)) ds
+  List.fold_left (navigate sign' t) (I.Incomplete (cD, qs, [])) ds

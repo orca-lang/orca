@@ -1,0 +1,7 @@
+data nat where
+| zero: nat
+| suc: nat -> nat
+
+def plus : (x y : nat) -> nat where
+| zero m => m
+| (suc n) m => plus n (suc m)

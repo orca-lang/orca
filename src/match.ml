@@ -24,7 +24,7 @@ let print_cos = function
 
 (* Given the name of a type and a spine, return the parameter, the indices *)
 let split_idx_param (sign : signature) (cG : I.ctx) (n : def_name) (es1 : comp_or_syn)
-    (es2 : comp_or_syn) : I.ctx * subst * comp_or_syn * comp_or_syn * comp_or_syn =
+    (es2 : comp_or_syn) : I.ctx * I.subst * comp_or_syn * comp_or_syn * comp_or_syn =
   match lookup_sign_entry sign n with
   | DataDef (_, ps, is, _) ->
      (* Debug.print (fun () -> "Splitting parameters " ^ IP.print_exps es1 ^ " against " ^ IP.print_tel ps); *)
@@ -56,7 +56,7 @@ let rec rename_ctx_using_pats (cG : I.ctx) (ps : pats) =
   | _ -> raise (Error.Violation "rename_ctx_using_pats. Both arguments should have same length")
 
 
-let rec subst_of_ctx_map sign (sigma : ctx_map) (tel : I.tel) : subst =
+let rec subst_of_ctx_map sign (sigma : ctx_map) (tel : I.tel) : I.subst =
   match sigma, tel with
   | [], [] -> []
   | p :: ps, (_, n, t) :: tel' -> (n, Procpat.exp_of_pat sign I.Nil p) :: (subst_of_ctx_map sign ps tel')
@@ -185,8 +185,8 @@ let split_flex_unify (sign : signature) sigma0 maybe_g (p1 : pats) (thetatel : I
   Debug.print (fun () -> "pdelta = " ^ print_psubst pdelta);
   cD', cT, delta, pdelta, cT'
 
-let compute_split_map sign (ss:single_subst) (pss:single_psubst) (cD1:I.ctx) (x:name)
-    (cD2:I.ctx) (delta : subst) (pdelta : psubst) (cD':I.ctx) : I.ctx * I.pats =
+let compute_split_map sign (ss:I.single_subst) (pss:single_psubst) (cD1:I.ctx) (x:name)
+    (cD2:I.ctx) (delta : I.subst) (pdelta : psubst) (cD':I.ctx) : I.ctx * I.pats =
   Debug.indent ();
   Debug.print (fun () -> "ss = " ^ IP.print_subst [ss]);
   Debug.print (fun () -> "pss = " ^ print_psubst [pss]);

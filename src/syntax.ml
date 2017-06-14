@@ -236,14 +236,18 @@ module Int = struct
   type codecl = def_name * tel * codsig * exp
   type codecls = codecl list
 
+  type single_subst = name * exp
+  type subst = single_subst list
+
   type rhs
     = Just of exp
     | Impossible of name
 
   type split_tree
-    = Node of ctx * pats * name * split_tree list
-    | Incomplete of ctx * pats
-    | Leaf of ctx * pats * rhs
+    = Node of ctx * pats * subst * name * split_tree list
+    | Incomplete of ctx * pats * subst
+    | Leaf of ctx * pats * subst * rhs
+    | EmptyTree
 
   type pat_decls = (pats * rhs) list
 

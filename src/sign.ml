@@ -20,12 +20,14 @@ type signature_entry
   | CodataDef of def_name * tel * tel * universe
   | SpecDef of def_name * stel
   | Program of def_name * tel * exp * pat_decls * reducible
+  | PSplit of def_name * tel * exp * split_tree * reducible
 
 type signature = signature_entry list
 
 let signature_entry_name = function
     | Definition (n', _, _, _, _)
     | Program (n', _, _, _, _)
+    | PSplit (n', _, _, _, _)
     | DataDef (n', _, _, _)
     | CodataDef (n', _, _, _)
     | SpecDef (n', _)
@@ -115,6 +117,7 @@ let lookup_sign sign n =
     Pi (is @ [Explicit, m, t], e)
 
   | Program (_,tel,t, _, _) -> if tel = [] then t else Pi (tel, t)
+  | PSplit (_,tel,t, _, _) -> if tel = [] then t else Pi (tel, t)
 
   | _ -> raise (Error.Error ("Name " ^ n ^ " is syntactic"))
 
@@ -142,6 +145,7 @@ type lookup_result
   = D of exp                    (* A definition without pattern matching *)
   | P of pat_decls              (* A definition with pattern matching *)
   | N                           (* A non-reducible constant *)
+  | S of split_tree             (* A definition with pattern matching (using split tree) *)
 
 let lookup_sign_def sign n =
   match lookup_sign_entry sign n with
@@ -154,6 +158,8 @@ let lookup_sign_def sign n =
   | SpecDef _ -> N
   | Program (_, _, _, _, Stuck) -> N (* if it is stuck it does not reduce *)
   | Program (_, _, _, ds, _) -> P ds
+  | PSplit (_, _, _, _, Stuck) -> N (* if it is stuck it does not reduce *)
+  | PSplit (_, _, _, split, _) -> S split
   | Observation _ -> raise (Error.Violation "Observation not implemented")
 
 (* returns all the constructors of type n *)

@@ -240,9 +240,6 @@ let refresh_free_vars (rep : (name * name) list) e =
 
 (* Substitution of regular variables *)
 
-type single_subst = name * exp
-type subst = single_subst list
-
 let fv_subst cG sigma = List.concat (List.map (fun (n, e) -> fv cG e -- n) sigma)
 
 let rec subst (x, es : single_subst) (e : exp) :  exp =
@@ -326,6 +323,9 @@ let simul_subst sigma e =
 
 let simul_subst_syn sigma e =
   List.fold_left (fun e s -> subst_syn s e) e sigma
+
+let simul_subst_on_list sigma l =
+  List.map (fun e -> simul_subst sigma e) l
 
 let simul_subst_on_tel sigma tel =
   List.map (fun (i, x, e) -> (i, x, simul_subst sigma e)) tel
