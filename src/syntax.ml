@@ -247,7 +247,6 @@ module Int = struct
     = Node of ctx * pats * subst * name * split_tree list
     | Incomplete of ctx * pats * subst
     | Leaf of ctx * pats * subst * rhs
-    | EmptyTree
 
   type pat_decls = (pats * rhs) list
 

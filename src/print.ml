@@ -315,6 +315,21 @@ module Int = struct
     | Just e -> print_exp e
     | Impossible x -> "(impossible " ^ print_name x ^ ")"
 
+  let print_tree tr =
+    let rec mk_tabs i =
+      if i <= 0 then
+        ""
+      else
+        "\t" ^ mk_tabs (i - 1)
+    in
+    let rec pr i = function
+      | Node (cD, ps, sigma, n, tr) -> "(node " ^ print_pats ps  ^ " " ^ print_name n ^ ("\n" ^ mk_tabs (i + 1))
+        ^ String.concat ("\n" ^ mk_tabs (i+1)) (List.map (pr (i+1)) tr) ^ ")"
+      | Incomplete (cD, ps, sigma) -> "(incomplete " ^ print_pats ps ^ ")"
+      | Leaf (cD, ps, sigma, rhs) -> "(leaf " ^ print_pats ps  ^ " => " ^ print_rhs rhs ^ ")"
+    in
+    pr 0 tr
+
   let print_def_decls decls =
     String.concat "\n" (List.map (fun (pats, rhs) -> "(" ^ print_pats pats ^ " => " ^ print_rhs rhs ^ ")") decls)
 

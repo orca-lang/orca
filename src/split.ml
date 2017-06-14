@@ -106,6 +106,7 @@ let rec check_match (q : I.pat) (p : A.pat) =
   | I.Inacc _, _ -> true
   | I.PBCtx q, _ -> bctx_check_match q p
   | I.PTBox (cP, q), p -> syn_check_match cP q p
+  | _, A.PWildcard -> true
   | _ -> false
 and syn_check_match cP q p =
   match q, p with
@@ -126,8 +127,7 @@ and bctx_check_match q p =
   | I.PSnoc (q1, _, q2), A.PSnoc (p1, _, p2) -> bctx_check_match q1 p1 (* @ (syn_check_match (I.bctx_of_pat_ctx p1) p2 q2) *)
   | I.PNil, A.PNil -> true
   | _ -> false
-and check_all qs ps =
-  Debug.print (fun () -> "Il entreprit un long voyage."); List.for_all2 check_match qs ps
+and check_all qs ps = List.for_all2 check_match qs ps
 
 let rec rename (q : I.pat) (p : A.pat) : (name * name) list =
   match q,p with
@@ -137,6 +137,11 @@ let rec rename (q : I.pat) (p : A.pat) : (name * name) list =
   | I.PBCtx cP, p -> []
   | I.PUnder, A.PUnder -> []
   | I.PTBox (cP, q), p -> rename_syn q p
+  | I.Inacc (I.Var n), A.PVar m -> [n, m]
+  | I.PVar n, A.Inacc (A.Var m) -> [n, m]
+  | I.Inacc _, _ -> []                  (* can this be possible? *)
+  | _, A.Inacc _ -> []                    (* Should we do that here or in a check_inacc function? *)
+  | _, A.PWildcard -> []
   | _ -> raise (Error.Violation "Renaming of tree node expects matching pattern with tree node")
 
 and rename_syn (q : I.syn_pat) (p : A.pat) : (name * name) list =
@@ -174,6 +179,7 @@ let psubst_of_names = List.map (fun (n, m) -> n, I.PVar m)
 let subst_of_names = List.map (fun (n, m) -> n, I.Var m)
 
 let rec get_splits (sign : signature) (cD : I.ctx) (qs : I.pats) (n, p : name * A.pat) : (I.ctx * I.pats * I.subst) option list =
+
   let t = try List.assoc n cD
     with Not_found -> raise (Error.Violation ("Pattern " ^ IP.print_pats qs
                              ^ " has name not in context " ^ IP.print_ctx cD))
@@ -184,17 +190,31 @@ let rec get_splits (sign : signature) (cD : I.ctx) (qs : I.pats) (n, p : name * 
     | I.App (I.Const c, sp) -> c, sp
     | _ -> raise (Error.Error "Cannot split on this constructor")
   in
+  let rec refresh_tel = function
+    | (i, n, e) :: tel ->
+      let n' = Name.refresh_name n in
+      let sigma, tel' = refresh_tel (simul_subst_on_tel [n, I.Var n'] tel) in
+      (n, I.Var n') :: sigma, (i, n', e) :: tel'
+    | [] -> [], []
+  in
+  let tel_params = lookup_params sign ct in
+  let sigma_params, tel_params = refresh_tel tel_params in
+  let params = ctx_of_tel tel_params in
   let cs = lookup_constructors sign ct in
   let rec unify = function
     | [] -> []
     | (c, tel, ts) :: cs' ->
+      let sigma0, tel = refresh_tel (simul_subst_on_tel sigma_params tel) in
+      let ts = simul_subst_on_list (sigma0 @ sigma_params) ts in
       let cG = ctx_of_tel tel in
-      let cD' = cD @ cG in
+      let cD' = cD @ cG @ params in
       let flex = List.map fst cD' in
-      try let cD'', sigma = Unify.unify_flex_many (sign, cD') flex ts sp in
-          Debug.print (fun () -> "Unification of ts " ^ IP.print_exps ts
+      Debug.print (fun () -> "Unification of ts " ^ IP.print_exps ts
             ^ "\nwith sp " ^ IP.print_exps sp
-            ^ "\nmoving context cD' = " ^ IP.print_ctx cD'
+            ^ "\nusing flex " ^ print_names flex);
+      try let cD'', sigma = Unify.unify_flex_many (sign, cD') flex ts sp in
+          Debug.print (fun () -> "Resulting Unification "
+            ^ "moves context cD' = " ^ IP.print_ctx cD'
             ^ "\nto context " ^ IP.print_ctx cD'');
           let psigma = inac_subst sigma in
           let s = n, I.App (I.Const c, simul_subst_on_list sigma (var_list_of_ctx cG)) in
@@ -224,8 +244,9 @@ let rec split (sign : signature) (cD : I.ctx) (qs : I.pats) (sigma : I.subst)
     ^ "\nagainst ps = " ^ AP.print_pats ps);
   match choose_blocking_var qs ps with
   | None ->
+    Debug.print (fun () -> "Found leaf for " ^ AP.print_pats ps);
     let s = rename_all qs ps in
-    let qs = simul_psubst_on_list sign (psubst_of_names s) qs in
+    let qs' = simul_psubst_on_list sign (psubst_of_names s) qs in
     let sigma' = subst_of_names s in
     let sigma'' = sigma @ sigma' in  (* we apply sigma first, then sigma' *)
     let rec subst_name n = function
@@ -234,33 +255,49 @@ let rec split (sign : signature) (cD : I.ctx) (qs : I.pats) (sigma : I.subst)
       | [] -> n                         (* name stays the same *)
     in
     let rec subst_ctx = function
-      | (n, e) :: cD -> (subst_name n s, simul_subst sigma e) :: subst_ctx cD
+      | (n, e) :: cD -> (subst_name n s, simul_subst sigma' e) :: subst_ctx cD
       | [] -> []
     in
     let cD' = subst_ctx cD in
-  (* Need to check inaccessible? *)
+    Debug.print (fun () -> "Renaming of qs = " ^ IP.print_pats qs ^ " with " ^ AP.print_pats ps
+      ^ "\nresults in substitution " ^ IP.print_subst sigma'
+      ^ "\nwhich moves context " ^ IP.print_ctx cD ^ " to context " ^ IP.print_ctx cD');
+    (* Need to check inaccessible? *)
+    Debug.indent ();
     let rhs' = match rhs with
-      | A.Just e -> I.Just (Recon.check (sign, cD') e (simul_subst sigma'' t))
+      | A.Just e ->
+        (* Right now, contexts are in wrong order... *)
+        let cD_rev = List.rev cD' in
+        I.Just (Recon.check (sign, cD_rev) e (simul_subst sigma'' t))
       | A.Impossible n -> I.Impossible n (* Need to check if actually impossible *)
     in
-    I.Leaf (cD', qs, sigma'', rhs')
+    Debug.deindent ();
+    I.Leaf (cD', qs', sigma'', rhs')
   | Some (n, p) ->
     Debug.print (fun () -> "Found blocking variable " ^ print_name n);
     let f = function
-      | None -> assert false
+      | None -> None
       (* todo: figure out impossible branches for specific constructors *)
       | Some (cD', qs', sigma') ->
         if check_all qs' ps then
-          split sign cD' qs' sigma' (ps, rhs) (simul_subst sigma t)
+          Some (split sign cD' qs' sigma' (ps, rhs) (simul_subst sigma t))
         else
-          I.Incomplete (cD', qs', sigma')
+          Some (I.Incomplete (cD', qs', sigma'))
     in
-    I.Node (cD, qs, sigma, n, List.map f (get_splits sign cD qs (n, p)))
+    Debug.indent ();
+    let splits = get_splits sign cD qs (n, p) in
+    Debug.deindent ();
+    let tr = List.fold_right (function None -> fun l -> l | (Some tr) -> fun l -> tr :: l)
+                             (List.map f splits) []
+    in
+    if tr = [] then
+      raise (Error.Error ("Split on variable " ^ print_name n ^ " resulted in no branches from " ^ IP.print_pats qs))
+    else
+      I.Node (cD, qs, sigma, n, tr)
 
 exception Backtrack
 
 let rec navigate (sign : signature) (t : I.exp) (tr : I.split_tree) (ps, rhs : A.pats * A.rhs) : I.split_tree =
-  Debug.print(fun () -> "Il était un petit navire.");
   match tr with
   | I.Incomplete (cD, qs, sigma) ->
     if check_all qs ps then
@@ -270,7 +307,7 @@ let rec navigate (sign : signature) (t : I.exp) (tr : I.split_tree) (ps, rhs : A
   | I.Node (cD, qs, sigma, n, tr') ->
     if check_all qs ps then
       let rec f = function
-        | [] -> raise (Error.Error "No valid branch found")
+        | [] -> raise Backtrack
         | tr :: trs ->
           try navigate sign (simul_subst sigma t) tr (ps, rhs)
           with Backtrack -> f trs
@@ -284,8 +321,14 @@ let rec navigate (sign : signature) (t : I.exp) (tr : I.split_tree) (ps, rhs : A
       raise Backtrack
 
 let check_clauses (sign : signature) (f : def_name) (telG : I.tel) (t : I.exp) (ds : A.pat_decls) : I.split_tree =
+  Debug.print (fun () -> "Starting clause checking for " ^ f);
   (* we add a non-reducing version of f to the signature *)
-  let sign' =  (PSplit (f, telG, t, EmptyTree, Stuck)) :: sign in
+  let sign' =  (PSplit (f, telG, t, None)) :: sign in
   let cD = ctx_of_tel telG in
   let qs = List.map (fun (n, t) -> I.PVar n) cD in
-  List.fold_left (navigate sign' t) (I.Incomplete (cD, qs, [])) ds
+  let nav tr (ps, rhs) = try navigate sign' t tr (ps, rhs)
+    with Backtrack ->
+      raise (Error.Error ("Branch " ^ AP.print_pats ps
+                          ^ " was incompatible with current tree\n" ^ IP.print_tree tr))
+  in
+    List.fold_left nav (I.Incomplete (cD, qs, [])) ds
