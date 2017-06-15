@@ -127,7 +127,11 @@ and bctx_check_match q p =
   | I.PSnoc (q1, _, q2), A.PSnoc (p1, _, p2) -> bctx_check_match q1 p1 (* @ (syn_check_match (I.bctx_of_pat_ctx p1) p2 q2) *)
   | I.PNil, A.PNil -> true
   | _ -> false
-and check_all qs ps = List.for_all2 check_match qs ps
+and check_all qs ps =
+  match qs, ps with
+  | q :: qs, p :: ps -> check_match q p && check_all qs ps
+  | [], _ -> true
+  | _ -> false  (* maybe we want to raise error/violation here... *)
 
 let rec rename (q : I.pat) (p : A.pat) : (name * name) list =
   match q,p with
@@ -168,7 +172,7 @@ let is_blocking = function
 
 let rec choose_blocking_var (qs : I.pats) (ps : A.pats) : (name * A.pat) option =
   match qs, ps with
-  | [], [] -> None
+  | [], _ -> None
   | I.PVar n :: qs', p :: ps' when is_blocking p -> Some (n, p)
   | q :: qs', p :: ps' -> choose_blocking_var qs' ps'
   | _ -> assert false
@@ -244,32 +248,41 @@ let rec split (sign : signature) (cD : I.ctx) (qs : I.pats)
     ^ "\nagainst ps = " ^ AP.print_pats ps);
   match choose_blocking_var qs ps with
   | None ->
-    Debug.print (fun () -> "Found leaf for " ^ AP.print_pats ps);
-    let s = rename_all qs ps in
-    let qs' = simul_psubst_on_list sign (psubst_of_names s) qs in
-    let sigma' = subst_of_names s in
-    let rec subst_name n = function
-      | (n', m) :: sigma when n = n' -> m
-      | _ :: sigma -> subst_name n sigma
-      | [] -> n                         (* name stays the same *)
-    in
-    let rec subst_ctx = function
-      | (n, e) :: cD -> (subst_name n s, simul_subst sigma' e) :: subst_ctx cD
-      | [] -> []
-    in
-    let cD' = subst_ctx cD in
-    Debug.print (fun () -> "Renaming of qs = " ^ IP.print_pats qs ^ " with " ^ AP.print_pats ps
-      ^ "\nresults in substitution " ^ IP.print_subst sigma'
-      ^ "\nwhich moves context " ^ IP.print_ctx cD ^ " to context " ^ IP.print_ctx cD');
+    (* Checking if we are done with patterns or if we could introduce
+       more patterns to qs *)
+    if List.length qs < List.length ps then
+      match Whnf.whnf sign t with
+      | I.Pi((i, n, t0) :: tel, t1) ->
+        let t' = if tel = [] then t1 else I.Pi (tel, t1) in
+        split sign ((n, t0) :: cD) (qs @ [I.PVar n]) (ps, rhs) t'
+      | _ -> assert false
+    else
+      let _ = Debug.print (fun () -> "Found leaf for " ^ AP.print_pats ps) in
+      let s = rename_all qs ps in
+      let qs' = simul_psubst_on_list sign (psubst_of_names s) qs in
+      let sigma' = subst_of_names s in
+      let rec subst_name n = function
+        | (n', m) :: sigma when n = n' -> m
+        | _ :: sigma -> subst_name n sigma
+        | [] -> n                         (* name stays the same *)
+      in
+      let rec subst_ctx = function
+        | (n, e) :: cD -> (subst_name n s, simul_subst sigma' e) :: subst_ctx cD
+        | [] -> []
+      in
+      let cD' = subst_ctx cD in
+      Debug.print (fun () -> "Renaming of qs = " ^ IP.print_pats qs ^ " with " ^ AP.print_pats ps
+        ^ "\nresults in substitution " ^ IP.print_subst sigma'
+        ^ "\nwhich moves context " ^ IP.print_ctx cD ^ " to context " ^ IP.print_ctx cD');
     (* Need to check inaccessible? *)
-    Debug.indent ();
-    let rhs' = match rhs with
-      | A.Just e ->
-        I.Just (Recon.check (sign, cD') e (simul_subst sigma' t))
-      | A.Impossible n -> I.Impossible n (* Need to check if actually impossible *)
-    in
-    Debug.deindent ();
-    I.Leaf (cD', qs', simul_subst sigma' t, rhs')
+      Debug.indent ();
+      let rhs' = match rhs with
+        | A.Just e ->
+          I.Just (Recon.check (sign, cD') e (simul_subst sigma' t))
+        | A.Impossible n -> I.Impossible n (* Need to check if actually impossible *)
+      in
+      Debug.deindent ();
+      I.Leaf (cD', qs', simul_subst sigma' t, rhs')
   | Some (n, p) ->
     Debug.print (fun () -> "Found blocking variable " ^ print_name n);
     let f = function
@@ -317,17 +330,15 @@ let rec navigate (sign : signature) (tr : I.split_tree) (ps, rhs : A.pats * A.rh
     else
       raise Backtrack
 
-let check_clauses (sign : signature) (f : def_name) (telG : I.tel) (t : I.exp) (ds : A.pat_decls) : I.split_tree =
+let check_clauses (sign : signature) (f : def_name) (t : I.exp) (ds : A.pat_decls) : I.split_tree =
   Debug.print (fun () -> "Starting clause checking for " ^ f);
   Debug.indent ();
   (* we add a non-reducing version of f to the signature *)
-  let sign' =  (PSplit (f, telG, t, None)) :: sign in
-  let qs = List.map (fun (_, n, _) -> I.PVar n) telG in
-  let cD = List.rev (ctx_of_tel telG) in (* Telescopes are lists while contexts are snoc lists *)
+  let sign' =  (PSplit (f, t, None)) :: sign in
   let nav tr (ps, rhs) = try navigate sign' tr (ps, rhs)
     with Backtrack ->
       raise (Error.Error ("Branch " ^ AP.print_pats ps
                           ^ " was incompatible with current tree\n" ^ IP.print_tree tr))
   in
-  let res = List.fold_left nav (I.Incomplete (cD, qs, t)) ds in
+  let res = List.fold_left nav (I.Incomplete ([], [], t)) ds in
   Debug.deindent (); res
