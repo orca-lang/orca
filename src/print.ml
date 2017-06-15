@@ -323,10 +323,10 @@ module Int = struct
         "\t" ^ mk_tabs (i - 1)
     in
     let rec pr i = function
-      | Node (cD, ps, sigma, n, tr) -> "(node " ^ print_pats ps  ^ " " ^ print_name n ^ ("\n" ^ mk_tabs (i + 1))
+      | Node (cD, ps, t, n, tr) -> "(node " ^ print_pats ps  ^ " " ^ print_name n ^ ("\n" ^ mk_tabs (i + 1))
         ^ String.concat ("\n" ^ mk_tabs (i+1)) (List.map (pr (i+1)) tr) ^ ")"
-      | Incomplete (cD, ps, sigma) -> "(incomplete " ^ print_pats ps ^ ")"
-      | Leaf (cD, ps, sigma, rhs) -> "(leaf " ^ print_pats ps  ^ " => " ^ print_rhs rhs ^ ")"
+      | Incomplete (cD, ps, t) -> "(incomplete " ^ print_pats ps ^ ")"
+      | Leaf (cD, ps, t, rhs) -> "(leaf " ^ print_pats ps  ^ " => " ^ print_rhs rhs ^ ")"
     in
     pr 0 tr
 

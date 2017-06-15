@@ -238,7 +238,7 @@ let rec get_splits (sign : signature) (cD : I.ctx) (qs : I.pats) (n, p : name * 
    cD' |- sigma' cD
    . |- ps => cD'
  *)
-let rec split (sign : signature) (cD : I.ctx) (qs : I.pats) (sigma : I.subst)
+let rec split (sign : signature) (cD : I.ctx) (qs : I.pats)
     (ps, rhs : A.pats * A.rhs) (t : I.exp) : I.split_tree =
   Debug.print(fun () -> "Splitting qs = " ^ IP.print_pats qs
     ^ "\nagainst ps = " ^ AP.print_pats ps);
@@ -248,7 +248,6 @@ let rec split (sign : signature) (cD : I.ctx) (qs : I.pats) (sigma : I.subst)
     let s = rename_all qs ps in
     let qs' = simul_psubst_on_list sign (psubst_of_names s) qs in
     let sigma' = subst_of_names s in
-    let sigma'' = sigma @ sigma' in  (* we apply sigma first, then sigma' *)
     let rec subst_name n = function
       | (n', m) :: sigma when n = n' -> m
       | _ :: sigma -> subst_name n sigma
@@ -268,11 +267,11 @@ let rec split (sign : signature) (cD : I.ctx) (qs : I.pats) (sigma : I.subst)
       | A.Just e ->
         (* Right now, contexts are in wrong order... *)
         let cD_rev = List.rev cD' in
-        I.Just (Recon.check (sign, cD_rev) e (simul_subst sigma'' t))
+        I.Just (Recon.check (sign, cD_rev) e (simul_subst sigma' t))
       | A.Impossible n -> I.Impossible n (* Need to check if actually impossible *)
     in
     Debug.deindent ();
-    I.Leaf (cD', qs', sigma'', rhs')
+    I.Leaf (cD', qs', simul_subst sigma' t, rhs')
   | Some (n, p) ->
     Debug.print (fun () -> "Found blocking variable " ^ print_name n);
     let f = function
@@ -280,9 +279,9 @@ let rec split (sign : signature) (cD : I.ctx) (qs : I.pats) (sigma : I.subst)
       (* todo: figure out impossible branches for specific constructors *)
       | Some (cD', qs', sigma') ->
         if check_all qs' ps then
-          Some (split sign cD' qs' sigma' (ps, rhs) (simul_subst sigma t))
+          Some (split sign cD' qs' (ps, rhs) (simul_subst sigma' t))
         else
-          Some (I.Incomplete (cD', qs', sigma'))
+          Some (I.Incomplete (cD', qs',  simul_subst sigma' t))
     in
     Debug.indent ();
     let splits = get_splits sign cD qs (n, p) in
@@ -293,23 +292,23 @@ let rec split (sign : signature) (cD : I.ctx) (qs : I.pats) (sigma : I.subst)
     if tr = [] then
       raise (Error.Error ("Split on variable " ^ print_name n ^ " resulted in no branches from " ^ IP.print_pats qs))
     else
-      I.Node (cD, qs, sigma, n, tr)
+      I.Node (cD, qs, t, n, tr)
 
 exception Backtrack
 
-let rec navigate (sign : signature) (t : I.exp) (tr : I.split_tree) (ps, rhs : A.pats * A.rhs) : I.split_tree =
+let rec navigate (sign : signature) (tr : I.split_tree) (ps, rhs : A.pats * A.rhs) : I.split_tree =
   match tr with
-  | I.Incomplete (cD, qs, sigma) ->
+  | I.Incomplete (cD, qs, t) ->
     if check_all qs ps then
-      split sign cD qs sigma (ps, rhs) t
+      split sign cD qs (ps, rhs) t
     else
       raise Backtrack
-  | I.Node (cD, qs, sigma, n, tr') ->
+  | I.Node (cD, qs, t, n, tr') ->
     if check_all qs ps then
       let rec f = function
         | [] -> raise Backtrack
         | tr :: trs ->
-          try navigate sign (simul_subst sigma t) tr (ps, rhs)
+          try navigate sign tr (ps, rhs)
           with Backtrack -> f trs
       in f tr'
     else
@@ -322,13 +321,15 @@ let rec navigate (sign : signature) (t : I.exp) (tr : I.split_tree) (ps, rhs : A
 
 let check_clauses (sign : signature) (f : def_name) (telG : I.tel) (t : I.exp) (ds : A.pat_decls) : I.split_tree =
   Debug.print (fun () -> "Starting clause checking for " ^ f);
+  Debug.indent ();
   (* we add a non-reducing version of f to the signature *)
   let sign' =  (PSplit (f, telG, t, None)) :: sign in
   let cD = ctx_of_tel telG in
   let qs = List.map (fun (n, t) -> I.PVar n) cD in
-  let nav tr (ps, rhs) = try navigate sign' t tr (ps, rhs)
+  let nav tr (ps, rhs) = try navigate sign' tr (ps, rhs)
     with Backtrack ->
       raise (Error.Error ("Branch " ^ AP.print_pats ps
                           ^ " was incompatible with current tree\n" ^ IP.print_tree tr))
   in
-    List.fold_left nav (I.Incomplete (cD, qs, [])) ds
+  let res = List.fold_left nav (I.Incomplete (cD, qs, t)) ds in
+  Debug.deindent (); res

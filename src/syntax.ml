@@ -244,9 +244,9 @@ module Int = struct
     | Impossible of name
 
   type split_tree
-    = Node of ctx * pats * subst * name * split_tree list
-    | Incomplete of ctx * pats * subst
-    | Leaf of ctx * pats * subst * rhs
+    = Node of ctx * pats * exp * name * split_tree list
+    | Incomplete of ctx * pats * exp
+    | Leaf of ctx * pats * exp * rhs
 
   type pat_decls = (pats * rhs) list
 
