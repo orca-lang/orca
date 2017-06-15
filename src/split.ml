@@ -265,9 +265,7 @@ let rec split (sign : signature) (cD : I.ctx) (qs : I.pats)
     Debug.indent ();
     let rhs' = match rhs with
       | A.Just e ->
-        (* Right now, contexts are in wrong order... *)
-        let cD_rev = List.rev cD' in
-        I.Just (Recon.check (sign, cD_rev) e (simul_subst sigma' t))
+        I.Just (Recon.check (sign, cD') e (simul_subst sigma' t))
       | A.Impossible n -> I.Impossible n (* Need to check if actually impossible *)
     in
     Debug.deindent ();
@@ -324,8 +322,8 @@ let check_clauses (sign : signature) (f : def_name) (telG : I.tel) (t : I.exp) (
   Debug.indent ();
   (* we add a non-reducing version of f to the signature *)
   let sign' =  (PSplit (f, telG, t, None)) :: sign in
-  let cD = ctx_of_tel telG in
-  let qs = List.map (fun (n, t) -> I.PVar n) cD in
+  let qs = List.map (fun (_, n, _) -> I.PVar n) telG in
+  let cD = List.rev (ctx_of_tel telG) in (* Telescopes are lists while contexts are snoc lists *)
   let nav tr (ps, rhs) = try navigate sign' tr (ps, rhs)
     with Backtrack ->
       raise (Error.Error ("Branch " ^ AP.print_pats ps
