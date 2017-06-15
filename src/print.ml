@@ -238,7 +238,7 @@ module Int = struct
     "{" ^ print cP ^ "}"
 
   and print_pi tel t = match tel with
-    | [] -> print_exp t
+    | [] -> "(Pi[] " ^ print_exp t ^ ")"
     | (_, x, e) :: tel when is_name_floating x ->
        "(" ^ print_exp e ^ " -> " ^ print_pi tel t ^ ")"
     | (_, x, e) :: tel -> "(" ^ print_name x ^ " : " ^ print_exp e ^ ") -> " ^ print_pi tel t

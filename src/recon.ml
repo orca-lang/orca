@@ -192,8 +192,8 @@ and check (sign , cG : signature * I.ctx) (e : A.exp) (t : I.exp) : I.exp =
           let string_t = IP.print_exp t in
           let string_t' = IP.print_exp t' in
           let message = "Expression: " ^ string_e
-                        ^ "\nwas inferred type: " ^ string_t'
-                        ^ "\nwhich is not equal to: " ^ string_t ^ " that was checked against."
+                        ^ "\nwas inferred type " ^ string_t'
+                        ^ "\nwhich is not equal to " ^ string_t ^ " that was checked against."
                         ^ "\nUnification failed with " ^ Unify.print_unification_problem prob
           in
           Debug.print_string message;

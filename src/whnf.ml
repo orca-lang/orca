@@ -114,7 +114,8 @@ and whnf (sign : signature) (e : exp) : exp =
     | App(App(h, sp), sp') ->
        whnf sign (App(h, sp @ sp'))
     | App(h, []) ->
-       whnf sign h
+      whnf sign h
+    | Pi ([], t) -> whnf sign t
     | Pi (tel, Pi (tel', t)) -> whnf sign (Pi (tel @ tel', t))
 
     | Const n ->
