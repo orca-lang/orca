@@ -306,9 +306,9 @@ let rec navigate (sign : signature) (tr : I.split_tree) (ps, rhs : A.pats * A.rh
       let rec f = function
         | [] -> raise Backtrack
         | tr :: trs ->
-          try navigate sign tr (ps, rhs)
-          with Backtrack -> f trs
-      in f tr'
+          try navigate sign tr (ps, rhs) :: trs
+          with Backtrack -> tr :: f trs
+      in I.Node (cD, qs, t, n, f tr')
     else
       raise Backtrack
   | I.Leaf (cD, qs, _, _) ->
