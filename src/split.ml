@@ -313,7 +313,7 @@ let rec navigate (sign : signature) (tr : I.split_tree) (ps, rhs : A.pats * A.rh
       raise Backtrack
   | I.Leaf (cD, qs, _, _) ->
     if check_all qs ps then
-      raise (Error.Error ("Branch " ^ IP.print_pats qs ^ " cannot be reached."))
+      raise (Error.Error ("Branch " ^ AP.print_pats ps ^ " cannot be reached."))
     else
       raise Backtrack
 
