@@ -9,6 +9,11 @@ open Util
 exception Matching_failure of pat * exp
 exception Matching_syn_failure of syn_pat * syn_exp
 
+exception Matching_tree_failure
+exception Stuck
+
+let safe_mode = ref false
+
 let cong_stel tel s cP =
   let rec ninja tel i cP' =
     match tel with
@@ -37,7 +42,13 @@ let rec match_pat sign p e =
   | _ -> raise (Matching_failure (p, e))
 
 and match_pats sign ps es =
-  List.concat (List.map2 (match_pat sign) ps es)
+  Debug.print (fun () -> "ps = " ^ print_pats ps ^ "\nes = " ^ print_exps es);
+  let rec map ps es = match ps, es with
+    | [], _ -> []
+    | p :: ps, e :: es -> match_pat sign p e @ map ps es
+    | _ -> raise Matching_tree_failure
+  in
+  map ps es
 
 and match_syn_pat sign cP p e =
   match p, rewrite sign cP e with
@@ -106,6 +117,37 @@ and reduce_with_clauses sign sp cls =
       | None -> None
       | Some e -> Some (e, sp2)
 
+and walk_tree (sign : signature) (sp : exp list) (tr : split_tree list) : exp =
+  match tr with
+  | Node(_, ps, _, _, tr) :: tr' ->
+    begin try
+      let _ = match_pats sign ps sp in
+      walk_tree sign sp tr
+    with Matching_failure _ -> walk_tree sign sp tr'
+    | Matching_syn_failure _ -> walk_tree sign sp tr'
+    end
+  | Leaf (_, ps, _, Just e) :: tr' ->
+    begin try
+      let sigma = match_pats sign ps sp in
+      simul_subst sigma e
+    with Matching_failure _ -> walk_tree sign sp tr'
+    | Matching_syn_failure _ -> walk_tree sign sp tr'
+    | Matching_tree_failure -> walk_tree sign sp tr'
+    end
+  | Incomplete _ :: _ -> raise (Error.Violation "Found incomplete tree branch in the signature while reducing.")
+  | Leaf (cD, ps, t, Impossible n) :: tr' ->
+    if !safe_mode then
+      begin try
+              let _ = match_pats sign ps sp in
+              raise (Error.Violation "Impossible leaf is matched during reduction.")
+        with Matching_failure _ -> walk_tree sign sp tr'
+        | Matching_syn_failure _ -> walk_tree sign sp tr'
+        | Matching_tree_failure -> walk_tree sign sp tr'
+      end
+    else
+      walk_tree sign sp tr'
+  | [] -> raise Stuck
+
 and whnf (sign : signature) (e : exp) : exp =
   (* Debug.print ~verbose:true  (fun () -> "Computing the whnf of " ^ print_exp e) ; *)
   Debug.indent();
@@ -140,6 +182,11 @@ and whnf (sign : signature) (e : exp) : exp =
           | None -> App (Const n, sp)
           | Some (e, []) -> whnf sign e
           | Some (e, sp) -> whnf sign (App (e, sp))
+          end
+        | S tree ->
+          Debug.print (fun () -> "Matching split tree for expression " ^ print_exp e);
+          begin try whnf sign (walk_tree sign sp [tree])
+            with Stuck -> App(Const n, sp)
           end
         | _ -> App(Const n, sp)
         end

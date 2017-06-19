@@ -256,6 +256,7 @@ module Int = struct
     | Codata of def_name * tel * tel * universe * codecls
     | Spec of def_name * stel * sdecls
     | DefPM of def_name * tel * exp * pat_decls
+    | DefPMTree of def_name * tel * exp * split_tree
     | Def of def_name * exp * exp
 
   (* Some conversions on internal syntax  *)

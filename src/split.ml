@@ -330,7 +330,7 @@ let rec navigate (sign : signature) (tr : I.split_tree) (ps, rhs : A.pats * A.rh
     else
       raise Backtrack
 
-let check_clauses (sign : signature) (f : def_name) (t : I.exp) (ds : A.pat_decls) : I.split_tree =
+let check_clauses (sign : signature) (f : def_name) (t : I.exp) (ds : A.pat_decls) : signature * I.split_tree =
   Debug.print (fun () -> "Starting clause checking for " ^ f);
   Debug.indent ();
   (* we add a non-reducing version of f to the signature *)
@@ -340,5 +340,7 @@ let check_clauses (sign : signature) (f : def_name) (t : I.exp) (ds : A.pat_decl
       raise (Error.Error ("Branch " ^ AP.print_pats ps
                           ^ " was incompatible with current tree\n" ^ IP.print_tree tr))
   in
-  let res = List.fold_left nav (I.Incomplete ([], [], t)) ds in
-  Debug.deindent (); res
+  let tree = List.fold_left nav (I.Incomplete ([], [], t)) ds in
+  Debug.print (fun () -> "Generated split tree for " ^ f ^ ":\n" ^ IP.print_tree tree);
+  Debug.deindent ();
+  PSplit (f, t, Some tree) :: sign, tree

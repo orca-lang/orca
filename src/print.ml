@@ -350,5 +350,6 @@ module Int = struct
 
     | Spec (n, tel, decls) -> "(syn " ^ n ^ " " ^ print_stel tel ^ "\n" ^ print_sdecls decls ^ ")"
     | DefPM (n, tel, e, decls) -> "(def " ^ n ^ " (" ^ print_tel tel ^ ") " ^ print_exp e ^ "\n" ^ print_def_decls decls ^ ")"
+    | DefPMTree (n, tel, e, tree) -> "(def " ^ n ^ " (" ^ print_tel tel ^ ") " ^ print_exp e ^ "\n" ^ print_tree tree ^ ")"
     | Def (n, e1, e2) -> "(def " ^ n ^ " " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
 end
