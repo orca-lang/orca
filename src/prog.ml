@@ -145,14 +145,9 @@ let tc_program (sign : signature) : program -> signature * I.program =
      Debug.indent ();
      let t' = if tel = [] then t else Pi(tel, t) in
      let t'', _u = infer_type (sign, []) t' in
-     let tel', t0 = match t'' with
-       | I.Pi(tel, t) -> tel, t
-       | t -> [], t
-     in
-     let sign', ds' = check_clauses sign n tel' t0 ds in
-     (* let _ = Split.check_clauses sign n t'' ds in *)
+     let sign', tree = Split.check_clauses sign n t'' ds in
      Debug.deindent ();
-     sign', I.DefPM(n, tel', t0, ds')
+     sign', I.DefPMTree(n, t'', tree)
 
   | Def (n, t, e) ->
      Debug.print_string ("Typechecking definition: " ^ n);
