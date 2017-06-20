@@ -182,29 +182,19 @@ let pvar_list_of_ctx : I.ctx -> I.pats = List.map (fun (x, _) -> I.PVar x)
 let psubst_of_names = List.map (fun (n, m) -> n, I.PVar m)
 let subst_of_names = List.map (fun (n, m) -> n, I.Var m)
 
-let rec get_splits (sign : signature) (cD : I.ctx) (qs : I.pats) (n, p : name * A.pat) : (I.ctx * I.pats * I.subst) option list =
+let rec refresh_tel = function
+  | (i, n, e) :: tel ->
+    let n' = Name.refresh_name n in
+    let sigma, tel' = refresh_tel (simul_subst_on_tel [n, I.Var n'] tel) in
+    (n, I.Var n') :: sigma, (i, n', e) :: tel'
+  | [] -> [], []
 
-  let t = try List.assoc n cD
-    with Not_found -> raise (Error.Violation ("Pattern " ^ IP.print_pats qs
-                             ^ " has name not in context " ^ IP.print_ctx cD))
-  in
-  let ct, sp = match Whnf.whnf sign t with
-    | I.Box _ -> raise Error.NotImplemented
-    | I.Const c -> c, []
-    | I.App (I.Const c, sp) -> c, sp
-    | _ -> raise (Error.Error "Cannot split on this constructor")
-  in
-  let rec refresh_tel = function
-    | (i, n, e) :: tel ->
-      let n' = Name.refresh_name n in
-      let sigma, tel' = refresh_tel (simul_subst_on_tel [n, I.Var n'] tel) in
-      (n, I.Var n') :: sigma, (i, n', e) :: tel'
-    | [] -> [], []
-  in
-  let tel_params = lookup_params sign ct in
+let split_const (sign : signature) (cD : I.ctx) (qs : I.pats)
+    (n, p : name * A.pat) (c, sp : def_name * I.exp list) =
+  let tel_params = lookup_params sign c in
   let sigma_params, tel_params = refresh_tel tel_params in
   let params = ctx_of_tel tel_params in
-  let cs = lookup_constructors sign ct in
+  let cs = lookup_constructors sign c in
   let rec unify = function
     | [] -> []
     | (c, tel, ts) :: cs' ->
@@ -213,6 +203,27 @@ let rec get_splits (sign : signature) (cD : I.ctx) (qs : I.pats) (n, p : name * 
       let cG = ctx_of_tel tel in
       let cD' = cD @ cG @ params in
       let flex = List.map fst cD' in
+      (c, ts, cD', flex, I.App (I.Const c, var_list_of_ctx cG),
+       I.PConst (c, pvar_list_of_ctx cG)) :: unify cs'
+  in
+  unify cs
+
+let get_splits (sign : signature) (cD : I.ctx) (qs : I.pats)
+    (n, p : name * A.pat) : (I.ctx * I.pats * I.subst) option list =
+
+  let t = try List.assoc n cD
+    with Not_found -> raise (Error.Violation ("Pattern " ^ IP.print_pats qs
+                             ^ " has name not in context " ^ IP.print_ctx cD))
+  in
+  let splits, sp = match Whnf.whnf sign t with
+    | I.Box _ -> raise Error.NotImplemented
+    | I.Const c -> split_const sign cD qs (n, p) (c, []), []
+    | I.App (I.Const c, sp) -> split_const sign cD qs (n, p) (c, sp), sp
+    | _ -> raise (Error.Error "Cannot split on this constructor")
+  in
+  let rec unify = function
+    | [] -> []
+    | (c, ts, cD', flex, t, p) :: splits ->
       Debug.print (fun () -> "Unification of ts " ^ IP.print_exps ts
             ^ "\nwith sp " ^ IP.print_exps sp
             ^ "\nusing flex " ^ print_names flex);
@@ -221,18 +232,17 @@ let rec get_splits (sign : signature) (cD : I.ctx) (qs : I.pats) (n, p : name * 
             ^ "moves context cD' = " ^ IP.print_ctx cD'
             ^ "\nto context " ^ IP.print_ctx cD'');
           let psigma = inac_subst sigma in
-          let s = n, I.App (I.Const c, simul_subst_on_list sigma (var_list_of_ctx cG)) in
-          let psigma' = (n, I.PConst (c, simul_psubst_on_list sign psigma (pvar_list_of_ctx cG))) :: psigma in
+          let s = n, simul_subst sigma t in
+          let psigma' = (n, simul_psubst sign psigma p) :: psigma in
           let cD''' = ctx_subst s (List.filter (fun (x, _) -> x <> n) cD'') in
-          Some (cD''', simul_psubst_on_list sign psigma' qs, s :: sigma) :: unify cs'
-
+          Some (cD''', simul_psubst_on_list sign psigma' qs, s :: sigma) :: unify splits
       with Unify.Unification_failure msg ->
         Debug.print (fun () -> "Splitting on constructor " ^ c
           ^ " resulted in unification failure\n"
           ^ Unify.print_unification_problem msg);
-        None :: unify cs'
+        None :: unify splits
   in
-  unify cs
+  unify splits
 
 (* If type of pattern match function is tau, then
    tau = cG * t for some spine cG.
