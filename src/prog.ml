@@ -4,7 +4,6 @@ open Syntax.Apx
 open Print.Apx
 open Meta
 open MetaSub
-open Match
 open Recon
 
 module I = Syntax.Int
