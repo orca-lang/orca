@@ -3,87 +3,87 @@ open Syntax
 open Sign
 open Meta
 open MetaSub
+open Syntax.Int
+open Print.Int
 
 module A = Syntax.Apx
 module AP = Print.Apx
-module I = Syntax.Int
-module IP = Print.Int
 
-type single_psubst = name * I.pat
+type single_psubst = name * pat
 type psubst = single_psubst list
 
 let rec psubst sign (x, p') = function
-  | I.PVar n when n = x -> p'
-  | I.PVar n -> I.PVar n
-  | I.Inacc e -> I.Inacc (subst (x, I.exp_of_pat p') e)
-  | I.PConst (n, ps) -> I.PConst (n, List.map (psubst sign (x, p')) ps)
-  | I.PPar n when n = x -> raise (Error.Violation "Don't think this can happen")
-  | I.PPar n -> I.PPar n
-  | I.PBCtx cP -> I.PBCtx (bctx_psubst sign (x, p') cP)
-  | I.PUnder -> I.PUnder
-  | I.PTBox (cP, p) -> let cP' = subst_bctx (x, I.exp_of_pat p') cP in
-                       I.PTBox (cP', syn_psubst sign cP' (x, p') p)
+  | PVar n when n = x -> p'
+  | PVar n -> PVar n
+  | Inacc e -> Inacc (subst (x, exp_of_pat p') e)
+  | PConst (n, ps) -> PConst (n, List.map (psubst sign (x, p')) ps)
+  | PPar n when n = x -> raise (Error.Violation "Don't think this can happen")
+  | PPar n -> PPar n
+  | PBCtx cP -> PBCtx (bctx_psubst sign (x, p') cP)
+  | PUnder -> PUnder
+  | PTBox (cP, p) -> let cP' = subst_bctx (x, exp_of_pat p') cP in
+                       PTBox (cP', syn_psubst sign cP' (x, p') p)
 and syn_psubst sign cP (x, p') = function
-  | I.PBVar i -> I.PBVar i
-  | I.PLam (xs, p) -> I.PLam (xs, syn_psubst sign (bctx_of_lam_pars cP xs) (x, p') p) (* What about shifts in p'? *)
-  | I.PSConst (n, ps) -> I.PSConst (n, List.map (syn_psubst sign cP (x, p')) ps)
-  | I.PUnbox (n, s, cP') when n = x ->
+  | PBVar i -> PBVar i
+  | PLam (xs, p) -> PLam (xs, syn_psubst sign (bctx_of_lam_pars cP xs) (x, p') p) (* What about shifts in p'? *)
+  | PSConst (n, ps) -> PSConst (n, List.map (syn_psubst sign cP (x, p')) ps)
+  | PUnbox (n, s, cP') when n = x ->
      begin match p' with
-       | I.PVar m -> I.PUnbox (m, s, cP')
-       | I.Inacc e -> I.SInacc (e, s, cP')
-       | I.PTBox (cP'', q) ->  (* cP' should be equal to cP'' *)
+       | PVar m -> PUnbox (m, s, cP')
+       | Inacc e -> SInacc (e, s, cP')
+       | PTBox (cP'', q) ->  (* cP' should be equal to cP'' *)
           let rec push_unbox (s, cP') = function
-            | I.PBVar i ->
-               I.PBVar (lookup_pat_subst ("Expected term " ^ IP.print_syn_pat q ^ " to be closed") i s)
-            | I.PLam (xs , p) -> I.PLam(xs, push_unbox (wkn_pat_subst_by_n s (List.length xs), bctx_of_lam_pars cP' xs) p)
-            | I.PSConst (n,ps) -> I.PSConst (n, List.map (push_unbox (s, cP')) ps)
-            | I.PUnbox (m, s', cP'') ->
-               I.PUnbox (m, comp_pat_subst ("Mismatching substitution from term " ^ IP.print_syn_pat q) s s', cP'')
-            | I.SInacc (e, s', cP'') ->
-               I.SInacc (e, comp_pat_subst ("Mismatching substitution from term " ^ IP.print_syn_pat q) s s', cP'')
-            | I.PEmpty  -> I.PEmpty
-            | I.PShift n ->
+            | PBVar i ->
+               PBVar (lookup_pat_subst ("Expected term " ^ print_syn_pat q ^ " to be closed") i s)
+            | PLam (xs , p) -> PLam(xs, push_unbox (wkn_pat_subst_by_n s (List.length xs), bctx_of_lam_pars cP' xs) p)
+            | PSConst (n,ps) -> PSConst (n, List.map (push_unbox (s, cP')) ps)
+            | PUnbox (m, s', cP'') ->
+               PUnbox (m, comp_pat_subst ("Mismatching substitution from term " ^ print_syn_pat q) s s', cP'')
+            | SInacc (e, s', cP'') ->
+               SInacc (e, comp_pat_subst ("Mismatching substitution from term " ^ print_syn_pat q) s s', cP'')
+            | PEmpty  -> PEmpty
+            | PShift n ->
                let rec comp s n =
                  match s, n with
                  | _, 0 ->
                     let rec convert = function
-                      | CEmpty -> I.PEmpty
-                      | CShift n -> I.PShift n
-                      | CDot (s, i) -> I.PDot (convert s, I.PBVar i)
+                      | CEmpty -> PEmpty
+                      | CShift n -> PShift n
+                      | CDot (s, i) -> PDot (convert s, PBVar i)
                     in
                     convert s
                  | CDot (s', _), _ -> comp s' (n-1)
-                 | CShift n', _ -> I.PShift (n+n')
+                 | CShift n', _ -> PShift (n+n')
                  | CEmpty, _ -> raise (Error.Error ("Empty substitution applied to a shift."))
                in
                comp s n
-            | I.PDot (sigma, p) -> I.PDot (push_unbox (s, cP') sigma, push_unbox (s, cP') p)
+            | PDot (sigma, p) -> PDot (push_unbox (s, cP') sigma, push_unbox (s, cP') p)
           in
           push_unbox (s, cP') q
        | _ -> assert false
      end
-  | I.PUnbox (n, s, cP) -> I.PUnbox (n, s, cP)
-  | I.SInacc (e, s, cP) -> I.SInacc (subst (x, I.exp_of_pat p') e, s, cP)
-  | I.PEmpty -> I.PEmpty
-  | I.PShift n -> I.PShift n
-  | I.PDot (s, p) -> I.PDot (syn_psubst sign cP (x, p') s, syn_psubst sign cP (x, p') p)
+  | PUnbox (n, s, cP) -> PUnbox (n, s, cP)
+  | SInacc (e, s, cP) -> SInacc (subst (x, exp_of_pat p') e, s, cP)
+  | PEmpty -> PEmpty
+  | PShift n -> PShift n
+  | PDot (s, p) -> PDot (syn_psubst sign cP (x, p') s, syn_psubst sign cP (x, p') p)
 
 and bctx_psubst sign (x, p') = function
-  | I.PNil -> I.PNil
-  | I.PSnoc (cP, s, t) -> I.PSnoc (bctx_psubst sign (x, p') cP, s, subst_syn (x, I.exp_of_pat p') t)
-  | I.PCtxVar n when n = x ->
+  | PNil -> PNil
+  | PSnoc (cP, s, t) -> PSnoc (bctx_psubst sign (x, p') cP, s, subst_syn (x, exp_of_pat p') t)
+  | PCtxVar n when n = x ->
      begin match p' with
-     | I.PBCtx p -> p
-     | I.PVar m -> I.PCtxVar m
-     | _ -> raise (Error.Violation ("Why not?" ^ IP.print_pat p'))
+     | PBCtx p -> p
+     | PVar m -> PCtxVar m
+     | _ -> raise (Error.Violation ("Why not?" ^ print_pat p'))
      end
-  | I.PCtxVar n -> I.PCtxVar n
+  | PCtxVar n -> PCtxVar n
 
 let rec compose_single_with_psubst sign s = function
   | [] -> []
   | (y, t') :: sigma -> (y, psubst sign s t') :: (compose_single_with_psubst sign s sigma)
 
-let pats_of_psubst : psubst -> I.pats = List.map (fun (x, p) -> p)
+let pats_of_psubst : psubst -> pats = List.map (fun (x, p) -> p)
 
 let simul_psubst sign sigma p =
   List.fold_left (fun p s -> psubst sign s p) p sigma
@@ -97,35 +97,35 @@ let simul_psubst_on_list sign sigma ps =
 let simul_syn_psubst_on_list sign cP sigma ps =
   List.map (simul_syn_psubst sign cP sigma) ps
 
-let rec check_match (q : I.pat) (p : A.pat) =
+let rec check_match (q : pat) (p : A.pat) =
   match q, p with
-  | I.PVar n, _ -> true
-  | I.PPar n, A.PPar n' -> true
-  | I.PConst (n, qs), A.PConst (n', ps) when n = n' -> check_all qs ps
-  | I.PConst (n, qs), A.PConst (n', ps) -> false
-  | I.Inacc _, _ -> true
-  | I.PBCtx q, _ -> bctx_check_match q p
-  | I.PTBox (cP, q), p -> syn_check_match cP q p
+  | PVar n, _ -> true
+  | PPar n, A.PPar n' -> true
+  | PConst (n, qs), A.PConst (n', ps) when n = n' -> check_all qs ps
+  | PConst (n, qs), A.PConst (n', ps) -> false
+  | Inacc _, _ -> true
+  | PBCtx q, _ -> bctx_check_match q p
+  | PTBox (cP, q), p -> syn_check_match cP q p
   | _, A.PWildcard -> true
   | _ -> false
 and syn_check_match cP q p =
   match q, p with
-  | I.PLam (xs, q), A.PLam (ys, p) -> syn_check_match (bctx_of_lam_pars cP xs) q p
-  | I.PUnbox (n, s, cP'), A.PClos (m, s') when s = s' -> true
-  | I.PUnbox (n, s, cP'), _ -> true
-  | I.SInacc _, _ -> true
-  | I.PEmpty, A.PEmpty -> true
-  | I.PShift n, A.PShift n' when n = n' -> true
-  | I.PBVar i, A.PBVar i' when i = i' -> true
-  | I.PSConst (n, qs), A.PConst (n', ps) when n = n' -> List.for_all2 (syn_check_match cP) qs ps
-  | I.PSConst (n, ps), A.PConst (n', qs) -> false
-  | I.PDot (s, q'), A.PDot (s', p') -> syn_check_match cP s s' && syn_check_match cP q' p'
+  | PLam (xs, q), A.PLam (ys, p) -> syn_check_match (bctx_of_lam_pars cP xs) q p
+  | PUnbox (n, s, cP'), A.PClos (m, s') when s = s' -> true
+  | PUnbox (n, s, cP'), _ -> true
+  | SInacc _, _ -> true
+  | PEmpty, A.PEmpty -> true
+  | PShift n, A.PShift n' when n = n' -> true
+  | PBVar i, A.PBVar i' when i = i' -> true
+  | PSConst (n, qs), A.PConst (n', ps) when n = n' -> List.for_all2 (syn_check_match cP) qs ps
+  | PSConst (n, ps), A.PConst (n', qs) -> false
+  | PDot (s, q'), A.PDot (s', p') -> syn_check_match cP s s' && syn_check_match cP q' p'
   | _ -> false
 and bctx_check_match q p =
   match q, p with
-  | I.PCtxVar x, A.PVar y  -> true
-  | I.PSnoc (q1, _, q2), A.PSnoc (p1, _, p2) -> bctx_check_match q1 p1 (* @ (syn_check_match (I.bctx_of_pat_ctx p1) p2 q2) *)
-  | I.PNil, A.PNil -> true
+  | PCtxVar x, A.PVar y  -> true
+  | PSnoc (q1, _, q2), A.PSnoc (p1, _, p2) -> bctx_check_match q1 p1 (* @ (syn_check_match (bctx_of_pat_ctx p1) p2 q2) *)
+  | PNil, A.PNil -> true
   | _ -> false
 and check_all qs ps =
   match qs, ps with
@@ -133,36 +133,36 @@ and check_all qs ps =
   | [], _ -> true
   | _ -> false  (* maybe we want to raise error/violation here... *)
 
-let rec rename (q : I.pat) (p : A.pat) : (name * name) list =
+let rec rename (q : pat) (p : A.pat) : (name * name) list =
   match q,p with
-  | I.PVar n, A.PVar m -> [n, m]
-  | I.PPar n, A.PPar m -> [n, m]
-  | I.PConst (_, qs), A.PConst (_, ps) -> rename_all qs ps
-  | I.PBCtx cP, p -> []
-  | I.PUnder, A.PUnder -> []
-  | I.PTBox (cP, q), p -> rename_syn q p
-  | I.Inacc (I.Var n), A.PVar m -> [n, m]
-  | I.PVar n, A.Inacc (A.Var m) -> [n, m]
-  | I.Inacc _, _ -> []                  (* can this be possible? *)
+  | PVar n, A.PVar m -> [n, m]
+  | PPar n, A.PPar m -> [n, m]
+  | PConst (_, qs), A.PConst (_, ps) -> rename_all qs ps
+  | PBCtx cP, p -> []
+  | PUnder, A.PUnder -> []
+  | PTBox (cP, q), p -> rename_syn q p
+  | Inacc (Var n), A.PVar m -> [n, m]
+  | PVar n, A.Inacc (A.Var m) -> [n, m]
+  | Inacc _, _ -> []                  (* can this be possible? *)
   | _, A.Inacc _ -> []                    (* Should we do that here or in a check_inacc function? *)
   | _, A.PWildcard -> []
   | _ -> raise (Error.Violation "Renaming of tree node expects matching pattern with tree node")
 
-and rename_syn (q : I.syn_pat) (p : A.pat) : (name * name) list =
+and rename_syn (q : syn_pat) (p : A.pat) : (name * name) list =
   match q, p with
-  | I.PBVar _, A.PBVar _ -> []
-  | I.PLam (es, q), A.PLam (sl, p) -> rename_syn q p
-  | I.PSConst (_, qs), A.PConst (_, ps) -> rename_all_syn qs ps
-  | I.PUnbox (n, _, _), A.PVar m -> [n, m]
-  | I.SInacc _, A.Inacc _ -> []
-  | I.PEmpty, A.PEmpty -> []
-  | I.PShift _, A.PShift _ -> []
-  | I.PDot(sq, q), A.PDot (sp, p) -> rename_syn sq sp @ rename_syn q p
+  | PBVar _, A.PBVar _ -> []
+  | PLam (es, q), A.PLam (sl, p) -> rename_syn q p
+  | PSConst (_, qs), A.PConst (_, ps) -> rename_all_syn qs ps
+  | PUnbox (n, _, _), A.PVar m -> [n, m]
+  | SInacc _, A.Inacc _ -> []
+  | PEmpty, A.PEmpty -> []
+  | PShift _, A.PShift _ -> []
+  | PDot(sq, q), A.PDot (sp, p) -> rename_syn sq sp @ rename_syn q p
   | _ -> raise (Error.Violation "Renaming of tree node expects matching pattern with tree node")
 
-and rename_all (qs : I.pats) (ps : A.pats) : (name * name) list = List.concat (List.map2 rename qs ps)
+and rename_all (qs : pats) (ps : A.pats) : (name * name) list = List.concat (List.map2 rename qs ps)
 
-and rename_all_syn (qs : I.syn_pats) (ps : A.pats) : (name * name) list = List.concat (List.map2 rename_syn qs ps)
+and rename_all_syn (qs : syn_pats) (ps : A.pats) : (name * name) list = List.concat (List.map2 rename_syn qs ps)
 
 let is_blocking = function
   | A.PVar _
@@ -170,27 +170,27 @@ let is_blocking = function
   | A.Inacc _ -> false
   | _ -> true
 
-let rec choose_blocking_var (qs : I.pats) (ps : A.pats) : (name * A.pat) option =
+let rec choose_blocking_var (qs : pats) (ps : A.pats) : (name * A.pat) option =
   match qs, ps with
   | [], _ -> None
-  | I.PVar n :: qs', p :: ps' when is_blocking p -> Some (n, p)
+  | PVar n :: qs', p :: ps' when is_blocking p -> Some (n, p)
   | q :: qs', p :: ps' -> choose_blocking_var qs' ps'
   | _ -> assert false
 
-let inac_subst = List.map (fun (x, e) -> x, I.Inacc e)
-let pvar_list_of_ctx : I.ctx -> I.pats = List.map (fun (x, _) -> I.PVar x)
-let psubst_of_names = List.map (fun (n, m) -> n, I.PVar m)
-let subst_of_names = List.map (fun (n, m) -> n, I.Var m)
+let inac_subst = List.map (fun (x, e) -> x, Inacc e)
+let pvar_list_of_ctx : ctx -> pats = List.map (fun (x, _) -> PVar x)
+let psubst_of_names = List.map (fun (n, m) -> n, PVar m)
+let subst_of_names = List.map (fun (n, m) -> n, Var m)
 
 let rec refresh_tel = function
   | (i, n, e) :: tel ->
     let n' = Name.refresh_name n in
-    let sigma, tel' = refresh_tel (simul_subst_on_tel [n, I.Var n'] tel) in
-    (n, I.Var n') :: sigma, (i, n', e) :: tel'
+    let sigma, tel' = refresh_tel (simul_subst_on_tel [n, Var n'] tel) in
+    (n, Var n') :: sigma, (i, n', e) :: tel'
   | [] -> [], []
 
-let split_const (sign : signature) (cD : I.ctx) (qs : I.pats)
-    (n, p : name * A.pat) (c, sp : def_name * I.exp list) =
+let split_const (sign : signature) (cD : ctx) (qs : pats)
+    (n, p : name * A.pat) (c, sp : def_name * exp list) =
   let tel_params = lookup_params sign c in
   let sigma_params, tel_params = refresh_tel tel_params in
   let params = ctx_of_tel tel_params in
@@ -203,34 +203,34 @@ let split_const (sign : signature) (cD : I.ctx) (qs : I.pats)
       let cG = ctx_of_tel tel in
       let cD' = cD @ cG @ params in
       let flex = List.map fst cD' in
-      (c, ts, cD', flex, I.App (I.Const c, var_list_of_ctx cG),
-       I.PConst (c, pvar_list_of_ctx cG)) :: unify cs'
+      (c, ts, cD', flex, App (Const c, var_list_of_ctx cG),
+       PConst (c, pvar_list_of_ctx cG)) :: unify cs'
   in
   unify cs
 
-let get_splits (sign : signature) (cD : I.ctx) (qs : I.pats)
-    (n, p : name * A.pat) : (I.ctx * I.pats * I.subst) option list =
+let get_splits (sign : signature) (cD : ctx) (qs : pats)
+    (n, p : name * A.pat) : (ctx * pats * subst) option list =
 
   let t = try List.assoc n cD
-    with Not_found -> raise (Error.Violation ("Pattern " ^ IP.print_pats qs
-                             ^ " has name not in context " ^ IP.print_ctx cD))
+    with Not_found -> raise (Error.Violation ("Pattern " ^ print_pats qs
+                             ^ " has name not in context " ^ print_ctx cD))
   in
   let splits, sp = match Whnf.whnf sign t with
-    | I.Box _ -> raise Error.NotImplemented
-    | I.Const c -> split_const sign cD qs (n, p) (c, []), []
-    | I.App (I.Const c, sp) -> split_const sign cD qs (n, p) (c, sp), sp
+    | Box _ -> raise Error.NotImplemented
+    | Const c -> split_const sign cD qs (n, p) (c, []), []
+    | App (Const c, sp) -> split_const sign cD qs (n, p) (c, sp), sp
     | _ -> raise (Error.Error "Cannot split on this constructor")
   in
   let rec unify = function
     | [] -> []
     | (c, ts, cD', flex, t, p) :: splits ->
-      Debug.print (fun () -> "Unification of ts " ^ IP.print_exps ts
-            ^ "\nwith sp " ^ IP.print_exps sp
+      Debug.print (fun () -> "Unification of ts " ^ print_exps ts
+            ^ "\nwith sp " ^ print_exps sp
             ^ "\nusing flex " ^ print_names flex);
       try let cD'', sigma = Unify.unify_flex_many (sign, cD') flex ts sp in
           Debug.print (fun () -> "Resulting Unification "
-            ^ "moves context cD' = " ^ IP.print_ctx cD'
-            ^ "\nto context " ^ IP.print_ctx cD'');
+            ^ "moves context cD' = " ^ print_ctx cD'
+            ^ "\nto context " ^ print_ctx cD'');
           let psigma = inac_subst sigma in
           let s = n, simul_subst sigma t in
           let psigma' = (n, simul_psubst sign psigma p) :: psigma in
@@ -252,9 +252,9 @@ let get_splits (sign : signature) (cD : I.ctx) (qs : I.pats)
    cD' |- sigma' cD
    . |- ps => cD'
  *)
-let rec split (sign : signature) (cD : I.ctx) (qs : I.pats)
-    (ps, rhs : A.pats * A.rhs) (t : I.exp) : I.split_tree =
-  Debug.print(fun () -> "Splitting qs = " ^ IP.print_pats qs
+let rec split (sign : signature) (cD : ctx) (qs : pats)
+    (ps, rhs : A.pats * A.rhs) (t : exp) : split_tree =
+  Debug.print(fun () -> "Splitting qs = " ^ print_pats qs
     ^ "\nagainst ps = " ^ AP.print_pats ps);
   match choose_blocking_var qs ps with
   | None ->
@@ -262,9 +262,9 @@ let rec split (sign : signature) (cD : I.ctx) (qs : I.pats)
        more patterns to qs *)
     if List.length qs < List.length ps then
       match Whnf.whnf sign t with
-      | I.Pi((i, n, t0) :: tel, t1) ->
-        let t' = if tel = [] then t1 else I.Pi (tel, t1) in
-        split sign ((n, t0) :: cD) (qs @ [I.PVar n]) (ps, rhs) t'
+      | Pi((i, n, t0) :: tel, t1) ->
+        let t' = if tel = [] then t1 else Pi (tel, t1) in
+        split sign ((n, t0) :: cD) (qs @ [PVar n]) (ps, rhs) t'
       | _ -> assert false
     else
       let _ = Debug.print (fun () -> "Found leaf for " ^ AP.print_pats ps) in
@@ -281,18 +281,18 @@ let rec split (sign : signature) (cD : I.ctx) (qs : I.pats)
         | [] -> []
       in
       let cD' = subst_ctx cD in
-      Debug.print (fun () -> "Renaming of qs = " ^ IP.print_pats qs ^ " with " ^ AP.print_pats ps
-        ^ "\nresults in substitution " ^ IP.print_subst sigma'
-        ^ "\nwhich moves context " ^ IP.print_ctx cD ^ " to context " ^ IP.print_ctx cD');
+      Debug.print (fun () -> "Renaming of qs = " ^ print_pats qs ^ " with " ^ AP.print_pats ps
+        ^ "\nresults in substitution " ^ print_subst sigma'
+        ^ "\nwhich moves context " ^ print_ctx cD ^ " to context " ^ print_ctx cD');
     (* Need to check inaccessible? *)
       Debug.indent ();
       let rhs' = match rhs with
         | A.Just e ->
-          I.Just (Recon.check (sign, cD') e (simul_subst sigma' t))
-        | A.Impossible n -> I.Impossible n (* Need to check if actually impossible *)
+          Just (Recon.check (sign, cD') e (simul_subst sigma' t))
+        | A.Impossible n -> Impossible n (* Need to check if actually impossible *)
       in
       Debug.deindent ();
-      I.Leaf (cD', qs', simul_subst sigma' t, rhs')
+      Leaf (cD', qs', simul_subst sigma' t, rhs')
   | Some (n, p) ->
     Debug.print (fun () -> "Found blocking variable " ^ print_name n);
     let f = function
@@ -302,7 +302,7 @@ let rec split (sign : signature) (cD : I.ctx) (qs : I.pats)
         if check_all qs' ps then
           Some (split sign cD' qs' (ps, rhs) (simul_subst sigma' t))
         else
-          Some (I.Incomplete (cD', qs',  simul_subst sigma' t))
+          Some (Incomplete (cD', qs',  simul_subst sigma' t))
     in
     Debug.indent ();
     let splits = get_splits sign cD qs (n, p) in
@@ -311,36 +311,36 @@ let rec split (sign : signature) (cD : I.ctx) (qs : I.pats)
                              (List.map f splits) []
     in
     if tr = [] then
-      raise (Error.Error ("Split on variable " ^ print_name n ^ " resulted in no branches from " ^ IP.print_pats qs))
+      raise (Error.Error ("Split on variable " ^ print_name n ^ " resulted in no branches from " ^ print_pats qs))
     else
-      I.Node (cD, qs, t, n, tr)
+      Node (cD, qs, t, n, tr)
 
 exception Backtrack
 
-let rec navigate (sign : signature) (tr : I.split_tree) (ps, rhs : A.pats * A.rhs) : I.split_tree =
+let rec navigate (sign : signature) (tr : split_tree) (ps, rhs : A.pats * A.rhs) : split_tree =
   match tr with
-  | I.Incomplete (cD, qs, t) ->
+  | Incomplete (cD, qs, t) ->
     if check_all qs ps then
       split sign cD qs (ps, rhs) t
     else
       raise Backtrack
-  | I.Node (cD, qs, t, n, tr') ->
+  | Node (cD, qs, t, n, tr') ->
     if check_all qs ps then
       let rec f = function
         | [] -> raise Backtrack
         | tr :: trs ->
           try navigate sign tr (ps, rhs) :: trs
           with Backtrack -> tr :: f trs
-      in I.Node (cD, qs, t, n, f tr')
+      in Node (cD, qs, t, n, f tr')
     else
       raise Backtrack
-  | I.Leaf (cD, qs, _, _) ->
+  | Leaf (cD, qs, _, _) ->
     if check_all qs ps then
       raise (Error.Error ("Branch " ^ AP.print_pats ps ^ " cannot be reached."))
     else
       raise Backtrack
 
-let check_clauses (sign : signature) (f : def_name) (t : I.exp) (ds : A.pat_decls) : signature * I.split_tree =
+let check_clauses (sign : signature) (f : def_name) (t : exp) (ds : A.pat_decls) : signature * split_tree =
   Debug.print (fun () -> "Starting clause checking for " ^ f);
   Debug.indent ();
   (* we add a non-reducing version of f to the signature *)
@@ -348,9 +348,9 @@ let check_clauses (sign : signature) (f : def_name) (t : I.exp) (ds : A.pat_decl
   let nav tr (ps, rhs) = try navigate sign' tr (ps, rhs)
     with Backtrack ->
       raise (Error.Error ("Branch " ^ AP.print_pats ps
-                          ^ " was incompatible with current tree\n" ^ IP.print_tree tr))
+                          ^ " was incompatible with current tree\n" ^ print_tree tr))
   in
-  let tree = List.fold_left nav (I.Incomplete ([], [], t)) ds in
-  Debug.print (fun () -> "Generated split tree for " ^ f ^ ":\n" ^ IP.print_tree tree);
+  let tree = List.fold_left nav (Incomplete ([], [], t)) ds in
+  Debug.print (fun () -> "Generated split tree for " ^ f ^ ":\n" ^ print_tree tree);
   Debug.deindent ();
   PSplit (f, t, Some tree) :: sign, tree
