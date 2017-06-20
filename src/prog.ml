@@ -146,7 +146,7 @@ let tc_program (sign : signature) : program -> signature * I.program =
      let t'', _u = infer_type (sign, []) t' in
      let sign', tree = Split.check_clauses sign n t'' ds in
      Debug.deindent ();
-     sign', I.DefPMTree(n, t'', tree)
+     sign', I.DefPM(n, t'', tree)
 
   | Def (n, t, e) ->
      Debug.print_string ("Typechecking definition: " ^ n);

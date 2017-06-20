@@ -248,15 +248,12 @@ module Int = struct
     | Incomplete of ctx * pats * exp
     | Leaf of ctx * pats * exp * rhs
 
-  type pat_decls = (pats * rhs) list
-
   type program =
     (* name, parameters, indices, universe *)
     | Data of def_name * tel * tel * universe * decls
     | Codata of def_name * tel * tel * universe * codecls
     | Spec of def_name * stel * sdecls
-    | DefPM of def_name * tel * exp * pat_decls
-    | DefPMTree of def_name * exp * split_tree
+    | DefPM of def_name * exp * split_tree
     | Def of def_name * exp * exp
 
   (* Some conversions on internal syntax  *)

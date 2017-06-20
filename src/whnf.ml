@@ -177,12 +177,6 @@ and whnf (sign : signature) (e : exp) : exp =
         Debug.print ~verbose:true  (fun () -> "Head of application was a constant " ^ print_exp (Const n));
         begin match lookup_sign_def sign n with
         | D e -> whnf sign (App (e, sp))
-        | P cls -> Debug.print (fun () -> "Definition " ^ n ^ " has clause list " ^ String.concat "\n" (List.map (fun cl -> print_pats (fst cl)) cls));
-          begin match reduce_with_clauses sign sp cls with
-          | None -> App (Const n, sp)
-          | Some (e, []) -> whnf sign e
-          | Some (e, sp) -> whnf sign (App (e, sp))
-          end
         | S tree ->
           Debug.print (fun () -> "Matching split tree for expression " ^ print_exp e);
           begin try whnf sign (walk_tree sign sp [tree])

@@ -460,18 +460,35 @@ let fmt_rhs cG pps = function
   | Impossible n ->
      Fmt.pf pps "impossible %a" (comp_var cG) n
 
-let fmt_pat_decl cG pps (pats, rhs) =
-  let cG' = (List.map (fun x -> x, dt) (Meta.fv_pats pats)) @ cG in
-  Fmt.pf pps "| %a => %a"
-         (list ~sep:nbsp (fmt_pat cG')) pats
-         (fmt_rhs cG') rhs
+let rec fmt_tree depth pps tree =
+  match tree with
+  | Node (cD, pats, t, n, tr) ->
+    Fmt.pf pps "%a => %a"
+      (fmt_pats cD) pats
+      (fmt_trees (depth+1)) tr
+  | Incomplete (cD, pats, t) ->
+    Fmt.pf pps "%a incomplete"
+      (fmt_pats cD) pats
+  | Leaf (cD, pats, t, rhs) ->
+    Fmt.pf pps "%a ==>> %a"
+      (fmt_pats cD) pats
+      (fmt_rhs cD) rhs
 
-let rec fmt_pat_decls cG pps = function
+and fmt_trees depth pps trees =
+  let indent_depth =
+    let rec indent = function
+      | 0 -> ""
+      | n -> "\t" ^ indent (n-1)
+    in
+    "\n" ^ indent depth
+  in
+  match trees with
   | [] -> ()
-  | pat::pats -> Fmt.pf pps "%a@,%a"
-                    (fmt_pat_decl cG) pat
-                    (fmt_pat_decls cG) pats
-
+  | t :: tr ->
+    Fmt.pf pps "%s%a%a"
+      indent_depth
+      (fmt_tree depth) t
+      (fmt_trees depth) tr
 
 let rec fmt_sdecl pps (n, stel, (tn, es)) =
   match es with
@@ -565,21 +582,13 @@ let fmt_program pps = function
             (fmt_exp [] never_paren) t
             (fmt_exp [] never_paren) e
 
-  | DefPM (n, [], t, pats) ->
+  | DefPM (n, t, tree) ->
      Fmt.pf pps "%a %a : %a %a@,%a"
             keyword "def"
             const n
             (fmt_exp [] never_paren) t
             keyword "where"
-            (fmt_pat_decls []) pats
-
-  | DefPM (n, tel, t, pats) ->
-     Fmt.pf pps "%a %a : %a %a@,%a"
-            keyword "def"
-            const n
-            (fmt_tel []) (tel, t)
-            keyword "where"
-            (fmt_pat_decls []) pats
+            (fmt_tree 0) tree
 
   (* printing specification types *)
   | Spec (n, [], ds) ->

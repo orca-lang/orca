@@ -349,7 +349,6 @@ module Int = struct
        "(data " ^ n ^ " (" ^ print_params ps ^ ") (" ^ print_params is ^ ") " ^ print_universe u  ^ "\n" ^ print_codecls decls ^ ")"
 
     | Spec (n, tel, decls) -> "(syn " ^ n ^ " " ^ print_stel tel ^ "\n" ^ print_sdecls decls ^ ")"
-    | DefPM (n, tel, e, decls) -> "(def " ^ n ^ " (" ^ print_tel tel ^ ") " ^ print_exp e ^ "\n" ^ print_def_decls decls ^ ")"
-    | DefPMTree (n, e, tree) -> "(def " ^ n ^ " : " ^ print_exp e ^ "\n" ^ print_tree tree ^ ")"
+    | DefPM (n, e, tree) -> "(def " ^ n ^ " : " ^ print_exp e ^ "\n" ^ print_tree tree ^ ")"
     | Def (n, e1, e2) -> "(def " ^ n ^ " " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
 end
