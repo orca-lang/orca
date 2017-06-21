@@ -167,7 +167,11 @@ and rename_syn (q : syn_pat) (p : A.pat) : (name * name) list =
   | PEmpty, A.PEmpty -> []
   | PShift _, A.PShift _ -> []
   | PDot(sq, q), A.PDot (sp, p) -> rename_syn sq sp @ rename_syn q p
-  | _ -> raise (Error.Violation "Renaming of tree node expects matching pattern with tree node")
+  | PUnbox(n, s, cP), A.PClos(m, s') -> [n, m]
+  | PUnbox(n, s, cP), A.Inacc(A.Var m) -> [n, m]
+  | SInacc (Var n, s, cP), A.PVar m -> [n, m]
+  | _ -> raise (Error.Violation ("Renaming of tree node expects matching pattern with tree node\nq = "
+                                   ^ print_syn_pat q ^ "\np = " ^ AP.print_pat p))
 
 and rename_all (qs : pats) (ps : A.pats) : (name * name) list = List.concat (List.map2 rename qs ps)
 
@@ -182,12 +186,40 @@ let is_blocking = function
 let rec choose_blocking_var (qs : pats) (ps : A.pats) : (name * A.pat) option =
   match qs, ps with
   | [], _ -> None
-  | PVar n :: qs', p :: ps' when is_blocking p -> Some (n, p)
-  | q :: qs', p :: ps' -> choose_blocking_var qs' ps'
+  | q :: qs', p :: ps' ->
+    begin match choose_blocking q p with
+    | Some w -> Some w
+    | None -> choose_blocking_var qs' ps'
+    end
   | _ -> assert false
+
+and choose_blocking_var_syn (qs : syn_pats) (ps : A.pats) : (name * A.pat) option =
+  match qs, ps with
+  | [], _ -> None
+  | q :: qs', p :: ps' ->
+    begin match choose_blocking_syn q p with
+    | Some w -> Some w
+    | None -> choose_blocking_var_syn qs' ps'
+    end
+  | _ -> assert false
+
+and choose_blocking_syn (q : syn_pat) (p : A.pat) : (name * A.pat) option =
+  match q, p with
+  | PLam (xs, q), A.PLam(ys, p) -> choose_blocking_syn q p
+  | PSConst (c, qs), A.PConst(c', ps) -> choose_blocking_var_syn qs ps
+  | PUnbox (n, s, cP), p when is_blocking p -> Some (n, p)
+  | _ -> None
+
+and choose_blocking (q : pat) (p : A.pat) : (name * A.pat) option =
+  match q, p with
+  | PVar n, p when is_blocking p -> Some (n, p)
+  | PTBox(cP, q), p -> choose_blocking_syn q p
+  | PConst(c, qs), A.PConst (c', ps) -> choose_blocking_var qs ps
+  | _ -> None
 
 let inac_subst = List.map (fun (x, e) -> x, Inacc e)
 let pvar_list_of_ctx : ctx -> pats = List.map (fun (x, _) -> PVar x)
+let punbox_list_of_ctx cP : ctx -> syn_pat list = List.map (fun (x, _) -> PUnbox(x, pid_sub, cP))
 let psubst_of_names = List.map (fun (n, m) -> n, PVar m)
 let subst_of_names = List.map (fun (n, m) -> n, Var m)
 
@@ -199,12 +231,12 @@ let rec refresh_tel = function
   | [] -> [], []
 
 let split_const (sign : signature) (cD : ctx) (qs : pats)
-    (n, p : name * A.pat) (c, sp : def_name * exp list) =
+    (n, p : name * A.pat) (c : def_name) =
   let tel_params = lookup_params sign c in
   let sigma_params, tel_params = refresh_tel tel_params in
   let params = ctx_of_tel tel_params in
   let cs = lookup_constructors sign c in
-  let rec unify = function
+  let rec process = function
     | [] -> []
     | (c, tel, ts) :: cs' ->
       let sigma0, tel = refresh_tel (simul_subst_on_tel sigma_params tel) in
@@ -212,27 +244,74 @@ let split_const (sign : signature) (cD : ctx) (qs : pats)
       let cG = ctx_of_tel tel in
       let cD' = cD @ cG @ params in
       let flex = List.map fst cD' in
-      (c, ts, cD', flex, App (Const c, var_list_of_ctx cG),
-       PConst (c, pvar_list_of_ctx cG)) :: unify cs'
+      (c, ts, cD', flex, (if cG == [] then Const c else App (Const c, var_list_of_ctx cG)),
+       PConst (c, pvar_list_of_ctx cG)) :: process cs'
   in
-  unify cs
+  process cs
 
-let get_splits (sign : signature) (cD : ctx) (qs : pats)
-    (n, p : name * A.pat) : (ctx * pats * subst) option list =
-
-  let t = try List.assoc n cD
-    with Not_found -> raise (Error.Violation ("Pattern " ^ print_pats qs
-                             ^ " has name not in context " ^ print_ctx cD))
+let split_sconst (sign : signature) (cD : ctx) (cP : bctx) (qs : pats)
+    (n, p : name * A.pat) (c : def_name) =
+  let cs = lookup_syn_constructors sign cP c in
+  let rec process = function
+    | [] -> []
+    | (c, tel, ts) :: cs' ->
+      let sigma0, tel = refresh_tel tel in
+      let ts = simul_subst_syn_on_list sigma0 ts in
+      let cG = ctx_of_tel tel in
+      let cD' = cD @ cG in
+      let flex = List.map fst cD' in
+      (ts, cD', flex, (if cG == [] then SConst c else AppL (SConst c, unbox_list_of_ctx cP cG)),
+       PSConst (c, punbox_list_of_ctx cP cG)) :: process cs'
   in
-  let splits, sp = match Whnf.whnf sign t with
-    | Box _ -> raise Error.NotImplemented
-    | Const c -> split_const sign cD qs (n, p) (c, []), []
-    | App (Const c, sp) -> split_const sign cD qs (n, p) (c, sp), sp
+  process cs
+
+let split_lam (sign : signature) (cD : ctx) (cP : bctx) (qs : pats)
+    (n, p : name * A.pat) (tel, t : stel * syn_exp) =
+  let xs = List.map (fun (_, x, t) -> x, t) tel in
+  let cP' = bctx_of_lam_pars cP xs in
+  let m = Name.refresh_name n in
+  let cD' = (m, Box(cP', t)) :: cD in
+  let e = Unbox (Var m, id_sub, cP') in
+  let p = PUnbox (m, pid_sub, cP') in
+  [[], cD', [], Lam (xs, e), PLam (xs, p)]
+
+let split_box (sign : signature) (cD : ctx) (qs : pats)
+    (n, p : name * A.pat) (cP, t : bctx * syn_exp) =
+  let splits, sp = match Whnf.rewrite sign cP t with
+    | SConst c -> split_sconst sign cD cP qs (n, p) c, []
+    | AppL (SConst c, sp) -> split_sconst sign cD cP qs (n, p) c, sp
+    | SPi (tel, t) -> split_lam sign cD cP qs (n, p) (tel, t), []
+    | SBCtx cP' -> raise Error.NotImplemented
+    | SCtx -> raise (Error.Error "Context are irrelevant")
     | _ -> raise (Error.Error "Cannot split on this constructor")
   in
   let rec unify = function
     | [] -> []
-    | (c, ts, cD', flex, t, p) :: splits ->
+    | (ts, cD', flex, e, p) :: splits ->
+      try let cD'', sigma = Unify.unify_flex_many_syn (sign, cD') cP flex ts sp in
+          Debug.print(fun () -> "Unification: cD' = " ^ print_ctx cD' ^ "\ncD'' = "^ print_ctx cD''
+            ^ "\nsigma = "^ print_subst sigma);
+          let psigma = inac_subst sigma in
+          let s = n, TermBox(cP, simul_subst_syn sigma e) in
+          let psigma' = (n, (PTBox (cP, simul_syn_psubst sign cP psigma p))) :: psigma in
+          let cD''' = ctx_subst s (List.filter (fun (x, _) -> x <> n) cD'') in
+          Some (cD''', simul_psubst_on_list sign psigma' qs, s :: sigma) :: unify splits
+      with Unify.Unification_failure msg ->
+        Debug.print_string (Unify.print_unification_problem msg);
+        None :: unify splits
+  in
+  (* if cP <> Nil then *)
+  (*   let x = Name.gen_name "X" in *)
+  (*   Some ((x, Box (cP, t)) :: cD, simul_psubst_on_list sign [n, PTBox (cP, PPar x)] qs, [n, Var x]) :: unify splits *)
+  (* else *)
+    unify splits
+
+let get_splits (sign : signature) (cD : ctx) (qs : pats)
+    (n, p : name * A.pat) (c, sp : def_name * exp list) : (ctx * pats * subst) option list =
+  let splits = split_const sign cD qs (n, p) c in
+  let rec unify = function
+    | [] -> []
+    | (c, ts, cD', flex, e, p) :: splits ->
       Debug.print (fun () -> "Unification of ts " ^ print_exps ts
             ^ "\nwith sp " ^ print_exps sp
             ^ "\nusing flex " ^ print_names flex);
@@ -241,7 +320,7 @@ let get_splits (sign : signature) (cD : ctx) (qs : pats)
             ^ "moves context cD' = " ^ print_ctx cD'
             ^ "\nto context " ^ print_ctx cD'');
           let psigma = inac_subst sigma in
-          let s = n, simul_subst sigma t in
+          let s = n, simul_subst sigma e in
           let psigma' = (n, simul_psubst sign psigma p) :: psigma in
           let cD''' = ctx_subst s (List.filter (fun (x, _) -> x <> n) cD'') in
           Some (cD''', simul_psubst_on_list sign psigma' qs, s :: sigma) :: unify splits
@@ -264,7 +343,8 @@ let get_splits (sign : signature) (cD : ctx) (qs : pats)
 let rec split (sign : signature) (cD : ctx) (qs : pats)
     (ps, rhs : A.pats * A.rhs) (t : exp) : split_tree =
   Debug.print(fun () -> "Splitting qs = " ^ print_pats qs
-    ^ "\nagainst ps = " ^ AP.print_pats ps);
+    ^ "\nagainst ps = " ^ AP.print_pats ps
+    ^ "\ncontext is " ^ print_ctx cD);
   match choose_blocking_var qs ps with
   | None ->
     (* Checking if we are done with patterns or if we could introduce
@@ -314,7 +394,16 @@ let rec split (sign : signature) (cD : ctx) (qs : pats)
           Some (Incomplete (cD', qs',  simul_subst sigma' t))
     in
     Debug.indent ();
-    let splits = get_splits sign cD qs (n, p) in
+    let t = try List.assoc n cD
+      with Not_found -> raise (Error.Violation ("Pattern " ^ print_pats qs
+        ^ " has name not in context " ^ print_ctx cD))
+    in
+    let splits = match Whnf.whnf sign t with
+      | Box(cP, t) -> split_box sign cD qs (n, p) (cP, t)
+      | Const c -> get_splits sign cD qs (n, p) (c, [])
+      | App (Const c, sp) -> get_splits sign cD qs (n, p) (c, sp)
+      | t -> raise (Error.Error ("Cannot match on type " ^ print_exp t))
+    in
     Debug.deindent ();
     let tr = List.fold_right (function None -> fun l -> l | (Some tr) -> fun l -> tr :: l)
                              (List.map f splits) []
@@ -354,7 +443,10 @@ let check_clauses (sign : signature) (f : def_name) (t : exp) (ds : A.pat_decls)
   Debug.indent ();
   (* we add a non-reducing version of f to the signature *)
   let sign' =  (PSplit (f, t, None)) :: sign in
-  let nav tr (ps, rhs) = try navigate sign' tr (ps, rhs)
+  let nav tr (ps, rhs) =
+    Debug.print (fun () -> "Navigating through patterns " ^ AP.print_pats ps
+      ^ "\nusing tree " ^ print_tree tr);
+    try navigate sign' tr (ps, rhs)
     with Backtrack ->
       raise (Error.Error ("Branch " ^ AP.print_pats ps
                           ^ " was incompatible with current tree\n" ^ print_tree tr))
