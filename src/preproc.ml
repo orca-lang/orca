@@ -379,7 +379,7 @@ let rec collect_pat_vars (s : sign) cG cP p =
       collect_pat_vars s cG cP' p
     else
       raise (Error.Error "Bound variables bindings (:>) cannot be nested")
-  | E.PPar n ->collect_pat_ctx s cG cP n
+  | E.PPar n -> collect_pat_ctx s cG cP n
   | E.PUnder -> cG
   | E.PWildcard -> cG
 
@@ -391,7 +391,7 @@ let rec pproc_pat (s : sign) cG cP p =
   | E.PIdent n -> find_name_pat s cG cP n
   | E.PPar n ->
      begin match find_name_pat s cG cP n with
-     | A.PVar n -> A.PVar n
+     | A.PVar n -> A.PPar n
      | _ -> raise (Error.Error "Expected parameter variable, got something else")
      end
   | E.PClos (x, e) ->

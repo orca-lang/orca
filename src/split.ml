@@ -17,8 +17,6 @@ let rec psubst sign (x, p') = function
   | PVar n -> PVar n
   | Inacc e -> Inacc (subst (x, exp_of_pat p') e)
   | PConst (n, ps) -> PConst (n, List.map (psubst sign (x, p')) ps)
-  | PPar n when n = x -> raise (Error.Violation "Don't think this can happen")
-  | PPar n -> PPar n
   | PBCtx cP -> PBCtx (bctx_psubst sign (x, p') cP)
   | PUnder -> PUnder
   | PTBox (cP, p) -> let cP' = subst_bctx (x, exp_of_pat p') cP in
@@ -58,6 +56,8 @@ and syn_psubst sign cP (x, p') = function
                in
                comp s n
             | PDot (sigma, p) -> PDot (push_unbox (s, cP') sigma, push_unbox (s, cP') p)
+            | PPar n -> PPar n
+
           in
           push_unbox (s, cP') q
        | _ -> assert false
@@ -67,6 +67,15 @@ and syn_psubst sign cP (x, p') = function
   | PEmpty -> PEmpty
   | PShift n -> PShift n
   | PDot (s, p) -> PDot (syn_psubst sign cP (x, p') s, syn_psubst sign cP (x, p') p)
+  | PPar n when n = x ->
+    begin match p' with
+    | PVar m -> PUnbox (m, pid_sub, cP)
+    | Inacc e -> SInacc (e, pid_sub, cP)
+    | PTBox (cP', q) -> assert false
+    | _ -> assert false
+    end
+  | PPar n -> PPar n
+
 
 and bctx_psubst sign (x, p') = function
   | PNil -> PNil
@@ -100,7 +109,6 @@ let simul_syn_psubst_on_list sign cP sigma ps =
 let rec check_match (q : pat) (p : A.pat) =
   match q, p with
   | PVar n, _ -> true
-  | PPar n, A.PPar n' -> true
   | PConst (n, qs), A.PConst (n', ps) when n = n' -> check_all qs ps
   | PConst (n, qs), A.PConst (n', ps) -> false
   | Inacc _, _ -> true
@@ -111,6 +119,7 @@ let rec check_match (q : pat) (p : A.pat) =
 and syn_check_match cP q p =
   match q, p with
   | PLam (xs, q), A.PLam (ys, p) -> syn_check_match (bctx_of_lam_pars cP xs) q p
+  | PPar n, A.PPar n' -> true
   | PUnbox (n, s, cP'), A.PClos (m, s') when s = s' -> true
   | PUnbox (n, s, cP'), _ -> true
   | SInacc _, _ -> true
@@ -136,7 +145,6 @@ and check_all qs ps =
 let rec rename (q : pat) (p : A.pat) : (name * name) list =
   match q,p with
   | PVar n, A.PVar m -> [n, m]
-  | PPar n, A.PPar m -> [n, m]
   | PConst (_, qs), A.PConst (_, ps) -> rename_all qs ps
   | PBCtx cP, p -> []
   | PUnder, A.PUnder -> []
@@ -151,6 +159,7 @@ let rec rename (q : pat) (p : A.pat) : (name * name) list =
 and rename_syn (q : syn_pat) (p : A.pat) : (name * name) list =
   match q, p with
   | PBVar _, A.PBVar _ -> []
+  | PPar n, A.PPar m -> [n, m]
   | PLam (es, q), A.PLam (sl, p) -> rename_syn q p
   | PSConst (_, qs), A.PConst (_, ps) -> rename_all_syn qs ps
   | PUnbox (n, _, _), A.PVar m -> [n, m]

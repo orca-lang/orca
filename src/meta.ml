@@ -67,7 +67,6 @@ and fv_spi cG (tel : stel) (t : syn_exp) = match tel with
 let rec fv_pat =
   function
   | PVar n -> [n]
-  | PPar _ -> []
   | Inacc _ -> []
   | PConst (n, ps) -> fv_pats ps
   | PBCtx cP -> fv_pat_bctx cP
@@ -77,6 +76,7 @@ let rec fv_pat =
 and fv_syn_pat =
   function
   | PBVar i -> []
+  | PPar n -> [n]
   | PLam (f, p) -> fv_syn_pat p
   | PSConst (n, ps) -> fv_syn_pats ps
   | PUnbox (n, _, _) -> [n]

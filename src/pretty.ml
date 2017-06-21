@@ -338,9 +338,6 @@ let rec fmt_pat_subst pps = function
 
 let rec fmt_pat cG pps = function
   | PVar n -> comp_var cG pps n
-  | PPar n ->
-     Fmt.pf pps "<:%a"
-            (comp_var cG) n
   | Inacc e ->
      Fmt.pf pps ".%a"
             (fmt_exp cG 0) e
@@ -367,6 +364,9 @@ and fmt_syn_pat_bctx cG pps = function
             (fmt_syn_exp cG (bctx_of_pat_ctx cP') 3) t
 
 and fmt_syn_pat cG cP pps = function
+  | PPar n ->
+     Fmt.pf pps "<:%a"
+            (comp_var cG) n
   | PBVar i ->
     begin match beautify_idx i cP with
     | None -> Fmt.pf pps "i%a"

@@ -251,7 +251,6 @@ module Int = struct
 
   let rec print_pat (p : pat) : string = match p with
     | PVar n -> print_name n
-    | PPar n -> "(<: " ^ print_name n ^ ")"
     | Inacc e -> "." ^ print_exp e
 
     | PConst (n, ps) -> "(" ^ n ^ " " ^ (String.concat " " (List.map (fun p -> "(" ^ print_pat p ^ ")") ps)) ^ ")"
@@ -261,7 +260,8 @@ module Int = struct
 
   and print_syn_pat = function
     | PBVar i -> "i" ^ string_of_int i
-    | PLam (fs, p) -> "(\ " ^ String.concat " " (List.map (fun (x, t) -> "("^ x ^ " : " ^ print_syn_exp t ^ ")") fs) ^ " " ^ print_syn_pat p ^ ")"
+    | PPar n -> "(<: " ^ print_name n ^ ")"
+    | PLam (fs, p) -> "(\\ " ^ String.concat " " (List.map (fun (x, t) -> "("^ x ^ " : " ^ print_syn_exp t ^ ")") fs) ^ " " ^ print_syn_pat p ^ ")"
     | PSConst (n, ps) -> "(" ^ n ^ " " ^ (String.concat " " (List.map (fun p -> "(" ^ print_syn_pat p ^ ")") ps)) ^ ")"
     | PUnbox (n, s, cP) -> "(u " ^ print_name n ^ "[" ^ print_pat_subst s ^ " : " ^ print_bctx cP ^ "])"
     | SInacc (e, s, cP) -> "(s. " ^ print_exp e ^ "[" ^ print_pat_subst s ^ " : " ^ print_bctx cP ^ "])"

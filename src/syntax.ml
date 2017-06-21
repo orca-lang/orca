@@ -202,7 +202,6 @@ module Int = struct
     | Inacc of exp
     | PConst of def_name * pat list
     | PBCtx of pat_bctx
-    | PPar of name
     | PUnder
     | PTBox of bctx * syn_pat
 
@@ -212,6 +211,7 @@ module Int = struct
     | PSConst of def_name * syn_pat list
     | PUnbox of name * pat_subst * bctx
     | SInacc of exp * pat_subst * bctx
+    | PPar of name
     | PEmpty
     | PShift of int
     | PDot of syn_pat * syn_pat
@@ -268,7 +268,6 @@ module Int = struct
   let rec exp_of_pat : pat -> exp =
     fun p -> match p with
              | PVar n -> Var n
-             | PPar n -> Var n           (* MMMMM *)
 
              | Inacc e -> e
 
@@ -292,6 +291,8 @@ module Int = struct
     | PEmpty -> Empty
     | PShift i -> Shift i
     | PDot (p1, p2) -> Dot (syn_exp_of_pat p1, syn_exp_of_pat p2)
+    | PPar n -> Unbox(Var n, id_sub, Nil)           (* MMMMM *)
+
 
   and bctx_of_pat_ctx = function
     | PNil -> Nil
