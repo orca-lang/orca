@@ -18,6 +18,15 @@ def plus' : (x y : nat) -> nat where
 | m zero => m
 | m (suc n) => plus' (suc m) n
 
+data bool where
+| true : bool
+| false : bool
+
+def is_double : nat -> bool where
+| zero => true
+| (suc (suc m)) => is_double m
+| (suc zero) => false
+
 data eq (A : set) : A -> A -> set where
 | refl: (x : A) -> eq A x x
 
