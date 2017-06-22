@@ -14,9 +14,10 @@ let tc_constructor (sign , cG : signature * I.ctx) (u : I.universe) (tel : I.tel
                    (n , tel', (n', es) : def_name * tel * dsig) : signature_entry * I.decl =
   Debug.print_string ("Typechecking constructor: " ^ n) ;
   let tel'', uc = check_tel (sign, cG) u tel' in
+  let cG' = (List.rev (ctx_of_tel tel'')) @ cG in
   if uc <= u then
     begin
-      let check' = check (sign, (ctx_of_tel tel'') @ cG) in
+      let check' = check (sign, cG') in
       let rec check_indices es tel =
         match es, tel with
         | [], [] -> []
@@ -49,13 +50,14 @@ let tc_observation (sign , cG : signature * I.ctx) (u : I.universe) (tel : I.tel
                    (n , tel', (m, n', es), e : def_name * tel * codsig * exp) : signature_entry * I.codecl =
   Debug.print_string ("Typechecking constructor: " ^ n) ;
   let tel'', uc = check_tel (sign, cG) u tel' in
+  let cG' = (List.rev (ctx_of_tel tel'')) @ cG in
   if uc <= u then                       (* Note: Is that check needed for codatatypes? *)
     begin
       let rec check_indices es tel =
         match es, tel with
         | [], [] -> []
         | e::es', (_, x, t)::tel' ->
-           let e' = check (sign, (ctx_of_tel tel'') @ cG) e t in
+           let e' = check (sign, cG') e t in
            e'::check_indices es' (simul_subst_on_tel [x, e'] tel')
         | _ -> raise (Error.Error ("Constructor " ^ n
              ^ " does not return a term of the fully applied type for " ^ n'))
@@ -63,7 +65,7 @@ let tc_observation (sign , cG : signature * I.ctx) (u : I.universe) (tel : I.tel
       Debug.print (fun () -> "Checking indices applied to " ^ n' ^ " at the tail of signature of " ^ n
         ^ "\nes = (" ^ String.concat ", " (List.map print_exp es) ^ ")\ntel = " ^ IP.print_tel tel);
       let es' = check_indices es tel in
-      let e' = check (sign, (m, I.App (I.Const n', es')) :: ((ctx_of_tel tel'') @ cG)) e (I.Set u) in
+      let e' = check (sign, (m, I.App (I.Const n', es')) :: cG') e (I.Set u) in
       Observation (n, tel'', (m, n', es'), e'), (n, tel'', (m, n', es'), e')
     end
   else

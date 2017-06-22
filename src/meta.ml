@@ -348,7 +348,7 @@ let rec subst_of_pats sign (sigma : pats) (tel : tel) : subst =
   | p :: ps, (_, n, t) :: tel' -> (n, exp_of_pat p) :: (subst_of_pats sign ps tel')
   | _ -> raise (Error.Violation "subst_of_ctx_map got lists of different lengths")
 
-let ctx_of_tel : tel -> ctx = List.map (fun (_, x, s) -> x, s)
+let ctx_of_tel (tel : tel) : ctx = List.rev (List.map (fun (_, x, s) -> x, s) tel)
 
 let exp_list_of_ctx : ctx -> exp list = List.map snd
 

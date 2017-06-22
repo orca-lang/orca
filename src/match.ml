@@ -22,6 +22,8 @@ let print_cos = function
   | Syn s -> IP.print_syn_exps s
   | Comp e -> IP.print_exps e
 
+let ctx_of_tel : I.tel -> I.ctx = List.map (fun (_, x, s) -> x, s)
+
 (* Given the name of a type and a spine, return the parameter, the indices *)
 let split_idx_param (sign : signature) (cG : I.ctx) (n : def_name) (es1 : comp_or_syn)
     (es2 : comp_or_syn) : I.ctx * I.subst * comp_or_syn * comp_or_syn * comp_or_syn =
