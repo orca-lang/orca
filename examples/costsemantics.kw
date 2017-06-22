@@ -1,0 +1,39 @@
+spec tm where
+| lam : (tm ->> tm) ->> tm
+| app : tm ->> tm ->> tm
+| letv : tm ->> (tm ->> tm) ->> tm
+
+data nat where
+| zero : nat
+| suc : nat -> nat
+
+def plus : nat -> nat -> nat where
+| zero n => n
+| (suc m) n => suc (plus m n)
+
+data eval : (m : (|- tm)) (n : (|- tm)) (k : nat) -> set where
+| e-lam : (m : (\0,x:tm |- tm)) (k : nat) -> eval (lam (\x.m)) (lam (\x.m)) k
+| e-app : (m n v : (|- tm)) (k l : nat) (m' : (\0,x:tm |- tm))
+          -> eval m (lam (\x.m')) k -> eval n v l
+          -> eval (app m n) (m'[..;v]) (suc (plus k l))
+| e-let : (m v w : (|- tm)) (n : (\0,x:tm |- tm)) (k l : nat)
+          -> eval m v l
+          -> eval (n[..;v]) w k
+          -> eval (letv m (\x.n)) w (suc (plus k l))
+
+def trans : (g : ctx) -> (g |- tm) -> (g |- tm) where
+| g (<: p) => p
+| g (app m n) => app (trans g m) (trans g n)
+| g (lam (\x.m)) => lam (\x.trans (g,x:tm) m)
+| g (letv m (\y.n)) => app (lam (\x. trans (g,x:tm) n)) (trans g m)
+
+def ctrns : (|- tm) -> |- tm = fn m => trans \0 m
+
+def val-preserve : (m v : (|- tm)) (k : nat) -> eval m v k
+                   -> eval (ctrns m) (ctrns v) k where
+(*) | ._ ._ .k (e-lam m k) => ?
+| .(app m n) .(m'[..;v]) .(suc (plus k l)) (e-app m n v k l m' e1 e2) =>
+  e-app (ctrns m) (ctrns n) v k l m'
+        (val-preserve m (lam (\x.m')) k e1)
+        (val-preserve n v l e2)
+(*) | .(letv m (\x.n)) .w .(suc (plus k l)) (e-let m v w n k l e1 e2) => ?
