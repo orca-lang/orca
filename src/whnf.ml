@@ -24,7 +24,7 @@ let cong_stel tel s cP =
        (icit, x, Clos(e, s', cP')) :: tel', i', cP''
   in
   let tel', i, cP' = ninja tel 0 cP in
-  tel', (ShiftS (i, s)), cP'
+  tel', (if i > 0 then ShiftS (i, s) else s), cP'
 
 let rec match_pat sign p e =
   let e = whnf sign e in
@@ -326,7 +326,7 @@ and rewrite (sign : signature) cP (e : syn_exp) : syn_exp =
 
   (* LiftEnv *)
   | Comp(Dot(s2,e), Snoc(cP, _, _) , ShiftS (n, s1)) when n > 0 ->
-     w (dmsg "LiftEnv" (fun () -> (Dot(Comp(s2, cP, (ShiftS (n-1, s1))), e))))
+     w (dmsg "LiftEnv" (fun () -> (Dot(Comp(s2, cP, (if n-1 > 0 then ShiftS (n-1, s1) else s1)), e))))
 
   | Comp (Shift n, _, Shift m) -> (dmsg "ShiftAdd" (fun () -> (Shift (n+m))))
 
