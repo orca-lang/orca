@@ -44,14 +44,21 @@ let rec psubst sign (x, p') = function
   | I.PVar n -> I.PVar n
   | I.Inacc e -> I.Inacc (subst (x, I.exp_of_pat p') e)
   | I.PConst (n, ps) -> I.PConst (n, List.map (psubst sign (x, p')) ps)
-  | I.PPar n when n = x -> raise (Error.Violation "Don't think this can happen")
-  | I.PPar n -> I.PPar n
   | I.PBCtx cP -> I.PBCtx (bctx_psubst sign (x, p') cP)
   | I.PUnder -> I.PUnder
   | I.PTBox (cP, p) -> let cP' = subst_bctx (x, I.exp_of_pat p') cP in
                        I.PTBox (cP', syn_psubst sign cP' (x, p') p)
 and syn_psubst sign cP (x, p') = function
   | I.PBVar i -> I.PBVar i
+  | I.PPar n when n = x ->
+    begin match p' with
+    | I.PVar m -> I.PUnbox (m, pid_sub, cP)
+    | I.Inacc e -> I.SInacc (e, pid_sub, cP)
+    | I.PTBox (cP', q) -> assert false
+    | _ -> assert false
+    end
+  | I.PPar n -> I.PPar n
+
   | I.PLam (xs, p) -> I.PLam (xs, syn_psubst sign (bctx_of_lam_pars cP xs) (x, p') p) (* What about shifts in p'? *)
   | I.PSConst (n, ps) -> I.PSConst (n, List.map (syn_psubst sign cP (x, p')) ps)
   | I.PUnbox (n, s, cP') when n = x ->
@@ -85,6 +92,7 @@ and syn_psubst sign cP (x, p') = function
                in
                comp s n
             | I.PDot (sigma, p) -> I.PDot (push_unbox (s, cP') sigma, push_unbox (s, cP') p)
+            | I.PPar n -> I.PPar n
           in
           push_unbox (s, cP') q
        | _ -> assert false

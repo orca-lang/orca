@@ -338,9 +338,6 @@ let rec fmt_pat_subst pps = function
 
 let rec fmt_pat cG pps = function
   | PVar n -> comp_var cG pps n
-  | PPar n ->
-     Fmt.pf pps "<:%a"
-            (comp_var cG) n
   | Inacc e ->
      Fmt.pf pps ".%a"
             (fmt_exp cG 0) e
@@ -373,6 +370,10 @@ and fmt_syn_pat cG cP pps = function
       bound_var i
     | Some n -> bound_name pps n
     end
+  | PPar n ->
+    Fmt.pf pps "<:%a"
+      (comp_var cG) n
+
   | PLam (xs, p) ->
      let xs' = List.map fst xs in
      let cP' = bctx_of_names xs' cP in

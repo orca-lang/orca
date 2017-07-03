@@ -76,7 +76,6 @@ let matching (p : I.pat) (q : pat) : pats =
      let rec apx_match (p : I.pat) (q : A.pat) =
        match p, q with
        | I.PVar n, _ -> [Apx q]
-       | I.PPar n, A.PPar n' -> [Int (I.PPar n')]
        | I.PConst (n, ps), A.PConst (n', qs) when n = n' -> List.concat (List.map2 apx_match ps qs)
        | I.PConst (n, ps), A.PConst (n', qs) -> raise(Error.Error "Pattern matching does not
  match. (A)")
@@ -88,6 +87,7 @@ let matching (p : I.pat) (q : pat) : pats =
      and syn_apx_match cP p q =
        match p, q with
        | I.PLam (xs, p), A.PLam (ys, q) -> syn_apx_match (bctx_of_lam_pars cP xs) p q
+       | I.PPar n, A.PPar n' -> [Int (I.PTBox (cP, I.PPar n'))]
        | I.PUnbox (n, s, cP'), A.PClos (m, s') when s = s' -> [Int (I.PTBox (cP, (I.PUnbox (m, s, cP'))))]
        | I.PUnbox (n, s, cP'), _ -> [Apx q] (* need to apply inverse sub to q *)
        | I.SInacc _, _ -> []
@@ -110,7 +110,6 @@ let matching (p : I.pat) (q : pat) : pats =
      let rec int_match (p : I.pat) (q : I.pat) =
        match p, q with
        | I.PVar n, _ -> [Int q]
-       | I.PPar n, I.PPar n' -> [Int(I.PVar n')]
        | I.PConst (n, ps), I.PConst (n', qs) when n = n' -> List.concat (List.map2 int_match ps qs)
        | I.PConst (n, ps), I.PConst (n', qs) -> raise (Error.Error "Pattern matching does not match. (I)")
        | I.Inacc _, _ -> []
@@ -121,6 +120,7 @@ let matching (p : I.pat) (q : pat) : pats =
        match p, q with
        | I.PLam (xs, p), I.PLam (ys, q) -> syn_int_match (bctx_of_lam_pars cP xs) p q
        | I.PUnbox (n, s, cP'), _ -> [Int (I.PTBox(cP, q))]
+       | I.PPar n, I.PPar n' -> [Int(I.PTBox (cP, q))]
        | I.SInacc _, _ -> []
        | I.PEmpty, I.PEmpty -> []
        | I.PShift n, I.PShift n' when n = n' -> []
@@ -320,7 +320,7 @@ let check_ppar (sign : signature) (p1 : pats) (n : name) (cD1 : I.ctx)
     | t -> raise (Error.Error ("Parameter variables can only be used against a boxed type. Found " ^ IP.print_exp t))
   in
 
-  compute_split_map sign (x, I.Var n) (x, I.PPar n) cD1 x cD2 [] [] (cD1 @ [n, I.Box (g, t)])
+  compute_split_map sign (x, I.Var n) (x, I.PTBox(g, I.PPar n)) cD1 x cD2 [] [] (cD1 @ [n, I.Box (g, t)])
   (* (\* let cD' = cD1 @ [n, Box (g, t)] @ (simul_subst_on_ctx [x, Var n] cD2) in *\) *)
   (* let delta =  *)
 
@@ -417,11 +417,14 @@ let split_rec (sign : signature) (ps : pats) (cD : I.ctx) : I.ctx * I.pats =
   and search_int p1 p ps cD1 cD2 =
     match p, cD2 with
     | I.PVar y, (x, t) :: cD2 ->
-       search (p1 @ [Int(I.PVar y)]) ps (cD1 @ [y, t]) (ctx_subst (x, I.Var y) cD2)
+      search (p1 @ [Int(I.PVar y)]) ps (cD1 @ [y, t]) (ctx_subst (x, I.Var y) cD2)
     | I.Inacc e, (x, t) :: cD2 ->
        search (p1 @ [Int(I.Inacc e)]) ps (cD1 @ [x, t]) cD2
     | I.PTBox (cP1, I.PUnbox(n, s, cP2)), (x, t) :: cD2 ->
-       search (p1 @ [Int(I.PTBox (cP1, I.PUnbox(n, s, cP2)))]) ps (cD1 @ [x, t]) cD2
+      search (p1 @ [Int(I.PTBox (cP1, I.PUnbox(n, s, cP2)))]) ps (cD1 @ [x, t]) cD2
+    | I.PTBox (cP1, I.PPar y), (x, t) :: cD2 ->
+      search (p1 @ [Int(I.PTBox (cP1, I.PPar y))]) ps (cD1 @ [y, t]) (ctx_subst (x, I.Var y) cD2)
+
     (* | I.PBCtx (I.PSnoc (g, y, p)), (x, t) :: cD2 -> *)
     (*    split_snoc sign p1 (Int (I.PBCtx g), y, Int (I.PTBox (I.bctx_of_pat_ctx g, p))) cD1 (x, t) cD2 *)
     | I.PBCtx (I.PCtxVar y), (x, t) :: cD2 ->
@@ -499,6 +502,7 @@ let check_pats (sign : signature) (p : pats) (cG : I.ctx) : I.ctx * I.pats =
   Debug.indent ();
   let is_Pvar = function
     | Int (I.PVar _)
+    | Int (I.PTBox (_, I.PPar _))
     | Int (I.PTBox (_, I.PUnbox _))
     | Apx (A.SInacc _)
     | Apx (A.Inacc _)
@@ -570,7 +574,6 @@ and check_inac (sign, cD : signature * I.ctx) (p : A.pat) (q : I.pat) (t : I.exp
      Debug.deindent ();
      I.Inacc (simul_subst sigma ep')
   | A.PVar x, I.PVar y when x = y -> I.PVar x
-  | A.PPar x, I.PPar y when x = y -> I.PPar x
   | A.PConst (n, sp), I.PConst (n', sq) when n = n' ->
      begin match lookup_sign_entry sign n with
      | Constructor (_, tel, _) -> I.PConst (n, check_inacs (sign, cD) sp sq (ctx_of_tel tel))
@@ -638,7 +641,7 @@ and check_inac_syn (sign, cD : signature * I.ctx) (cP : I.bctx) (p : A.pat) (q :
      I.PUnbox(n, CShift 0, cP')
   | A.PBVar i, I.PBVar i' when i = i' ->
      I.PBVar i
-
+  | A.PPar x, I.PPar y when x = y -> I.PPar x
   | A.Inacc _, _ -> raise (Error.Error ("Failed to infer the value of inaccessible pattern when checking that the pattern "
                                         ^ AP.print_pat p ^ " has type " ^ IP.print_syn_exp t))
   | A.SInacc _, _ -> raise (Error.Error ("Failed to infer the value of inaccessible pattern when checking that the pattern "
