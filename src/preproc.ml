@@ -391,7 +391,7 @@ let rec pproc_pat (s : sign) cG cP p =
   | E.PIdent n -> find_name_pat s cG cP n
   | E.PPar n ->
      begin match find_name_pat s cG cP n with
-     | A.PVar n -> A.PVar n
+     | A.PVar n -> A.PPar n
      | _ -> raise (Error.Error "Expected parameter variable, got something else")
      end
   | E.PClos (x, e) ->
