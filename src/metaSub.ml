@@ -190,6 +190,7 @@ let apply_inv_subst e s =
     | Shift n, Shift _ -> raise (Error.Error "Shift too long")
     | Shift n, Empty -> Empty
     | Shift n, Dot(_,_) -> assert false
+    | Shift 0, ShiftS (n, Empty) -> Shift 0
 
     | Dot (s, e), s' -> Dot (apply_inv s s', apply_inv e s')
     | Comp _, _-> assert false
