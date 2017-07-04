@@ -42,7 +42,7 @@ let rec match_pat sign p e =
   | _ -> raise (Matching_failure (p, e))
 
 and match_pats sign ps es =
-  Debug.print (fun () -> "ps = " ^ print_pats ps ^ "\nes = " ^ print_exps es);
+  Debug.print ~verbose:true (fun () -> "ps = " ^ print_pats ps ^ "\nes = " ^ print_exps es);
   let rec map ps es = match ps, es with
     | [], _ -> []
     | p :: ps, e :: es -> match_pat sign p e @ map ps es
@@ -171,13 +171,27 @@ and whnf (sign : signature) (e : exp) : exp =
       begin match whnf sign h with
       | Fn(xs, e) as f ->
         Debug.print ~verbose:true  (fun () -> "Head of application was a function " ^ print_exp f);
-        let sigma = List.map2 (fun x e -> x, e) xs sp in
-        whnf sign (simul_subst sigma e) (* Beta reduction *)
+        let rec map xs sp =
+          match xs, sp with
+          | [], sp -> [], [], sp
+          | x::xs, e :: sp ->
+            let sigma, xs', sp' = map xs sp in
+            (x, whnf sign e) :: sigma, xs', sp' (* we evaluate e for call by value *)
+          | xs, [] -> [], xs, sp
+        in
+        let sigma, xs', sp' = map xs sp in
+        let e' = simul_subst sigma e in
+        if xs' <> [] then
+          Fn(xs', e')
+        else if sp' <> [] then
+          whnf sign (App (e', sp'))
+        else
+          whnf sign e'
       | Const n ->
         Debug.print ~verbose:true  (fun () -> "Head of application was a constant " ^ print_exp (Const n));
         begin match lookup_sign_def sign n with
         | D e -> whnf sign (App (e, sp))
-        | P cls -> Debug.print (fun () -> "Definition " ^ n ^ " has clause list " ^ String.concat "\n" (List.map (fun cl -> print_pats (fst cl)) cls));
+        | P cls -> Debug.print ~verbose:true (fun () -> "Definition " ^ n ^ " has clause list " ^ String.concat "\n" (List.map (fun cl -> print_pats (fst cl)) cls));
           begin match reduce_with_clauses sign sp cls with
           | None -> App (Const n, sp)
           | Some (e, []) -> whnf sign e
