@@ -110,7 +110,7 @@ let rec refresh_exp (rep : (name * name) list) : exp -> exp =
   | BCtx cP -> BCtx (refresh_bctx rep cP)
   | Fn (xs, e) ->
      let xs' = List.map refresh_name xs in
-     let extra = List.map2 (fun x y -> x, y) xs xs in
+     let extra = List.map2 (fun x y -> x, y) xs xs' in
      Fn (xs', refresh_exp (extra @ rep) e)
   | App (e1, es) -> App(f e1, List.map f es)
   | Const n -> Const n
