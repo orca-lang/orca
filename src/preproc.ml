@@ -75,6 +75,7 @@ let find_name_pat (sign : sign) (cG : ctx) (cP : bctx) (n : E.name) : A.pat =
                then A.PConst (n , [])
                else raise (Error.Error ("Unbound variable: " ^ n))
 
+let add_names_sign sign ns = ns @ sign
 let add_name_sign sign n = n :: sign
 let add_name_ctx c n = let nn = Name.gen_name n in ((n, nn) :: c), nn
 let rec add_names_ctx c = function
@@ -501,27 +502,43 @@ let pre_process s = function
      let s' = add_name_sign s n in
      let s'', ds' = List.fold_left (fun (s, dos) d -> let ss, dd = pproc_codecl s cG d n in ss, (dd :: dos)) (s', []) ds in
      s'', A.Codata (n, ps', is, u, ds')
-  | E.Spec (n, e, ds) ->
-    let tel, e' = pproc_stel s [] [] e in
-    let _ = match e' with
-      | A.Star -> ()
-      | _ -> raise (Error.Error_loc (loc e, "Syntax definition for " ^ n ^ " should have kind * instead of " ^ AP.print_exp e'))
+  | E.Spec spec ->
+    let ns = List.map (fun (n, _, _) -> n) spec in
+    let s' = add_names_sign s ns in
+    let rec process s = function
+      | (n, e, ds) :: spec ->
+        let tel, e' = pproc_stel s [] [] e in
+        let _ = match e' with
+          | A.Star -> ()
+          | _ -> raise (Error.Error_loc (loc e, "Syntax definition for " ^ n ^ " should have kind * instead of " ^ AP.print_exp e'))
+        in
+        let s', ds' = List.fold_left (fun (s, dos) d -> let ss, dd = pproc_sdecl s [] d n in ss, (dd :: dos)) (s, []) ds in
+        let s'', spec' = process s' spec in
+        s'', (n, tel, ds') :: spec'
+      | [] -> s, []
     in
-     let s' = add_name_sign s n in
-     let s'', ds' = List.fold_left (fun (s, dos) d -> let ss, dd = pproc_sdecl s [] d n in ss, (dd :: dos)) (s', []) ds in
-     s'', A.Spec (n, tel, ds')
-  | E.DefPM (n, e, ds) ->
-     let s' = add_name_sign s n in
-     let e' = pproc_exp s [] [] e in
-     let lengths = List.map (fun (ps, _) -> List.length ps) ds in
-     if try List.for_all ((=) (List.hd lengths)) lengths
-        with Failure _ -> raise (Error.Error ("Empty set of patterns for definition " ^ n))
-     then () else raise (Error.Error_loc (loc e, "Not all pattern spines are of the same length for definition " ^ n));
-     begin match e' with
-     | A.Pi(tel, e'') ->
-        s', A.DefPM (n, tel, e'', List.map (pproc_def_decl s') ds)
-     | e'' -> s', A.DefPM (n, [], e'', List.map (pproc_def_decl s') ds)
-     end
+    let s'', spec' = process s' spec in
+    s'', A.Spec spec'
+  | E.DefPM def ->
+    let ns = List.map (fun (n, _, _) -> n) def in
+    let s' = add_names_sign s ns in
+    let rec process = function
+      | (n, e, ds) :: def ->
+        let e' = pproc_exp s [] [] e in
+        let lengths = List.map (fun (ps, _) -> List.length ps) ds in
+        if begin
+          try List.for_all ((=) (List.hd lengths)) lengths
+          with Failure _ -> raise (Error.Error ("Empty set of patterns for definition " ^ n))
+        end
+        then () else raise (Error.Error_loc (loc e, "Not all pattern spines are of the same length for definition " ^ n));
+        begin match e' with
+        | A.Pi(tel, e'') -> (n, tel, e'', List.map (pproc_def_decl s') ds) :: process def
+        | e'' -> (n, [], e'', List.map (pproc_def_decl s') ds) :: process def
+        end
+      | [] -> []
+    in
+    s', A.DefPM (process def)
+
   | E.Def (n, t, e) ->
      let s' = add_name_sign s n in
      s', A.Def (n, pproc_exp s [] [] t, pproc_exp s [] [] e)

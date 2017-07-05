@@ -684,8 +684,7 @@ let check_clause (sign : signature) (f : def_name) (p : A.pats) (telG : I.tel) (
                         ^ "\nwith unification problem:\n"
                         ^ Unify.print_unification_problem prob))
 
-let check_clauses (sign : signature) (f : def_name) (telG : I.tel) (t : I.exp) (ds : A.pat_decls) : signature * I.pat_decls =
+let check_clauses (sign : signature) (f : def_name) (telG : I.tel) (t : I.exp) (ds : A.pat_decls) : signature_entry * I.pat_decls =
   (* we add a non-reducing version of f to the signature *)
-  let sign' =  (Program (f, telG, t, [], Stuck)) :: sign in
-  let ds'= List.map (fun (ps, rhs) -> check_clause sign' f ps telG t rhs) ds  in
-  (Program (f, telG, t, ds', Reduces)) :: sign, ds'
+  let ds'= List.map (fun (ps, rhs) -> check_clause sign f ps telG t rhs) ds  in
+  (Program (f, telG, t, ds', Reduces)), ds'

@@ -63,8 +63,8 @@ module Ext = struct
   type program =
     | Data of name * params * exp * decls
     | Codata of name * params * exp * decls
-    | Spec of name * exp * decls
-    | DefPM of name * exp * def_decls
+    | Spec of (name * exp * decls) list
+    | DefPM of (name * exp * def_decls) list
     | Def of name * exp * exp
 end
 
@@ -140,8 +140,8 @@ module Apx = struct
     (* name, parameters, indices, universe *)
     | Data of def_name * tel * tel * universe * decls
     | Codata of def_name * tel * tel * universe * codecls
-    | Spec of def_name * stel * sdecls
-    | DefPM of def_name * tel * exp * pat_decls
+    | Spec of (def_name * stel * sdecls) list
+    | DefPM of (def_name * tel * exp * pat_decls) list
     | Def of def_name * exp * exp
 end
 
@@ -254,8 +254,8 @@ module Int = struct
     (* name, parameters, indices, universe *)
     | Data of def_name * tel * tel * universe * decls
     | Codata of def_name * tel * tel * universe * codecls
-    | Spec of def_name * stel * sdecls
-    | DefPM of def_name * tel * exp * pat_decls
+    | Spec of (def_name * stel * sdecls) list
+    | DefPM of (def_name * tel * exp * pat_decls) list
     | DefPMTree of def_name * tel * exp * split_tree
     | Def of def_name * exp * exp
 

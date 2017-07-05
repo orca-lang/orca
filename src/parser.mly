@@ -5,7 +5,7 @@ open Syntax.Ext
 
 %}
 
-%token DATA CODATA SPEC DEF MID AMP RARR COLON SEMICOLON WHERE EQ UNDERSCORE PATTERNWILD CTX
+%token DATA CODATA SPEC AND DEF MID AMP RARR COLON SEMICOLON WHERE EQ UNDERSCORE PATTERNWILD CTX
 %token LPAREN RPAREN LCURLY RCURLY LSQUARE RSQUARE
 %token FN LAM APPL
 %token STAR ARR SARR TURNSTILE TTS (* term turnstile *) STT
@@ -50,10 +50,16 @@ toplevel:
     {Data (s, p, unwrap_or (Location.ghost (Set 0)) t, d)}
 | CODATA s = IDENT p = params t = type_dec? WHERE option (AMP) d = separated_list (AMP, decl)
     {Codata (s, p, unwrap_or (Location.ghost (Set 0)) t, d)}
-| SPEC s = IDENT t = type_dec? WHERE option(MID) d = separated_list (MID, decl)
-    {Spec (s, unwrap_or (Location.ghost Star) t, d)}
-| DEF f = IDENT COLON t = exp WHERE option(MID) d = separated_list (MID, def_decl) {DefPM (f, t, d)}
+| SPEC s = separated_nonempty_list(AND, spec)
+    {Spec s}
+| DEF d = separated_nonempty_list(AND, def) {DefPM d}
 | DEF f = IDENT COLON t = exp EQ e = exp {Def (f, t, e)}
+
+spec:
+| s = IDENT t = type_dec? WHERE option(MID) d = separated_list (MID, decl) {(s, unwrap_or (Location.ghost Star) t, d)}
+
+def:
+| f = IDENT COLON t = exp WHERE option(MID) d = separated_list (MID, def_decl) {(f, t, d)}
 
 type_dec:
 | COLON t = exp { t }

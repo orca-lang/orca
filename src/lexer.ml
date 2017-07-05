@@ -52,6 +52,7 @@ let rec main_scanner pos = lexer
   | "(*" -> comment pos 0 lexbuf
   | eof -> add_word pos (Ulexing.lexeme_length lexbuf), EOF
 
+  | "and"  -> add_word pos (Ulexing.lexeme_length lexbuf), AND
   | "data" -> add_word pos (Ulexing.lexeme_length lexbuf), DATA
   | "codata" -> add_word pos (Ulexing.lexeme_length lexbuf), CODATA
   | "syn" -> add_word pos (Ulexing.lexeme_length lexbuf), SPEC

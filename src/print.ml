@@ -68,8 +68,14 @@ module Ext = struct
   let print_program = function
     | Data (n, ps, e, decls) -> "(data " ^ n ^ " " ^ print_params ps ^ "  " ^ print_exp e ^ "\n" ^ print_decls decls ^ ")"
     | Codata (n, ps, e, decls) -> "(data " ^ n ^ " " ^ print_params ps ^ "  " ^ print_exp e ^ "\n" ^ print_decls decls ^ ")"
-    | Spec (n, e, decls) -> "(syn " ^ n ^ " " ^ print_exp e ^ "\n" ^ print_decls decls ^ ")"
-    | DefPM (n, e, decls) -> "(def " ^ n ^ " " ^ print_exp e ^ "\n" ^ print_def_decls decls ^ ")"
+
+    | Spec s -> "(spec "
+      ^ String.concat "\nand "
+      (List.map (fun (n, e, decls) -> "(" ^ n ^ " " ^ print_exp e ^ "\n" ^ print_decls decls ^ ")") s) ^ ")"
+    | DefPM d -> "(def "
+      ^ String.concat "\nand "
+      (List.map (fun (n, e, decls) -> "(" ^ n
+        ^ print_exp e ^ "\n" ^ print_def_decls decls ^ ")") d) ^ ")"
     | Def (n, e1, e2) -> "(def " ^ n ^ " " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
 
 end
@@ -182,9 +188,13 @@ module Apx = struct
       "(data " ^ n ^ " (" ^ print_params ps ^ ") (" ^ print_params is ^ ") " ^ print_universe u  ^ "\n" ^ print_decls decls ^ ")"
     | Codata (n, ps, is, u, decls) ->
        "(data " ^ n ^ " (" ^ print_params ps ^ ") (" ^ print_params is ^ ") " ^ print_universe u  ^ "\n" ^ print_codecls decls ^ ")"
-
-    | Spec (n, tel, decls) -> "(syn " ^ n ^ " " ^ print_stel tel ^ "\n" ^ print_sdecls decls ^ ")"
-    | DefPM (n, tel, e, decls) -> "(def " ^ n ^ " (" ^ print_tel tel ^ ") " ^ print_exp e ^ "\n" ^ print_def_decls decls ^ ")"
+    | Spec s -> "(spec "
+      ^ String.concat "\nand "
+      (List.map (fun (n, tel, decls) -> "(" ^ n ^ " " ^ print_stel tel ^ "\n" ^ print_sdecls decls ^ ")") s) ^ ")"
+    | DefPM d -> "(def "
+      ^ String.concat "\nand "
+      (List.map (fun (n, tel, e, decls) -> "(" ^ n ^ " (" ^ print_tel tel ^ ") "
+        ^ print_exp e ^ "\n" ^ print_def_decls decls ^ ")") d) ^ ")"
     | Def (n, e1, e2) -> "(def " ^ n ^ " " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
   end
 
@@ -349,8 +359,14 @@ module Int = struct
     | Codata (n, ps, is, u, decls) ->
        "(data " ^ n ^ " (" ^ print_params ps ^ ") (" ^ print_params is ^ ") " ^ print_universe u  ^ "\n" ^ print_codecls decls ^ ")"
 
-    | Spec (n, tel, decls) -> "(syn " ^ n ^ " " ^ print_stel tel ^ "\n" ^ print_sdecls decls ^ ")"
-    | DefPM (n, tel, e, decls) -> "(def " ^ n ^ " (" ^ print_tel tel ^ ") " ^ print_exp e ^ "\n" ^ print_def_decls decls ^ ")"
+    | Spec s -> "(spec "
+      ^ String.concat "\nand "
+      (List.map (fun (n, tel, decls) -> "(" ^ n ^ " " ^ print_stel tel ^ "\n" ^ print_sdecls decls ^ ")") s) ^ ")"
+    | DefPM d ->
+      "(def "
+      ^ String.concat "\nand "
+      (List.map (fun (n, tel, e, decls) -> "(" ^ n ^ " (" ^ print_tel tel ^ ") "
+        ^ print_exp e ^ "\n" ^ print_def_decls decls ^ ")") d) ^ ")"
     | DefPMTree (n, tel, e, tree) -> "(def " ^ n ^ " (" ^ print_tel tel ^ ") " ^ print_exp e ^ "\n" ^ print_tree tree ^ ")"
     | Def (n, e1, e2) -> "(def " ^ n ^ " " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
 end

@@ -499,6 +499,43 @@ let rec fmt_params cG pps = function
             (fmt_tel_entry cG) p
             (fmt_params ((n, dt):: cG)) ps
 
+let rec fmt_defpm key pps = function
+  | (n, [], t, pats) :: def ->
+    Fmt.pf pps "%a %a : %a %a@,%a@,%a"
+            keyword key
+            const n
+            (fmt_exp [] never_paren) t
+            keyword "where"
+            (fmt_pat_decls []) pats
+            (fmt_defpm "and") def
+  | (n, tel, t, pats) :: def ->
+      Fmt.pf pps "%a %a : %a %a@,%a@,%a"
+            keyword "def"
+            const n
+            (fmt_tel []) (tel, t)
+            keyword "where"
+           (fmt_pat_decls []) pats
+           (fmt_defpm "and") def
+  | [] -> ()
+
+let rec fmt_spec key pps = function
+  | (n, [], ds) :: def ->
+    Fmt.pf pps "%a %a %a@,%a@,%a"
+      keyword key
+      const n
+      keyword "where"
+      fmt_sdecls ds
+      (fmt_spec "and") def
+  | (n, tel, ds) :: def ->
+    Fmt.pf pps "%a %a : %a %a@,%a@,%a"
+      keyword key
+      const n
+      (fmt_stel [] Nil) (tel, Star)
+      keyword "where"
+      fmt_sdecls ds
+      (fmt_spec "and") def
+  | [] -> ()
+
 let fmt_program pps = function
   (* printing inductive types *)
   | Data (n, [], [], 0, ds) ->
@@ -566,37 +603,11 @@ let fmt_program pps = function
             (fmt_exp [] never_paren) t
             (fmt_exp [] never_paren) e
 
-  | DefPM (n, [], t, pats) ->
-     Fmt.pf pps "%a %a : %a %a@,%a"
-            keyword "def"
-            const n
-            (fmt_exp [] never_paren) t
-            keyword "where"
-            (fmt_pat_decls []) pats
 
-  | DefPM (n, tel, t, pats) ->
-     Fmt.pf pps "%a %a : %a %a@,%a"
-            keyword "def"
-            const n
-            (fmt_tel []) (tel, t)
-            keyword "where"
-            (fmt_pat_decls []) pats
+  | DefPM def -> fmt_defpm "def" pps def
 
   (* printing specification types *)
-  | Spec (n, [], ds) ->
-     Fmt.pf pps "%a %a %a@,%a"
-            keyword "spec"
-            const n
-            keyword "where"
-            fmt_sdecls ds
-
-  | Spec (n, tel, ds) ->
-     Fmt.pf pps "%a %a : %a %a@,%a"
-            keyword "spec"
-            const n
-            (fmt_stel [] Nil) (tel, Star)
-            keyword "where"
-            fmt_sdecls ds
+  | Spec spec -> fmt_spec "spec" pps spec
 
   | p -> string pps (Print.Int.print_program p)
 

@@ -133,29 +133,46 @@ let tc_program (sign : signature) : program -> signature * I.program =
     let sign'', ds' = tc_observations (sign', cG) u (ps' @ is') ds in
     sign'', I.Codata(n, ps', is', u'', List.rev ds')
 
-  | Spec (n, tel, ds) ->
-    Debug.print_string ("Typechecking syn declaration: " ^ n);
-    Debug.indent ();
-    let tel' = check_stel (sign, []) I.Nil tel in
-    let sign' = SpecDef (n, tel') :: sign in
-    let sign'', ds' = tc_syn_constructors (sign', []) tel' ds in
-    Debug.deindent ();
-    sign'', I.Spec(n, tel', List.rev ds')
-
-  | DefPM (n, tel, t, ds) ->
-     Debug.print_string ("\nTypechecking pattern matching definition: " ^ n);
-     Debug.indent ();
-     let t' = if tel = [] then t else Pi(tel, t) in
-     let t'', _u = infer_type (sign, []) t' in
-     let tel', t0 = match t'' with
-       | I.Pi(tel, t) -> tel, t
-       | t -> [], t
-     in
-     let sign', ds' = check_clauses sign n tel' t0 ds in
-     (* let _ = Split.check_clauses sign n t'' ds in *)
-     Debug.deindent ();
-     sign', I.DefPM(n, tel', t0, ds')
-
+  | Spec spec ->
+    let spec' = List.map (fun (n, tel, ds) -> n, check_stel (sign, []) I.Nil tel, ds) spec in
+    let sign' = List.map (fun (n, tel, ds) -> SpecDef (n, tel)) spec' @ sign in
+    let rec process sign = function
+      | (n, tel, ds) :: spec ->
+        Debug.print_string ("Typechecking syn declaration: " ^ n);
+        Debug.indent ();
+        let sign', ds' = tc_syn_constructors (sign, []) tel ds in
+        let sign'', spec' = process sign' spec in
+        Debug.deindent ();
+        sign'', (n, tel, ds') :: spec'
+      | [] -> sign, []
+    in
+    let sign'', spec'' = process sign' spec' in
+    sign'', I.Spec spec''
+  | DefPM def ->
+    let process_type (n, tel, t, ds) =
+      let t' = if tel = [] then t else Pi(tel, t) in
+      let t'', _u = infer_type (sign, []) t' in
+      let tel', t0 = match t'' with
+        | I.Pi(tel, t) -> tel, t
+        | t -> [], t
+      in
+      (n, tel', t0, ds)
+    in
+    let def' = List.map process_type def in
+    let sign_temp = List.map (fun (n, tel, t, ds) -> Program (n, tel, t, [], Stuck)) def' @ sign in
+    let rec process = function
+      | (n, tel, t, ds) :: def ->
+        Debug.print_string ("\nTypechecking pattern matching definition: " ^ n);
+        Debug.indent ();
+        let sentry, ds' = check_clauses sign_temp n tel t ds in
+        (* let _ = Split.check_clauses sign n t'' ds in *)
+        Debug.deindent ();
+        let sentries, def' = process def in
+        sentry :: sentries, (n, tel, t, ds') :: def'
+      | [] -> [], []
+    in
+    let sentries, def'' = process def' in
+    sentries @ sign, I.DefPM def''
   | Def (n, t, e) ->
      Debug.print_string ("Typechecking definition: " ^ n);
      Debug.indent ();
