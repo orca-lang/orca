@@ -390,6 +390,16 @@ and rewrite (sign : signature) cP (e : syn_exp) : syn_exp =
       Dot (e, s)
     else w (Dot (e', s'))))
 
+  | ShiftS (n, s) ->
+    if n = 0 then w s
+    else
+      let rec tailify s =
+        function
+        | 0 -> Comp (Shift n, drop_suffix cP n, s)
+        | m -> Dot (tailify s (m-1), BVar (n-m))
+      in
+      w (tailify s n)
+
   (* IDK what to do with these *)
   (* | Clos (Box(g, t), s) -> assert false *)
 
