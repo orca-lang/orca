@@ -8,13 +8,13 @@ open Print.Int
 open Syntax
 open Syntax.Int
 
+let rec in_ctx n = function
+  | (x, _) :: _ when x = n -> true
+  | _ :: cG -> in_ctx n cG
+  | [] -> false
+
 let rec fv cG =
   let fv e = fv cG e in
-  let rec in_ctx n = function
-    | (x, _) :: _ when x = n -> true
-    | _ :: cG -> in_ctx n cG
-    | [] -> false
-  in
   function
   | Set _ -> []
   | Ctx -> []
@@ -54,6 +54,7 @@ and fv_syn cG =
 and fv_ctx cG = function
   | Nil -> []
   | Snoc(cP, _, e) -> fv_ctx cG cP @ fv_syn cG e
+  | CtxVar n when in_ctx n cG -> []
   | CtxVar n -> [n]
 
 and fv_pi cG (tel : tel) (t : exp) = match tel with
