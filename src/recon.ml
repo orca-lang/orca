@@ -51,7 +51,7 @@ let compute_wkn (sign, cG) cP cP' =
              Unify.unify_syn (sign, cG) cP x y
            with Unify.Unification_failure problem ->
              Debug.print (fun () -> Unify.print_unification_problem problem);
-             raise (Error.Error ("Types in contexts cannot unify"))
+             raise (Error.Error ("Types in contexts cannot unify:\n" ^ Unify.print_unification_problem problem))
          in
          check_lists xs ys (I.Snoc(cP, n, simul_subst_syn sigma x))
       | _ -> raise (Error.Error "Term cannot be of larger context than ambient one")
@@ -62,28 +62,7 @@ let compute_wkn (sign, cG) cP cP' =
     in
     check_lists ts1 ts2 cP1
   else
-    raise (Error.Error ("Cannot infer the substitution"))
-
-
-
-
-  (* Debug.print(fun () -> "Unifying contexts.\ng  = " ^ IP.print_exp g ^ "\ng' = " ^ IP.print_exp g' ^ "\n with ctx " ^ IP.print_ctx cG); *)
-  (* let cD, sigma = *)
-    (* try *)
-    (*   Unify.unify_bctx (sign, cG) cP cP' *)
-    (* with *)
-    (*   Unify.Unification_failure problem -> *)
-    (*     Debug.print (fun () -> Unify.print_unification_problem problem); *)
-    (*     raise (Error.Error (IP.print_exp e ^ " is defined in bound context " ^ IP.print_bctx cP *)
-    (*                         ^ " but it was expected to be in bound context " ^ IP.print_bctx cP')) *)
-
-(* let check_box (sign, cG) cP e = function *)
-(*   | I.Box (g, t) -> *)
-(*     let cD, sigma = unify_ctx (sign, cG) e g cP in *)
-(*     simul_subst sigma e, simul_subst_syn sigma t *)
-(*   | t -> e, t *)
-
-
+    raise (Error.Error ("Cannot infer the substitution unifying contexts\ncP = " ^ IP.print_bctx cP ^ "\ncP' = " ^ IP.print_bctx cP'))
 
 (* infers the type and returns the internal term and its type *)
 let rec infer (sign, cG : signature * I.ctx) (e : A.exp) : I.exp * I.exp =
@@ -326,7 +305,9 @@ and check_syn (sign, cG) cP (e : A.exp) (t : I.syn_exp) =
           raise (Error.Error ("Checking syntactic term " ^ AP.print_exp e ^ " against type "
                               ^ PP.print_syn_exp cG cP (Whnf.normalize_syn sign cP t)
                               ^ "\nIn context " ^ PP.print_bctx cG (Whnf.whnf_bctx sign cP)
-                            ^ "\nFailed with unification problem:\n" ^ Unify.print_unification_problem prob))
+                              ^ "\nFailed with unification problem:\n" ^ Unify.print_unification_problem prob
+                              ^ "\nWhen unifying:\n" ^ PP.print_syn_exp cG cP (Whnf.normalize_syn sign cP t)
+                              ^ "\nwith:\n"^ PP.print_syn_exp cG cP (Whnf.normalize_syn sign cP t')))
       in
       simul_subst_syn sigma e'
     | e, t ->
