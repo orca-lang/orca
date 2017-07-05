@@ -229,7 +229,7 @@ and unify_flex_syn (sign, cG) cP flex e1 e2 =
     else
       raise (Unification_failure(Expressions_dont_unify_syn (flex, e1', e2')))
 
-  | Unbox(Var n, _, _), Unbox (Var m, _, _) when n = m -> cG, [] (* MMM *)
+  | Unbox(Var n, s, _), Unbox (Var m, s', _) when n = m ->  unify_flex_syn (sign, cG) cP flex s s'
   | Unbox(Var n, s, cP'), _ when is_flex n ->
      if not (occur_check_syn sign cP n e2') then
        try
