@@ -131,7 +131,10 @@ and check (sign , cG : signature * I.ctx) (e : A.exp) (t : I.exp) : I.exp =
   Debug.indent();
   let res_e = match e, t' with
     (* checkable terms *)
-    | A.Hole n, _ -> I.Hole n  (* holes are always of the right type *)
+    | A.Hole n, _ ->
+      Debug.print (fun () -> "Hole named " ^ print_name n ^ " has type : " ^ PP.print_exp cG (Whnf.normalize sign t')
+        ^ "\nin context: " ^ PP.print_ctx cG);
+      I.Hole n  (* holes are always of the right type *)
     | A.Fn (fs, e), I.Pi(tel, t) ->
        let sigma = List.map2 (fun f (_, n, _) -> n, I.Var f) fs tel in
        let t' = simul_subst sigma t in
