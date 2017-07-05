@@ -215,7 +215,10 @@ and fmt_exp cG parens pps e =
       (fmt_exp cG 2) e2
       (close_paren 2)
 
-  | BCtx cP -> fmt_bctx cG pps cP
+  | BCtx cP -> Fmt.pf pps "%s%a%s"
+    (open_paren 2)
+    (fmt_bctx cG) cP
+    (close_paren 2)
 
 (* parens is an integer computing precedence of enclosing expression.
    If expression has lower precedence (higher number), parentheses
