@@ -14,7 +14,7 @@ let tc_constructor (sign , cG : signature * I.ctx) (u : I.universe) (tel : I.tel
                    (n , tel', (n', es) : def_name * tel * dsig) : signature_entry * I.decl =
   Debug.print_string ("Typechecking constructor: " ^ n) ;
   let tel'', uc = check_tel (sign, cG) u tel' in
-  let cG' = (List.rev (ctx_of_tel tel'')) @ cG in
+  let cG' = (ctx_of_tel tel'') @ cG in
   if uc <= u then
     begin
       let check' = check (sign, cG') in
@@ -50,7 +50,7 @@ let tc_observation (sign , cG : signature * I.ctx) (u : I.universe) (tel : I.tel
                    (n , tel', (m, n', es), e : def_name * tel * codsig * exp) : signature_entry * I.codecl =
   Debug.print_string ("Typechecking constructor: " ^ n) ;
   let tel'', uc = check_tel (sign, cG) u tel' in
-  let cG' = (List.rev (ctx_of_tel tel'')) @ cG in
+  let cG' = (ctx_of_tel tel'') @ cG in
   if uc <= u then                       (* Note: Is that check needed for codatatypes? *)
     begin
       let rec check_indices es tel =
