@@ -1,0 +1,106 @@
+spec exp where
+| z : exp
+| s : exp ->> exp
+| lam : (exp ->> exp) ->> exp
+| app : exp ->> exp ->> exp
+
+data eval : (|- exp) -> (|- exp) -> set where
+| ev-z : eval z z
+| ev-s : (e v : |- exp) -> eval e v -> eval (s e) (s v)
+| ev-lam : (e : (\0,x:exp |- exp)) -> eval (lam (\x.e)) (lam (\x.e))
+| ev-app : (e1 e2 v v2 : |- exp) (e : (\0,x:exp |- exp)) -> eval e1 (lam (\x.e))
+           -> eval e2 v2 -> eval (e[..;v2]) v -> eval (app e1 e2) v
+
+spec val where
+| v-z : val
+| v-s : val -> val
+| v-lam : (val ->> exp') ->> val
+
+and exp' where
+| z' : exp'
+| s' : exp' ->> exp'
+| lam' : (val ->> exp') ->> exp'
+| app' : exp' ->> exp' ->> exp'
+| vl : val -> exp'
+
+data evalv : (|- exp') -> (|- val) -> set where
+| ev-z' : evalv z' v-z
+| ev-s' : (e : |- exp') (v : |- val) -> evalv e v -> evalv (s' e) (v-s v)
+| ev-lam' : (e : (\0,x:val |- exp')) -> evalv (lam' (\x.e)) (v-lam (\x.e))
+| ev-app' : (e1 e2 : |- exp') (v v2 : |- val) (e : (\0,x:val |- exp')) -> evalv e1 (v-lam (\x.e))
+           -> evalv e2 v2 -> evalv (e[..;v2]) v -> evalv (app' e1 e2) v
+| ev-vl' : (v : |- val) -> evalv (vl v) v
+
+data rel: ctx -> ctx -> set where
+| empty : rel \0 \0
+| cons : (g h : ctx) -> rel g h -> rel (g,x:exp) (h,y:val)
+
+def conv : (g h : ctx) -> rel g h -> (g |- exp) -> (h |- exp') where
+| g h r z => z'
+| g h r (s e) => s' (conv g h r e)
+| g h r (lam (\x.e)) => lam' (\y.conv (g,x:exp) (h,y:val) (cons g h r) e)
+| g h r (app m n) => app' (conv g h r m) (conv g h r n)
+| ._ ._ (cons g h r) (g, x:exp :> x) => (h,x:val :> vl x)
+(*) | ._ ._ (cons g h r) x[^1] => (conv g h r x)
+(*) We need to extend pattern matching to parameter variables with substitutions
+
+def lift : (h : ctx) -> (h |- val) -> (h |- exp') where
+| h v-z => z'
+| h (v-s v) => s' (lift h v)
+| h (v-lam (\x.e)) => lam' (\x.e)
+
+def vnoc : (h g : ctx) -> rel g h -> (h |- exp') -> (g |- exp) where
+| h g r z' => z
+| h g r (s' e) => s (vnoc h g r e)
+| h g r (lam' (\x.e)) => lam (\y.vnoc (h,x:val) (g,y:exp) (cons g h r) e)
+| h g r (app' m n) => app (vnoc h g r m) (vnoc h g r n)
+| h g r (vl v) => vnoc h g r (lift h v)
+| ._ ._ (cons g h r) (h, x:val :> vl x) => (g,x:exp :> x)
+(*) | ._ ._ (cons g h r) x[^1] => (vnoc h g r x)
+
+
+data eq (A : set) (a : A) : A -> set where
+| refl : eq A a a
+
+def subst : (A : set) (P : A -> set) (a b : A) -> eq A a b -> P a -> P b where
+| A P a .a refl p => p
+
+def cong : (A B : set) (P : A -> B) (a1 a2 : A) -> eq A a1 a2  -> eq B (P a1) (P a2) where
+| A B P a .a refl => refl
+
+def cong2 : (A B C : set) (P : A -> B -> C) (a1 a2 : A) (b1 b2 : B) -> eq A a1 a2 -> eq B b1 b2 -> eq C (P a1 b1) (P a2 b2) where
+| A B C P a .a b .b refl refl => refl
+
+def conv-vnoc : (g h : ctx) (r : rel g h) (e : (g |- exp)) -> eq (g |- exp) (vnoc h g r (conv g h r e)) e where
+| g h r z => refl
+| g h r (s e) => cong (g |- exp) (g |- exp) (fn e => s e) (vnoc h g r (conv g h r e)) e (conv-vnoc g h r e)
+| g h r (lam (\x.e)) => cong (g,x:exp |- exp) (g |- exp) (fn e => lam (\x.e))
+                       (vnoc (h,y:val) (g,x:exp) (cons g h r) (conv (g,x:exp) (h,y:val) (cons g h r) e)) e
+                       (conv-vnoc (g,x:exp) (h,y:val) (cons g h r) e)
+(*) missing cases
+
+def vnoc-conv : (g h : ctx) (r : rel g h) (e : (h |- exp')) -> eq (h |- exp') e (conv g h r (vnoc h g r e)) = ?
+(*) missing cases
+
+data result : (c : |- exp) (d : |- val) -> set where
+| res : (c : |- exp) (d : |- val) (v0 : |- exp) -> eval c v0 -> eq (|- exp) (vnoc \0 \0 empty (lift \0 d)) v0 -> result c d
+
+def sound-s : (e : |- exp) (v : |- val) -> result e v -> result (s e) (v-s v) where
+| .e .v (res e v .(vnoc \0 \0 empty (lift \0 v)) d refl) =>
+  res (s e) (v-s v) (s (vnoc \0 \0 empty (lift \0 v))) (ev-s e (vnoc \0 \0 empty (lift \0 v)) d) refl
+
+def sound-app : (e1 e2 : |- exp) (v v2 : |- val) (e : (\0,y:val |- exp'))
+                -> result e1 (v-lam (\y.e)) -> result e2 v2 -> result (vnoc \0 \0 empty e[..;v2]) v -> result (app e1 e2) v = ?
+
+def sound : (e : |- exp) (v : |- val) -> evalv (conv \0 \0 empty e) v -> result e v where
+| z .v-z ev-z' => res z v-z z ev-z refl
+| (s e) .(v-s v) (ev-s' .(conv \0 \0 empty e) v d) => sound-s e v (sound e v d)
+| (lam (\x.e)) ._ (ev-lam' .(conv (\0,x:exp) (\0,y:val) (cons \0 \0 empty) e)) =>
+  res (lam (\x.e)) (v-lam (\y.conv (\0,x:exp) (\0,y:val) (cons \0 \0 empty) e)) (lam (\x.e)) (ev-lam e)
+      (conv-vnoc \0 \0 empty (lam (\x.e)))
+| (app e1 e2) .v (ev-app' .(conv \0 \0 empty e1) .(conv \0 \0 empty e2) v v2 e d1 d2 d3) =>
+  sound-app e1 e2 v v2 e (sound e1 (v-lam (\x.e)) d1) (sound e2 v2 d2)
+            (sound (vnoc \0 \0 empty e[..;v2]) v
+                   (subst (|- exp') (fn e => evalv e v) e[..;v2]
+                          (conv \0 \0 empty (vnoc \0 \0 empty e[..;v2])) (vnoc-conv \0 \0 empty e[..;v2]) d3))
+(*) Case for ev-vl' is impossible as conv only returns vl for variables but we're dealing with closed terms
