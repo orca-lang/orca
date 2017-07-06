@@ -26,7 +26,7 @@ let is_syntax = function
   | A.Nil -> true
   | _ -> false
 
-let compute_wkn (sign, cG) cP cP' =
+let compute_wkn (sign, cG) e cP cP' =
   let listify cP =
     let rec listify' = function
       | I.Nil -> None, []
@@ -54,7 +54,9 @@ let compute_wkn (sign, cG) cP cP' =
              raise (Error.Error ("Types in contexts cannot unify:\n" ^ Unify.print_unification_problem problem))
          in
          check_lists xs ys (I.Snoc(cP, n, simul_subst_syn sigma x))
-      | _ -> raise (Error.Error "Term cannot be of larger context than ambient one")
+      | _ -> raise (Error.Error ("Term " ^ Pretty.print_exp cG e ^ " is inferred to be in context "
+                                 ^ Pretty.print_bctx cG cP' ^ " which is larger than the context "
+                                 ^ Pretty.print_bctx cG cP ^ " in which it was found."))
     in
     let cP1 = match b1 with
       | None -> I.Nil
@@ -332,7 +334,7 @@ and infer_syn (sign, cG) cP (e : A.exp) =
        let e, t = infer (sign, cG) e in
        begin match t with
        | I.Box (cP', t') ->
-          let sigma = compute_wkn (sign, cG) cP cP' in
+          let sigma = compute_wkn (sign, cG) e cP cP' in
           I.Unbox (e, sigma, cP'), I.Clos (t', sigma, cP')
        | _ -> raise (Error.Error ("Expected a box type, got " ^ IP.print_exp t))
        end
@@ -370,7 +372,7 @@ and infer_syn (sign, cG) cP (e : A.exp) =
       (*   let sigma = compute_wkn (sign, cG) cP cP'' in *)
       (*   I.Lam(xs, I.AppL(I.Unbox(I.Var x, sigma, cP''), eta_tail (List.length xs))), I.Clos(t', sigma, cP'') *)
        | I.Box(cP', t') ->
-          let sigma = compute_wkn (sign, cG) cP cP' in
+          let sigma = compute_wkn (sign, cG) (I.Var x) cP cP' in
           I.Unbox(I.Var x, sigma, cP'), I.Clos(t', sigma, cP')
        | t -> raise (Error.Error ("Expected a box type, got " ^ IP.print_exp t))
        end
@@ -380,7 +382,7 @@ and infer_syn (sign, cG) cP (e : A.exp) =
     | A.Const n ->
        begin match lookup_sign sign n with
        | I.Box (cP', t') ->
-          let sigma = compute_wkn (sign, cG) cP cP' in
+          let sigma = compute_wkn (sign, cG) (I.Const n) cP cP' in
           I.Unbox(I.Const n, sigma, cP'), I.Clos(t', sigma, cP')
        | t -> raise (Error.Error ("Constant " ^ n ^ " has type " ^ PP.print_exp cG t ^ " where a syntactic type was expected."))
        end
