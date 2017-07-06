@@ -39,7 +39,7 @@ data rel: ctx -> ctx -> set where
 
 def tran : (g h : ctx) -> rel g h -> (st : |- s-tp) -> (g |- s-tm st) -> (h |- t-tm (tran-tp st)) where
 | g h r t (app s[^] .t m n) => tapp (tran-tp s) (tran-tp t) (tran g h r (arr s t) m) (tran g h r s n)
-| g h r (arr s t) (lam .s .t m) => tlam (tran-tp s) (tran-tp t) (\x. tran (g,x:s-tm s) (h,x:t-tm (tran-tp s)) (cons g h s r) t (m x))
+| g h r (arr s[^] t[^]) (lam .s .t m) => tlam (tran-tp s) (tran-tp t) (\x. tran (g,x:s-tm s[^]) (h,x:t-tm (tran-tp s)) (cons g h s r) t (m x))
 | g h r bool tt => tinl tunit tunit tone
 | g h r bool ff => tinr tunit tunit tone
 | g h r t (if .t b e1 e2) => tcase tunit tunit (tran-tp t) (tran g h r bool b)
