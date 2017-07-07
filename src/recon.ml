@@ -172,9 +172,9 @@ and check (sign , cG : signature * I.ctx) (e : A.exp) (t : I.exp) : I.exp =
          simul_subst sigma e
        with
        | Unify.Unification_failure prob ->
-          let string_e = IP.print_exp e in
-          let string_t = IP.print_exp t in
-          let string_t' = IP.print_exp t' in
+          let string_e = PP.print_exp cG e in
+          let string_t = PP.print_exp cG (Whnf.normalize sign t) in
+          let string_t' = PP.print_exp cG (Whnf.normalize sign t') in
           let message = "Expression: " ^ string_e
                         ^ "\nwas inferred type " ^ string_t'
                         ^ "\nwhich is not equal to " ^ string_t ^ " that was checked against."
