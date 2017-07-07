@@ -175,4 +175,27 @@ let rec lookup_constructors sign n =
     | _ :: sign' -> lookup_constructors sign' n
     | [] -> []
 
+let rec lookup_syn_constructors sign cP n =
+  match sign with
+  | SConstructor(c, tel, (n',ts)) :: sign' when n = n' ->
+    let extract_sigma sl = List.fold_right (fun (_, _, x) sigma -> Dot(sigma, x)) sl (Shift (List.length sl)) in
+    let extend_cP sl = List.fold_right (fun (x, s, _) cP -> Snoc(cP, x, s)) sl cP in
+    let rec abstract tel sl =
+      match tel with
+      | [] -> [], sl
+      | (i, x, s)::tel' ->
+         let cP' = extend_cP sl in
+         let sigma = extract_sigma sl in
+         let xn = Name.gen_name x in
+         let sl' = (x, s, Unbox(Var xn, Shift 0, cP')) :: sl in
+         let tel'', sl'' = abstract tel' sl'  in
+         (i, xn, Box(cP, Clos (s, sigma, cP')))::tel'', sl''
+    in
+    let tel', sl = abstract tel [] in
+    let sigma = extract_sigma sl in
+    let cP' = extend_cP sl in
+    (c, tel', List.map (fun e -> Clos(e, sigma, cP')) ts) :: lookup_syn_constructors sign' cP n
+    | _ :: sign' -> lookup_syn_constructors sign' cP n
+    | [] -> []
+
 let rec print_signature sign = "[" ^ String.concat "; " (List.map signature_entry_name sign) ^ "]"

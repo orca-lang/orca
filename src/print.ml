@@ -367,6 +367,9 @@ module Int = struct
       ^ String.concat "\nand "
       (List.map (fun (n, tel, e, decls) -> "(" ^ n ^ " (" ^ print_tel tel ^ ") "
         ^ print_exp e ^ "\n" ^ print_def_decls decls ^ ")") d) ^ ")"
-    | DefPMTree (n, tel, e, tree) -> "(def " ^ n ^ " (" ^ print_tel tel ^ ") " ^ print_exp e ^ "\n" ^ print_tree tree ^ ")"
+    | DefPMTree d -> "(deftree "
+      ^ String.concat "\nand "
+      (List.map (fun (n, e, tree) -> "(" ^ n ^ " ("
+        ^ print_exp e ^ "\n" ^ print_tree tree ^ ")" ^ ")") d) ^ ")"
     | Def (n, e1, e2) -> "(def " ^ n ^ " " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
 end

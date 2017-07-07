@@ -10,6 +10,11 @@ open Recon
 module I = Syntax.Int
 module IP = Print.Int
 
+let opt_split = ref false
+
+let set_split () =
+  opt_split := true
+
 let tc_constructor (sign , cG : signature * I.ctx) (u : I.universe) (tel : I.tel)
                    (n , tel', (n', es) : def_name * tel * dsig) : signature_entry * I.decl =
   Debug.print_string ("Typechecking constructor: " ^ n) ;
@@ -160,19 +165,33 @@ let tc_program (sign : signature) : program -> signature * I.program =
     in
     let def' = List.map process_type def in
     let sign_temp = List.map (fun (n, tel, t, ds) -> Program (n, tel, t, [], Stuck)) def' @ sign in
-    let rec process = function
-      | (n, tel, t, ds) :: def ->
-        Debug.print_string ("\nTypechecking pattern matching definition: " ^ n);
-        Debug.indent ();
-        let sentry, ds' = check_clauses sign_temp n tel t ds in
-        (* let _ = Split.check_clauses sign n t'' ds in *)
-        Debug.deindent ();
-        let sentries, def' = process def in
-        sentry :: sentries, (n, tel, t, ds') :: def'
-      | [] -> [], []
-    in
-    let sentries, def'' = process def' in
-    sentries @ sign, I.DefPM def''
+    if !opt_split then
+      let rec process = function
+        | (n, tel, t, ds) :: def ->
+          Debug.print_string ("\nTypechecking pattern matching definition: " ^ n);
+          Debug.indent ();
+          let sentry, tree = Split.check_clauses sign_temp n (I.Pi(tel, t)) ds in
+          Debug.deindent ();
+          let sentries, def' = process def in
+          sentry :: sentries, (n, I.Pi(tel, t), tree) :: def'
+        | [] -> [], []
+      in
+      let sentries, def'' = process def' in
+      sentries @ sign, I.DefPMTree def''
+    else
+      let rec process = function
+        | (n, tel, t, ds) :: def ->
+          Debug.print_string ("\nTypechecking pattern matching definition: " ^ n);
+          Debug.indent ();
+          let sentry, ds' = check_clauses sign_temp n tel t ds in
+
+          Debug.deindent ();
+          let sentries, def' = process def in
+          sentry :: sentries, (n, tel, t, ds') :: def'
+        | [] -> [], []
+      in
+      let sentries, def'' = process def' in
+      sentries @ sign, I.DefPM def''
   | Def (n, t, e) ->
      Debug.print_string ("Typechecking definition: " ^ n);
      Debug.indent ();
