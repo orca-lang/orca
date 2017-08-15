@@ -1,4 +1,4 @@
-(*) Simple examples wit syntax level natural numbers
+(*) Simple examples with syntax level natural numbers
 
 syn nat where
 | z : nat
