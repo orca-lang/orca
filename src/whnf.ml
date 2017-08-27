@@ -1,7 +1,7 @@
 open Syntax
 open Syntax.Int
 open Print.Int
-open Meta
+open MetaOp
 open MetaSub
 open Sign
 open Util

@@ -1,6 +1,6 @@
 open Sign
 open Name
-open Meta
+open MetaOp
 open Syntax.Int
 
 val unify : signature * ctx -> exp -> exp -> ctx * subst

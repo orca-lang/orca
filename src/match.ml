@@ -9,7 +9,7 @@ module A = Syntax.Apx
 module AP = Print.Apx
 module I = Syntax.Int
 module IP = Print.Int
-open Meta
+open MetaOp
 open MetaSub
 
 type ctx_map = pats

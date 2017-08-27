@@ -2,7 +2,7 @@ open Sign
 open Syntax
 open Syntax.Apx
 open Print.Apx
-open Meta
+open MetaOp
 open MetaSub
 open Match
 open Recon

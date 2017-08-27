@@ -1,7 +1,7 @@
 open Name
 open Syntax
 open Print
-open Meta
+open MetaOp
 open MetaSub
 module A = Syntax.Apx
 module I = Syntax.Int
