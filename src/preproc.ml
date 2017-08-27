@@ -22,7 +22,7 @@ module EP = Print.Ext
 module A = Syntax.Apx
 module AP = Print.Apx
 
-open Location
+open Loc
 
 type sign = E.name list (* The signature for types *)
 type ctx = (E.name * Name.name) list  (* The context for regular variables *)

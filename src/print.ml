@@ -13,7 +13,7 @@ module Ext = struct
   open Syntax.Ext
 
   let rec print_exp e =
-    match Location.content e with
+    match Loc.content e with
     | Star -> "*"
     | Set n -> "set" ^ string_of_int n
     | Arr (t, e) -> "(" ^ print_exp t ^ " -> " ^ print_exp e ^ ")"

@@ -120,10 +120,10 @@ let () =
      exit 1
   | Error.Error_loc (pos, msg) ->
      Debug.print_string ("An error occured while processing the input:\n" ^ msg
-                        ^ "\n at position " ^ Location.string_of_position pos) ;
+                        ^ "\n at position " ^ Loc.string_of_position pos) ;
      Printf.printf "An error occured while processing your input.\n\t%s\nAt %s.\n"
                    msg
-                   (Location.string_of_position pos);
+                   (Loc.string_of_position pos);
      exit 1
 
   | Error.Error msg ->

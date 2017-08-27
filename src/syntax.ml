@@ -13,7 +13,7 @@ module Ext = struct
   type name = string
   module N = Name
 
-  type exp = raw_exp Location.t
+  type exp = raw_exp Loc.t
   and raw_exp
     = Star
     | Set of int

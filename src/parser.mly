@@ -40,23 +40,23 @@ let unwrap_or def = function
 
 located(X):
   x = X
-  { Location.make $startpos $endpos x }
+  { Loc.make $startpos $endpos x }
 
 program:
 | d = toplevel* EOF {d}
 
 toplevel:
 | DATA s = IDENT p = params t = type_dec? WHERE option(MID) d = separated_list (MID, decl)
-    {Data (s, p, unwrap_or (Location.ghost (Set 0)) t, d)}
+    {Data (s, p, unwrap_or (Loc.ghost (Set 0)) t, d)}
 | CODATA s = IDENT p = params t = type_dec? WHERE option (AMP) d = separated_list (AMP, decl)
-    {Codata (s, p, unwrap_or (Location.ghost (Set 0)) t, d)}
+    {Codata (s, p, unwrap_or (Loc.ghost (Set 0)) t, d)}
 | SPEC s = separated_nonempty_list(AND, spec)
     {Spec s}
 | DEF d = separated_nonempty_list(AND, def) {DefPM d}
 | DEF f = IDENT COLON t = exp EQ e = exp {Def (f, t, e)}
 
 spec:
-| s = IDENT t = type_dec? WHERE option(MID) d = separated_list (MID, decl) {(s, unwrap_or (Location.ghost Star) t, d)}
+| s = IDENT t = type_dec? WHERE option(MID) d = separated_list (MID, decl) {(s, unwrap_or (Loc.ghost Star) t, d)}
 
 def:
 | f = IDENT COLON t = exp WHERE option(MID) d = separated_list (MID, def_decl) {(f, t, d)}
@@ -82,7 +82,7 @@ exp:
 raw_exp:
 | g =  exp TTS e = exp {ABox (g, e)}
 | g = exp TURNSTILE e = exp {Box (g, e)}
-| TURNSTILE e = exp {Box (Location.ghost Nil, e)}
+| TURNSTILE e = exp {Box (Loc.ghost Nil, e)}
 | e1 = exp e2 = almost_simple_exp {App (e1, e2)}
 | e1 = exp APPL e2 = exp {AppL (e1, e2)}
 | e1 = exp COLON e2 = exp {Annot (e1, e2)}
