@@ -151,7 +151,7 @@ let apply_inv_pat_subst e s =
     | Dot (s, e), s' -> Dot (apply_inv s s', apply_inv e s')
     | Comp _, _-> assert false
     | ShiftS _, _-> assert false
-    | SCtx, _ -> SCtx
+    | SCtx t, _ -> SCtx t
     | SConst n, _ -> SConst n
     | Unbox(e, s', cP), _ -> Unbox (e, apply_inv s' s, cP)
   in
@@ -195,7 +195,7 @@ let apply_inv_subst e s =
     | Dot (s, e), s' -> Dot (apply_inv s s', apply_inv e s')
     | Comp _, _-> assert false
     | ShiftS _, _-> assert false
-    | SCtx, _ -> SCtx
+    | SCtx t, _ -> SCtx t
     | SConst n, _ -> SConst n
     | Unbox(e, s', cP), _ -> Unbox (e, apply_inv s' s, cP)
     | _ -> raise (Error.Violation ("Failed to apply inverse substitution " ^ print_syn_exp s

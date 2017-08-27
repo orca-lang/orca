@@ -463,7 +463,7 @@ let rec normalize sign (e : exp) =
   | Box (cP, e) ->
     let cP' = normalize_bctx sign cP in
     Box (cP', normalize_syn sign cP e)
-  | Ctx  -> Ctx
+  | Ctx e  -> Ctx (normalize_syn sign Nil e)
   | Const n -> Const n
   | Var x -> Var x
   | Fn (xs, e) -> Fn (xs, norm e)
@@ -501,7 +501,7 @@ and normalize_syn sign cP e =
      let tel', cP' = List.fold_left f ([], cP) tel in
      SPi (tel', normalize_syn sign cP' t)
    | SBCtx cP -> SBCtx (normalize_bctx sign cP)
-   | SCtx  -> SCtx
+   | SCtx t -> SCtx (norm t)
    | Unbox (e,s, cP') ->
      let cP'' = normalize_bctx sign cP' in
      Unbox (normalize sign e, norm s, cP'')

@@ -177,7 +177,9 @@ and fmt_exp cG parens pps e =
      Fmt.pf pps "?%a"
             Name.fmt_name n
 
-  | Ctx -> string pps "ctx"
+  | Ctx e ->
+     Fmt.pf pps "ctx %a"
+            (fmt_syn_exp cG Nil 1) e (* cP = Nil really? *)
 
   | Pi (tel, e) ->
     Fmt.pf pps "%s%a%s"
@@ -236,7 +238,9 @@ and fmt_syn_exp cG cP parens pps e =
   let close_paren p = if parens < p then ")" else "" in
   match e with
   | Star -> string pps "*"
-  | SCtx -> string pps "ctx"
+  | SCtx t ->
+     Fmt.pf pps "ctx %a"
+            (fmt_syn_exp cG cP 1) t
 
   | SBCtx cP -> fmt_bctx cG pps cP
 

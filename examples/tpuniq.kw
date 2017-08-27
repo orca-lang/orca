@@ -20,7 +20,7 @@ data eq (A : set) (y : A) : A -> set where
 thm proj_eq_arr : (S1 S2 : |- tp) (T1 T2 : |- tp) -> eq (|- tp) (arr S1 T1) (arr S2 T2) -> eq (|- tp) T1 T2 where
 | s .s t .t refl => refl
 
-thm uniqueness : (g : ctx) (M : (g |- tm)) (S T : |- tp) -> (g |- oft M S[^]) -> (g |- oft M T[^]) -> eq (|- tp) S T where
+thm uniqueness : (g : ctx tm) (M : (g |- tm)) (S T : |- tp) -> (g |- oft M S[^]) -> (g |- oft M T[^]) -> eq (|- tp) S T where
 | g one unit unit t-unit t-unit => refl
 | g (app M N) T1 T2 (t-app .M .N S1[^] .(T1[^]) D1 E1) (t-app .M .N S2[^] .(T2[^]) D2 E2) =>
   proj_eq_arr S1 S2 T1 T2 (uniqueness g M (arr S1 T1) (arr S2 T2) D1 D2)

@@ -282,7 +282,7 @@ let split_box (sign : signature) (cD : ctx) (qs : pats)
     | AppL (SConst c, sp) -> split_sconst sign cD cP qs (n, p) c, sp
     | SPi (tel, t) -> split_lam sign cD cP qs (n, p) (tel, t), []
     | SBCtx cP' -> raise Error.NotImplemented
-    | SCtx -> raise (Error.Error "Context are irrelevant")
+    | SCtx _ -> raise (Error.Error "Context are irrelevant")
     | _ -> raise (Error.Error "Cannot split on this constructor")
   in
   let rec unify = function

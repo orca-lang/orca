@@ -103,9 +103,11 @@ let rec infer (sign, cG : signature * I.ctx) (e : A.exp) : I.exp * I.exp =
     | A.Pi (tel, t) ->
        check_pi (sign, cG) tel t
 
-    | A.Ctx -> I.Ctx, I.Set 0
+    | A.Ctx e  ->
+       let e' = check_syn_type (sign, cG) I.Nil e in
+       I.Ctx e', I.Set 0
     | A.Box (g, e) ->
-      let cP = check_ctx (sign, cG) g in
+      let cP = is_ctx (sign, cG) g in (* MMMMMMM *)
       let e' = check_syn_type (sign, cG) cP e in
       I.Box(cP, e'), I.Set 0
 
@@ -154,7 +156,7 @@ and check (sign , cG : signature * I.ctx) (e : A.exp) (t : I.exp) : I.exp =
     | _, I.Box (cP, alpha) when is_syntax e ->
        I.TermBox (cP, check_syn (sign, cG) cP e alpha)
 
-    | _, I.Ctx when is_syntax e -> I.BCtx (check_ctx (sign, cG) e)
+    | _, I.Ctx t when is_syntax e -> I.BCtx (check_ctx (sign, cG) e t)
 
     | _ ->
        let e, t' =
@@ -247,19 +249,49 @@ and check_syn_type (sign, cG) cP (e : A.exp) : I.syn_exp =
     | _ -> raise (Error.Error (AP.print_exp e ^ " is not a syntactic type."))
   in Debug.deindent (); res
 
-and check_ctx (sign, cG) g =
+and check_ctx (sign, cG) g t =
   match g with
   | A.Snoc (g, x, e) ->
-    let cP = check_ctx (sign, cG) g in
-    I.Snoc (cP, x, check_syn_type (sign, cG) cP e)
+    let cP = check_ctx (sign, cG) g t in
+    let t' = check_syn_type (sign, cG) cP e in
+    let _ = Unify.unify_syn (sign, cG) cP t t' in (* For the moment we ignore the sigma *)
+    I.Snoc (cP, x, t')
   | A.Nil -> I.Nil
   | A.Var x ->
     begin match lookup_ctx_fail cG x with
-    | I.Ctx -> I.CtxVar x
+    | I.Ctx _ -> I.CtxVar x     (* Maybe we want to have a type annotation with I.CtxVar *)
     | _ -> raise (Error.Error ("Variable " ^ print_name x ^ " was expected to be a context variable."))
     end
   | _ -> raise (Error.Error ("Expression " ^ AP.print_exp g ^ " was expected to be a context."))
 
+and infer_ctx (sign, cG) g =
+  match g with
+  | A.Snoc (g, x, e) ->
+    let cP, t = infer_ctx (sign, cG) g in
+    let t' = check_syn_type (sign, cG) cP e in
+    let _ = Unify.unify_syn (sign, cG) cP t t' in (* For the moment we ignore the sigma *)
+    I.Snoc (cP, x, t), t
+  | A.Nil -> raise (Error.Error "Cannot infer the type of an empty context")
+  | A.Var x ->
+    begin match lookup_ctx_fail cG x with
+    | I.Ctx t -> I.CtxVar x, t
+    | _ -> raise (Error.Error ("Variable " ^ print_name x ^ " was expected to be a context variable."))
+    end
+  | _ -> raise (Error.Error ("Expression " ^ AP.print_exp g ^ " was expected to be a context."))
+
+and is_ctx (sign, cG) g =
+  match g with
+  | A.Snoc (g, x, e) ->
+    let cP = is_ctx (sign, cG) g in
+    let t = check_syn_type (sign, cG) cP e in
+    I.Snoc (cP, x, t)
+  | A.Nil -> I.Nil
+  | A.Var x ->
+    begin match lookup_ctx_fail cG x with
+    | I.Ctx t -> I.CtxVar x
+    | _ -> raise (Error.Error ("Variable " ^ print_name x ^ " was expected to be a context variable."))
+    end
+  | _ -> raise (Error.Error ("Expression " ^ AP.print_exp g ^ " was expected to be a context."))
 
 and check_syn (sign, cG) cP (e : A.exp) (t : I.syn_exp) =
   let t' = Whnf.rewrite sign cP t in
@@ -284,7 +316,8 @@ and check_syn (sign, cG) cP (e : A.exp) (t : I.syn_exp) =
        | _ -> I.Lam (fs', check_syn (sign, cG) cP' e (I.SPi (tel', t)))
        end
 
-    | _, I.SCtx -> I.SBCtx(check_ctx (sign, cG) e)
+    | _, I.SCtx t ->
+       I.SBCtx(check_ctx (sign, cG) e t)
     | A.Empty, I.SBCtx I.Nil -> I.Empty
     | A.Shift n, I.SBCtx cP' ->
       let cP'' = drop_suffix cP n in

@@ -133,7 +133,8 @@ let rec pproc_exp (s : sign) (cG : ctx) (cP : bctx) (e : E.exp) : A.exp =
   let res = match content e with
   | E.Star -> A.Star
   | E.Set n -> A.Set n
-  | E.Ctx -> A.Ctx
+  | E.App (e1, e2) when content e1 = E.Ctx -> A.Ctx (f e2)
+  | E.Ctx -> raise (Error.Error_loc (loc e, "Ctx needs to specify its schema"))
   (* | E.Arr (t0, t1) when is_syntax -> *)
   (*   let tel, t' = pproc_stel s cG cP is_syntax e in *)
   (*   I.SPi (tel, t') *)

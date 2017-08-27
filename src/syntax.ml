@@ -80,7 +80,7 @@ module Apx = struct
     | Pi of tel * exp  (* A pi type *)
     | SPi of stel * exp (* A syntactic type *)
     | Box of exp * exp
-    | Ctx (* of exp *) (* Let's think about it *)
+    | Ctx of exp
     | Const of def_name (* The name of a constant *)
     | Var of name
     | Fn of name list * exp
@@ -155,7 +155,7 @@ module Int = struct
     = Set of universe
     | Pi of tel * exp  (* A pi type *)
     | Box of bctx * syn_exp
-    | Ctx
+    | Ctx of syn_exp
     | Const of def_name (* The name of a constant *)
     | Var of name
     | Fn of name list * exp
@@ -179,7 +179,7 @@ module Int = struct
     | Star (* Universe of syntax *)
     | SPi of stel * syn_exp (* A syntactic type *)
     | SBCtx of bctx
-    | SCtx
+    | SCtx of syn_exp
     | Unbox of exp * syn_exp * bctx
 
   and bctx

@@ -90,7 +90,7 @@ module Apx = struct
   let rec print_exp = function
     | Set n -> print_universe n
     | Star -> "*"
-    | Ctx -> "ctx"
+    | Ctx e -> "ctx" ^ " " ^ print_exp e
     | Pi (tel, t) -> print_pi tel t
     | SPi (tel, t) -> print_spi tel t
     | Box (ctx, e) -> "(" ^ print_exp ctx ^ " |- " ^ print_exp e ^ ")"
@@ -208,7 +208,7 @@ module Int = struct
   let rec print_exp = function
     | Set n -> print_universe n
 
-    | Ctx -> "ctx"
+    | Ctx e -> "ctx " ^ print_syn_exp e
     | Pi (tel, t) -> print_pi tel t
 
     | Box (ctx, e) -> "(" ^ print_bctx ctx ^ " |- " ^ print_syn_exp e ^ ")"
@@ -236,7 +236,7 @@ module Int = struct
     | Dot (s, e) -> "(" ^ print_syn_exp s ^ " ; " ^ print_syn_exp e ^ ")"
     | Clos (e, s, cP) -> "(" ^ print_syn_exp e ^ " [" ^ print_syn_exp s ^ " : " ^ print_bctx cP ^ "])"
     | Unbox (e, se, cP) -> "(ub " ^ print_exp e ^ "[" ^ print_syn_exp se ^ " : " ^ print_bctx cP  ^ "])"
-    | SCtx -> "ctx"
+    | SCtx e -> "ctx " ^ print_syn_exp e
     | SBCtx cP -> print_bctx cP
 
   and print_bctx cP =

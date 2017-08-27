@@ -1,0 +1,23 @@
+(*) The untyped lambda calculus
+
+spec tm where
+| app: tm -> tm -> tm
+| lam: (tm ->> tm) -> tm
+
+spec tp where
+
+
+(*) Step 1
+
+def copy : (g : ctx tm) -> (g |- tm) -> (g |- tm) where
+| g (app M N) => app (copy g M) (copy g N)
+| g (lam (\x. M)) => lam (\x. copy (g, tm) M)
+| g (<:x) => x
+
+(*) Step 2
+
+def copy' : (g : ctx tm) -> (g |- tm) -> (g |- tm) where
+| g (app M N) => app (copy g M) (copy g N)
+| g (lam (\x. M)) => lam (\x. copy (g, tm) M)
+(*) | (g, x: tm) (g, x: tm :> x) => (g, x: tm :> x)
+(*) | (g, x: tm) v[^1] => (copy' g v)[^1]
