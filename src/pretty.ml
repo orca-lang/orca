@@ -177,9 +177,9 @@ and fmt_exp cG parens pps e =
      Fmt.pf pps "?%a"
             Name.fmt_name n
 
-  | Ctx e ->
+  | Ctx sch ->
      Fmt.pf pps "ctx %a"
-            (fmt_syn_exp cG Nil 1) e (* cP = Nil really? *)
+            (fmt_schema cG 1) sch
 
   | Pi (tel, e) ->
     Fmt.pf pps "%s%a%s"
@@ -238,9 +238,9 @@ and fmt_syn_exp cG cP parens pps e =
   let close_paren p = if parens < p then ")" else "" in
   match e with
   | Star -> string pps "*"
-  | SCtx t ->
+  | SCtx sch ->
      Fmt.pf pps "ctx %a"
-            (fmt_syn_exp cG cP 1) t
+            (fmt_schema cG 1) sch
 
   | SBCtx cP -> fmt_bctx cG pps cP
 
@@ -314,6 +314,11 @@ and fmt_syn_exp cG cP parens pps e =
       (fmt_syn_exp cG cP 3) e1
       (fmt_syn_exp cG cP 2) e2
       (close_paren 3)
+
+and fmt_schema cG parens pps = function
+  | SimpleType t ->
+     Fmt.pf pps "%a"
+            (fmt_syn_exp cG Nil parens) t
 
 and fmt_bctx cG pps = function
   | Nil -> string pps "0"

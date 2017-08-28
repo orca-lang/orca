@@ -93,7 +93,6 @@ raw_exp:
 | s = exp COMMA e = exp {Comma (s, e)}
 | s = exp SEMICOLON e = exp {Semicolon (s, e)}
 
-
 almost_simple_exp:
 | e = simple_exp {e}
 | e = located(raw_almost_simple_exp) {e}
@@ -114,8 +113,10 @@ raw_simple_exp:
 | n = SHIFT {Shift n}
 | n = INDEX {BVar n}
 | NIL {Nil}
-| CTX {Ctx}
+| CTX sch=schema {Ctx sch}
 
+schema:
+| e = located(raw_simple_exp) {SimpleType e}
 
 
 simple_pattern:

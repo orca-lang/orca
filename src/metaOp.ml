@@ -17,7 +17,7 @@ let rec fv cG =
   let fv e = fv cG e in
   function
   | Set _ -> []
-  | Ctx e -> fv_syn cG e
+  | Ctx (SimpleType e) -> fv_syn cG e
   | BCtx cP -> fv_ctx cG cP
   | Pi (tel, t) -> fv_pi cG tel t
   | Box (ctx, e) -> fv_ctx cG ctx @ fv_syn cG e
@@ -49,7 +49,7 @@ and fv_syn cG =
   | Unbox (e, s, cP) ->
      fv cG e @ fvs s @ fv_ctx cG cP
   | SBCtx cP -> fv_ctx cG cP
-  | SCtx t -> fvs t
+  | SCtx (SimpleType t) -> fvs t
 
 and fv_ctx cG = function
   | Nil -> []
@@ -103,7 +103,7 @@ let rec refresh_exp (rep : (name * name) list) : exp -> exp =
   function
   | Set n -> Set n
 
-  | Ctx e -> Ctx (refresh_syn_exp rep e)
+  | Ctx (SimpleType e) -> Ctx (SimpleType (refresh_syn_exp rep e))
   | Pi (tel, t) -> let tel', t' = refresh_tel rep tel t in Pi(tel', t')
 
   | Box (cP, e) -> Box(refresh_bctx rep cP, refresh_syn_exp rep e)
@@ -128,7 +128,7 @@ and refresh_syn_exp rep =
   let f x = refresh_syn_exp rep x in
   function
   | Star -> Star
-  | SCtx t -> SCtx (f t)
+  | SCtx (SimpleType t) -> SCtx (SimpleType (f t))
   | SPi (tel, t) -> let tel', t' = refresh_stel rep tel t in SPi(tel', t')
   | Lam (x, e) ->
      Lam(x, f e)
@@ -177,7 +177,7 @@ let rec refresh_free_var (x , y : name * name) (e : exp) : exp =
   let f e = refresh_free_var (x, y) e in
   match e with
   | Set n -> Set n
-  | Ctx e -> Ctx (refresh_free_var_syn (x, y) e)
+  | Ctx (SimpleType e) -> Ctx (SimpleType (refresh_free_var_syn (x, y) e))
   | Pi (tel, t) ->
      let tel', t' = refresh_free_var_tel (x, y) tel t in
      Pi (tel', t')
@@ -197,7 +197,7 @@ and refresh_free_var_syn (x, y) e =
   let f e = refresh_free_var_syn (x, y) e in
   match e with
   | Star -> Star
-  | SCtx t -> SCtx (f t)
+  | SCtx (SimpleType t) -> SCtx (SimpleType (f t))
   | SPi (tel, t) ->
      let tel', t' = refresh_free_var_stel (x, y) tel t in
      SPi (tel', t')
@@ -247,7 +247,7 @@ let rec subst (x, es : single_subst) (e : exp) :  exp =
   let f e = subst (x, es) e in
   match e with
   | Set n -> Set n
-  | Ctx e -> Ctx (subst_syn (x, es) e)
+  | Ctx (SimpleType e) -> Ctx (SimpleType (subst_syn (x, es) e))
   | Pi (tel, t) ->
      let tel', t' = subst_pi (x, es) tel t in
      Pi(tel', t')
@@ -273,7 +273,7 @@ and subst_syn (x, es) e =
   let f e = subst_syn (x, es) e in
   match e with
   | Star -> Star
-  | SCtx t -> SCtx (f t)
+  | SCtx (SimpleType t) -> SCtx (SimpleType (f t))
   | SPi (tel, t) ->
      let tel', t' = subst_spi (x, es) tel t in
      SPi(tel', t')

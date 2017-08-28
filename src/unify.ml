@@ -162,7 +162,7 @@ let rec unify_flex (sign, cG) flex e1 e2 =
      else
        raise (Unification_failure (Occur_check (n, e1)))
   | Annot(e1, e2), Annot(e1', e2') -> unify_many cG [e1;e2] [e1';e2']
-  | Ctx e, Ctx e' -> unify_flex_syn (sign, cG) Nil flex e e'
+  | Ctx (SimpleType t), Ctx (SimpleType t') -> unify_flex_syn (sign, cG) Nil flex t t'
   | BCtx cP, BCtx cP' -> unify_flex_bctx (sign, cG) flex cP cP'
   | _, Hole _
   | Hole _, _ -> cG, []
@@ -198,7 +198,7 @@ and unify_flex_syn (sign, cG) cP flex e1 e2 =
   | ShiftS (n, e), ShiftS (n', e') when n = n' -> unify_flex_syn (sign, cG) (drop_suffix cP n) flex e e'
   | Dot(e1, e2), Dot(e1', e2') -> unify_many_syn [e1;e2] [e1';e2']
   | Comp (e1, cP, e2), Comp(e1', cP', e2') -> (* unify_many cG [e1;e2] [e1';e2'] *) assert false
-  | SCtx t, SCtx t' -> unify_flex_syn (sign, cG) cP flex t t'
+  | SCtx (SimpleType t), SCtx (SimpleType t') -> unify_flex_syn (sign, cG) cP flex t t'
   | SBCtx cP, SBCtx cP' -> unify_flex_bctx (sign, cG) flex cP cP'
   | Star, Star -> cG, []
   (* (\* This is comparing eta long and eta short versions *\) *)

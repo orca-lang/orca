@@ -36,7 +36,11 @@ module Ext = struct
     | Annot (e1, e2) -> "(: " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
     | Hole (Some s) -> "?" ^ s
     | Hole None -> "?"
-    | Ctx -> "ctx"
+    | Ctx sch -> "ctx" ^ print_schema sch
+
+  and print_schema =
+    function
+    | SimpleType e -> print_exp e
 
   let rec print_pat (p : pat) : string = match p with
     | PIdent n -> n
@@ -90,7 +94,7 @@ module Apx = struct
   let rec print_exp = function
     | Set n -> print_universe n
     | Star -> "*"
-    | Ctx e -> "ctx" ^ " " ^ print_exp e
+    | Ctx e -> "ctx " ^ print_schema e
     | Pi (tel, t) -> print_pi tel t
     | SPi (tel, t) -> print_spi tel t
     | Box (ctx, e) -> "(" ^ print_exp ctx ^ " |- " ^ print_exp e ^ ")"
@@ -109,6 +113,10 @@ module Apx = struct
     | Nil -> "0"
     | Annot (e1, e2) -> "(" ^ print_exp e1 ^ " : " ^ print_exp e2 ^ ")"
     | Hole s -> "?" ^ print_name s
+
+  and print_schema = function
+    | SimpleType t -> print_exp t
+
   and print_pi tel t = match tel with
     | [] -> print_exp t
     | (_, x, e) :: tel when is_name_floating x ->
@@ -208,7 +216,7 @@ module Int = struct
   let rec print_exp = function
     | Set n -> print_universe n
 
-    | Ctx e -> "ctx " ^ print_syn_exp e
+    | Ctx sch -> "ctx " ^ print_schema sch
     | Pi (tel, t) -> print_pi tel t
 
     | Box (ctx, e) -> "(" ^ print_bctx ctx ^ " |- " ^ print_syn_exp e ^ ")"
@@ -236,8 +244,11 @@ module Int = struct
     | Dot (s, e) -> "(" ^ print_syn_exp s ^ " ; " ^ print_syn_exp e ^ ")"
     | Clos (e, s, cP) -> "(" ^ print_syn_exp e ^ " [" ^ print_syn_exp s ^ " : " ^ print_bctx cP ^ "])"
     | Unbox (e, se, cP) -> "(ub " ^ print_exp e ^ "[" ^ print_syn_exp se ^ " : " ^ print_bctx cP  ^ "])"
-    | SCtx e -> "ctx " ^ print_syn_exp e
+    | SCtx sch -> "ctx " ^ print_schema sch
     | SBCtx cP -> print_bctx cP
+
+  and print_schema = function
+    | SimpleType t -> print_syn_exp t
 
   and print_bctx cP =
     let rec print = function

@@ -58,6 +58,7 @@ let rec main_scanner pos = lexer
   | "syn" -> add_word pos (Ulexing.lexeme_length lexbuf), SPEC
   | "spec" -> add_word pos (Ulexing.lexeme_length lexbuf), SPEC
   | "def" | "thm" | "lem" -> add_word pos (Ulexing.lexeme_length lexbuf), DEF
+  | "ctx" -> add_word pos (Ulexing.lexeme_length lexbuf), CTX
   | "|" -> add_word pos (Ulexing.lexeme_length lexbuf), MID
   | "=>" -> add_word pos (Ulexing.lexeme_length lexbuf), RARR
   | "->" -> add_word pos (Ulexing.lexeme_length lexbuf), ARR
@@ -101,7 +102,6 @@ let rec main_scanner pos = lexer
   | "set" numeral -> add_word pos (Ulexing.lexeme_length lexbuf)
                    , SET (int_of_string (remove_set (Ulexing.utf8_lexeme lexbuf)))
   | "set" -> add_word pos (Ulexing.lexeme_length lexbuf), SET 0
-  | "ctx" -> add_word pos (Ulexing.lexeme_length lexbuf), CTX
   | "._" -> add_word pos (Ulexing.lexeme_length lexbuf), PATTERNWILD
   | hole -> add_word pos (Ulexing.lexeme_length lexbuf)
           , HOLE (Some (remove_leading_char '?' (Ulexing.utf8_lexeme lexbuf)))

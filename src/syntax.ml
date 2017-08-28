@@ -35,7 +35,10 @@ module Ext = struct
     | Semicolon of exp * exp
     | Nil
     | Annot of exp * exp
-    | Ctx
+    | Ctx of schema
+
+  and schema
+    = SimpleType of exp
 
   type pat =
     | PIdent of name
@@ -80,7 +83,7 @@ module Apx = struct
     | Pi of tel * exp  (* A pi type *)
     | SPi of stel * exp (* A syntactic type *)
     | Box of exp * exp
-    | Ctx of exp
+    | Ctx of schema
     | Const of def_name (* The name of a constant *)
     | Var of name
     | Fn of name list * exp
@@ -96,6 +99,9 @@ module Apx = struct
     | Nil
     | Annot of exp * exp
     | Hole of name
+
+  and schema
+    = SimpleType of exp
 
   and tel_entry = icit * name * exp
   and tel = tel_entry list
@@ -155,7 +161,7 @@ module Int = struct
     = Set of universe
     | Pi of tel * exp  (* A pi type *)
     | Box of bctx * syn_exp
-    | Ctx of syn_exp
+    | Ctx of schema
     | Const of def_name (* The name of a constant *)
     | Var of name
     | Fn of name list * exp
@@ -179,8 +185,12 @@ module Int = struct
     | Star (* Universe of syntax *)
     | SPi of stel * syn_exp (* A syntactic type *)
     | SBCtx of bctx
-    | SCtx of syn_exp
+    | SCtx of schema
     | Unbox of exp * syn_exp * bctx
+
+  and schema
+    = SimpleType of syn_exp
+
 
   and bctx
     = Nil

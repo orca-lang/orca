@@ -103,9 +103,9 @@ let rec infer (sign, cG : signature * I.ctx) (e : A.exp) : I.exp * I.exp =
     | A.Pi (tel, t) ->
        check_pi (sign, cG) tel t
 
-    | A.Ctx e  ->
+    | A.Ctx (A.SimpleType e)  ->
        let e' = check_syn_type (sign, cG) I.Nil e in
-       I.Ctx e', I.Set 0
+       I.Ctx (I.SimpleType e'), I.Set 0
     | A.Box (g, e) ->
       let cP = is_ctx (sign, cG) g in (* MMMMMMM *)
       let e' = check_syn_type (sign, cG) cP e in
@@ -249,12 +249,13 @@ and check_syn_type (sign, cG) cP (e : A.exp) : I.syn_exp =
     | _ -> raise (Error.Error (AP.print_exp e ^ " is not a syntactic type."))
   in Debug.deindent (); res
 
-and check_ctx (sign, cG) g t =
+and check_ctx (sign, cG) g sch =
   match g with
   | A.Snoc (g, x, e) ->
-    let cP = check_ctx (sign, cG) g t in
-    let t' = check_syn_type (sign, cG) cP e in
-    let _ = Unify.unify_syn (sign, cG) cP t t' in (* For the moment we ignore the sigma *)
+     let I.SimpleType t = sch in
+     let cP = check_ctx (sign, cG) g sch in
+     let t' = check_syn_type (sign, cG) cP e in
+     let _ = Unify.unify_syn (sign, cG) cP t t' in (* For the moment we ignore the sigma *)
     I.Snoc (cP, x, t')
   | A.Nil -> I.Nil
   | A.Var x ->
@@ -274,7 +275,7 @@ and infer_ctx (sign, cG) g =
   | A.Nil -> raise (Error.Error "Cannot infer the type of an empty context")
   | A.Var x ->
     begin match lookup_ctx_fail cG x with
-    | I.Ctx t -> I.CtxVar x, t
+    | I.Ctx (I.SimpleType t) -> I.CtxVar x, t
     | _ -> raise (Error.Error ("Variable " ^ print_name x ^ " was expected to be a context variable."))
     end
   | _ -> raise (Error.Error ("Expression " ^ AP.print_exp g ^ " was expected to be a context."))
