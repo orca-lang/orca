@@ -9,3 +9,5 @@
 * add a printf-like interface to debug
 * Improve holes: add synthesizable holes
 * Improve holes: list their types when done
+
+** Lambdas that introduce multiple variables do so in the wrong order, this is done during preprocessing!!!
