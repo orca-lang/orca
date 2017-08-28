@@ -551,6 +551,54 @@ let rec fmt_defpm key pps = function
            (fmt_defpm "and") def
   | [] -> ()
 
+let rec ind sep = function
+  | 0 -> ""
+  | n -> sep ^ ind sep (n - 1)
+
+let rec fmt_tree dep pps = function
+  | Node (cG, pats, _t, n, trs) ->
+     Fmt.pf pps "%s* pats: [%a] split on: %a@,%a"
+            (ind "  " dep)
+            (fmt_pats cG) pats
+            (comp_var cG) n
+            (fmt_trees (dep+1)) trs
+
+
+  | Incomplete (cG, pats, e) ->
+     Fmt.pf pps "%s|-> %a <-- Incomplete"
+            (ind "  " dep)
+            (fmt_pats cG) pats
+
+  | Leaf (cG, pats, _t, Just body) ->
+     Fmt.pf pps "%s|-> %a => %a"
+            (ind "  " dep)
+            (fmt_pats cG) pats
+            (fmt_exp cG 1) body
+
+  | Leaf (cG, pats, e, Impossible n) ->
+     Fmt.pf pps "%s|-> impossible: %a"
+            (ind "  " dep)
+            (comp_var cG) n
+
+and fmt_trees dep pps = function
+  | tr :: trs ->
+     Fmt.pf pps "%a@,%a"
+            (fmt_tree dep) tr
+            (fmt_trees dep) trs
+  | [] -> ()
+
+
+let rec fmt_defpm_tree key pps = function
+  | (n, t, tr) :: def ->
+      Fmt.pf pps "%a %a : %a %a@,%a@,%a"
+            keyword "def"
+            const n
+            (fmt_exp [] never_paren) t
+            keyword "where"
+           (fmt_tree 0) tr
+           (fmt_defpm_tree "and") def
+  | [] -> ()
+
 let rec fmt_spec key pps = function
   | (n, [], ds) :: def ->
     Fmt.pf pps "%a %a %a@,%a@,%a"
@@ -642,7 +690,8 @@ let fmt_program pps = function
   (* printing specification types *)
   | Spec spec -> fmt_spec "spec" pps spec
 
-  | p -> string pps (Print.Int.print_program p)
+  | DefPMTree defs ->
+     fmt_defpm_tree "def" pps defs
 
 let fmt_programs pps ps =
   let rec fmt_programs pps = function
