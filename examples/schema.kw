@@ -5,19 +5,27 @@ spec tm where
 | lam: (tm ->> tm) -> tm
 
 spec tp where
+| foo : tp
+
+data one where 1 : one
+
+def s : one = 1
+def t : one = 1
 
 
 (*) Step 1
 
-def copy : (g : ctx tm) -> (g |- tm) -> (g |- tm) where
+def copy : (g : ctx {t : tp , s : tp} tm s t) -> (g |- tm) -> (g |- tm) where
+
+(*)def copy : (g : ctx tm) -> (g |- tm) -> (g |- tm) where
 | g (app M N) => app (copy g M) (copy g N)
 | g (lam (\x. M)) => lam (\x. copy (g, tm) M)
-| g (<:x) => x
+| g (<: x) => x
 
 (*) Step 2
 
 def copy' : (g : ctx tm) -> (g |- tm) -> (g |- tm) where
-| g (app M N) => app (copy g M) (copy g N)
-| g (lam (\x. M)) => lam (\x. copy (g, tm) M)
+| g (app M N) => app (copy' g M) (copy' g N)
+| g (lam (\x. M)) => lam (\x. copy' (g, tm) M)
 (*) | (g, x: tm) (g, x: tm :> x) => (g, x: tm :> x)
 (*) | (g, x: tm) v[^1] => (copy' g v)[^1]

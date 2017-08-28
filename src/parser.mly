@@ -24,7 +24,7 @@ open Syntax.Ext
 %right ARR SARR
 %left APPL
 
-%nonassoc STAR SHIFT SET EMPTYS IDENT NIL HOLE CTX INDEX
+%nonassoc STAR SHIFT SET EMPTYS IDENT NIL HOLE INDEX
 %right LPAREN
 
 %start <Syntax.Ext.program list>program
@@ -92,6 +92,7 @@ raw_exp:
 | s = exp SARR t = exp {SArr (s, t)}
 | s = exp COMMA e = exp {Comma (s, e)}
 | s = exp SEMICOLON e = exp {Semicolon (s, e)}
+| CTX sch=schema {Ctx sch}
 
 almost_simple_exp:
 | e = simple_exp {e}
@@ -113,11 +114,14 @@ raw_simple_exp:
 | n = SHIFT {Shift n}
 | n = INDEX {BVar n}
 | NIL {Nil}
-| CTX sch=schema {Ctx sch}
+
 
 schema:
-| e = located(raw_simple_exp) {SimpleType e}
+| e = simple_exp {SimpleType e}
+| LCURLY separated_nonempty_list(COMMA, schema_ex) RCURLY e=simple_exp {SimpleType e}
 
+schema_ex:
+| x=IDENT COLON e=located(raw_simple_exp) {x,e}
 
 simple_pattern:
 | x = IDENT {PIdent x}

@@ -36,7 +36,7 @@ module Ext = struct
     | Annot (e1, e2) -> "(: " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
     | Hole (Some s) -> "?" ^ s
     | Hole None -> "?"
-    | Ctx sch -> "ctx" ^ print_schema sch
+    | Ctx sch -> "ctx " ^ print_schema sch
 
   and print_schema =
     function
