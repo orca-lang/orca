@@ -126,7 +126,7 @@ and syn_check_match cP q p =
   | PEmpty, A.PEmpty -> true
   | PShift n, A.PShift n' when n = n' -> true
   | PBVar i, A.PBVar i' when i = i' -> true
-  | PSConst (n, qs), A.PConst (n', ps) when n = n' -> List.for_all2 (syn_check_match cP) qs ps
+  | PSConst (n, qs), A.PConst (n', ps) when n = n' -> syn_check_all cP qs ps
   | PSConst (n, ps), A.PConst (n', qs) -> false
   | PDot (s, q'), A.PDot (s', p') -> syn_check_match cP s s' && syn_check_match cP q' p'
   | _ -> false
@@ -139,6 +139,11 @@ and bctx_check_match q p =
 and check_all qs ps =
   match qs, ps with
   | q :: qs, p :: ps -> check_match q p && check_all qs ps
+  | [], _ -> true
+  | _ -> false  (* maybe we want to raise error/violation here... *)
+and syn_check_all cP qs ps =
+  match qs, ps with
+  | q :: qs, p :: ps -> syn_check_match cP q p && syn_check_all cP qs ps
   | [], _ -> true
   | _ -> false  (* maybe we want to raise error/violation here... *)
 
@@ -282,7 +287,7 @@ let split_box (sign : signature) (cD : ctx) (qs : pats)
     | AppL (SConst c, sp) -> split_sconst sign cD cP qs (n, p) c, sp
     | SPi (tel, t) -> split_lam sign cD cP qs (n, p) (tel, t), []
     | SBCtx cP' -> raise Error.NotImplemented
-    | SCtx _ -> raise (Error.Error "Context are irrelevant")
+    | SCtx _ -> raise (Error.Error "Contexts are irrelevant")
     | _ -> raise (Error.Error "Cannot split on this constructor")
   in
   let rec unify = function
@@ -300,10 +305,25 @@ let split_box (sign : signature) (cD : ctx) (qs : pats)
         Debug.print_string (Unify.print_unification_problem msg);
         None :: unify splits
   in
-  (* if cP <> Nil then *)
-  (*   let x = Name.gen_name "X" in *)
-  (*   Some ((x, Box (cP, t)) :: cD, simul_psubst_on_list sign [n, PTBox (cP, PPar x)] qs, [n, Var x]) :: unify splits *)
-  (* else *)
+  let rec admits_variables n = function
+    | Nil -> false
+    | CtxVar g -> begin try let _ = match lookup_ctx_fail cD g with
+                        | Ctx (SimpleType s) -> Unify.unify_syn (sign, cD) cP s t
+                        | Ctx (ExistType (tel, t')) ->
+                           let tel', sigma, cP' = abstract cP tel in
+                           let flex = List.map (fun (_, x, _) -> x) tel' in
+                           Unify.unify_flex_syn (sign, cD) cP flex (Clos (t, sigma, cP')) t'
+                        | _ -> raise (Error.Violation "Admits variable has bctx which is not a context")
+                      in true
+                  with Unify.Unification_failure _ -> false
+                  end
+    | Snoc (cP', _, s) -> try let _ = Unify.unify_syn (sign, cD) cP t (Clos (s, Shift (n+1), cP')) in true
+                          with Unify.Unification_failure _ -> admits_variables (n+1) cP'
+  in
+  if admits_variables 0 cP then
+    let x = Name.gen_name "X" in
+    Some ((x, Box (cP, t)) :: cD, simul_psubst_on_list sign [n, PTBox (cP, PPar x)] qs, [n, Var x]) :: unify splits
+  else
     unify splits
 
 let get_splits (sign : signature) (cD : ctx) (qs : pats)
