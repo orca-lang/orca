@@ -103,9 +103,7 @@ let rec infer (sign, cG : signature * I.ctx) (e : A.exp) : I.exp * I.exp =
     | A.Pi (tel, t) ->
        check_pi (sign, cG) tel t
 
-    | A.Ctx (A.SimpleType e)  ->
-       let e' = check_syn_type (sign, cG) I.Nil e in
-       I.Ctx (I.SimpleType e'), I.Set 0
+    | A.Ctx sch -> I.Ctx (check_schema (sign, cG) sch), I.Set 0
     | A.Box (g, e) ->
       let cP = is_ctx (sign, cG) g in (* MMMMMMM *)
       let e' = check_syn_type (sign, cG) cP e in
@@ -126,6 +124,15 @@ and infer_type (sign, cG : signature * I.ctx) (s : A.exp) : I.exp * I.universe =
   | t, e ->
      Debug.print (fun () -> "Assert universe failed for " ^ IP.print_exp e ^ ".") ;
      raise (Error.Error "Not a universe.")
+
+and check_schema (sign , cG : signature * I.ctx) (sch : A.schema) : I.schema =
+  match sch with
+  | A.SimpleType t ->
+     let t' = check_syn_type (sign, cG) I.Nil t in
+     I.SimpleType t'
+  | A.ExistType (tel, t) ->
+     let tel', t' = check_spi (sign, cG) I.Nil tel t in
+     I.ExistType (tel', t')
 
 and check (sign , cG : signature * I.ctx) (e : A.exp) (t : I.exp) : I.exp =
   let t' = Whnf.whnf sign t in
@@ -252,30 +259,16 @@ and check_syn_type (sign, cG) cP (e : A.exp) : I.syn_exp =
 and check_ctx (sign, cG) g sch =
   match g with
   | A.Snoc (g, x, e) ->
-     let I.SimpleType t = sch in
      let cP = check_ctx (sign, cG) g sch in
-     let t' = check_syn_type (sign, cG) cP e in
-     let _ = Unify.unify_syn (sign, cG) cP t t' in (* For the moment we ignore the sigma *)
-    I.Snoc (cP, x, t')
+     let t' = check_type_against_schema (sign, cG) cP e sch in
+     I.Snoc (cP, x, t')
+
   | A.Nil -> I.Nil
   | A.Var x ->
     begin match lookup_ctx_fail cG x with
-    | I.Ctx _ -> I.CtxVar x     (* Maybe we want to have a type annotation with I.CtxVar *)
-    | _ -> raise (Error.Error ("Variable " ^ print_name x ^ " was expected to be a context variable."))
-    end
-  | _ -> raise (Error.Error ("Expression " ^ AP.print_exp g ^ " was expected to be a context."))
-
-and infer_ctx (sign, cG) g =
-  match g with
-  | A.Snoc (g, x, e) ->
-    let cP, t = infer_ctx (sign, cG) g in
-    let t' = check_syn_type (sign, cG) cP e in
-    let _ = Unify.unify_syn (sign, cG) cP t t' in (* For the moment we ignore the sigma *)
-    I.Snoc (cP, x, t), t
-  | A.Nil -> raise (Error.Error "Cannot infer the type of an empty context")
-  | A.Var x ->
-    begin match lookup_ctx_fail cG x with
-    | I.Ctx (I.SimpleType t) -> I.CtxVar x, t
+    | I.Ctx sch' ->
+       let _ = Unify.unify_flex_schemata (sign, cG) [] sch sch' in (* we ignore the sigma *)
+       I.CtxVar x     (* Maybe we want to have a type annotation with I.CtxVar *)
     | _ -> raise (Error.Error ("Variable " ^ print_name x ^ " was expected to be a context variable."))
     end
   | _ -> raise (Error.Error ("Expression " ^ AP.print_exp g ^ " was expected to be a context."))
@@ -293,6 +286,18 @@ and is_ctx (sign, cG) g =
     | _ -> raise (Error.Error ("Variable " ^ print_name x ^ " was expected to be a context variable."))
     end
   | _ -> raise (Error.Error ("Expression " ^ AP.print_exp g ^ " was expected to be a context."))
+
+and check_type_against_schema (sign, cG) cP e sch =
+  let t' = check_syn_type (sign, cG) cP e in
+  let _, sigma = match sch with (* For the moment we ignore the sigma *)
+  | I.SimpleType t ->
+     Unify.unify_syn (sign, cG) cP t t'
+  | I.ExistType (tel, t) ->
+     let tel', sigma, cP' = abstract cP tel in
+     let flex = List.map (fun (_, x, _) -> x) tel' in
+     Unify.unify_flex_syn (sign, cG) cP flex (I.Clos (t, sigma, cP')) t'
+  in
+  simul_subst_syn sigma t'
 
 and check_syn (sign, cG) cP (e : A.exp) (t : I.syn_exp) =
   let t' = Whnf.rewrite sign cP t in

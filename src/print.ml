@@ -41,6 +41,9 @@ module Ext = struct
   and print_schema =
     function
     | SimpleType e -> print_exp e
+    | ExistType (params, e) -> "{" ^ String.concat ", "
+                                                   (List.map (fun (x, e) -> x ^ " : " ^ print_exp e) params)
+                               ^ "} " ^ print_exp e
 
   let rec print_pat (p : pat) : string = match p with
     | PIdent n -> n
@@ -116,6 +119,7 @@ module Apx = struct
 
   and print_schema = function
     | SimpleType t -> print_exp t
+    | ExistType (stel, e) -> "{" ^ print_stel stel ^ "} " ^ print_exp e
 
   and print_pi tel t = match tel with
     | [] -> print_exp t
@@ -125,6 +129,11 @@ module Apx = struct
   and print_spi tel t = match tel with
     | [] -> print_exp t
     | (_, x, e) :: tel -> "(" ^ x ^ " : " ^ print_exp e ^ ")->> " ^ print_spi tel t ^ ")"
+
+  (* TODO use this in print_spi *)
+  and print_stel (tel : stel) : string =
+    String.concat ", " (List.map (fun (_, x, e) -> "(" ^ x ^ ", " ^ print_exp e ^ ")") tel)
+
 
   let print_exps es = "(" ^ String.concat ", " (List.map print_exp es) ^ ")"
 
@@ -149,9 +158,6 @@ module Apx = struct
     String.concat ", " (List.map (fun (_, x, e) -> "(" ^ print_name x
                                                    ^ ", " ^ print_exp e ^ ")") tel)
 
-  (* TODO use this in print_spi *)
-  let print_stel (tel : stel) : string =
-    String.concat ", " (List.map (fun (_, x, e) -> "(" ^ x ^ ", " ^ print_exp e ^ ")") tel)
 
 
   let print_dsig ((d, es) : dsig) = "(" ^ d ^ " " ^ String.concat " " (List.map print_exp es) ^ ")"
@@ -249,6 +255,7 @@ module Int = struct
 
   and print_schema = function
     | SimpleType t -> print_syn_exp t
+    | ExistType (stel, e) -> "{" ^ print_stel stel ^ "} " ^ print_syn_exp e
 
   and print_bctx cP =
     let rec print = function
@@ -266,6 +273,9 @@ module Int = struct
   and print_spi tel t = match tel with
     | [] -> print_syn_exp t
     | (_, x, e) :: tel -> "(" ^ x ^ " : " ^ print_syn_exp e ^ ") ->> " ^ print_spi tel t
+
+  and print_stel (tel : stel) : string =
+    String.concat ", " (List.map (fun (_, x, e) -> "(" ^ x ^ ", " ^ print_syn_exp e ^ ")") tel)
 
   let print_exps es = "(" ^ String.concat ", " (List.map print_exp es) ^ ")"
   let print_syn_exps es = "(" ^ String.concat ", " (List.map print_syn_exp es) ^ ")"
@@ -304,10 +314,6 @@ module Int = struct
   let print_tel (tel : tel) : string =
     String.concat ", " (List.map (fun (_, x, e) -> "(" ^ print_name x
                                                    ^ ", " ^ print_exp e ^ ")") tel)
-
-  let print_stel (tel : stel) : string =
-    String.concat ", " (List.map (fun (_, x, e) -> "(" ^ x ^ ", " ^ print_syn_exp e ^ ")") tel)
-
 
   let print_dsig ((d, es) : dsig) = "(" ^ d ^ " " ^ String.concat " " (List.map print_exp es) ^ ")"
   let print_codsig ((m, d, es) : codsig) = "(" ^ print_name m ^ " : " ^ d ^ " " ^ String.concat " " (List.map print_exp es) ^ ")"

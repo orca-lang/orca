@@ -118,10 +118,10 @@ raw_simple_exp:
 
 schema:
 | e = simple_exp {SimpleType e}
-| LCURLY separated_nonempty_list(COMMA, schema_ex) RCURLY e=simple_exp {SimpleType e}
+| LCURLY params=separated_nonempty_list(COMMA, schema_ex) RCURLY e=simple_exp {ExistType (params, e)}
 
 schema_ex:
-| x=IDENT COLON e=located(raw_simple_exp) {x,e}
+| x=IDENT COLON e=simple_exp {x,e}
 
 simple_pattern:
 | x = IDENT {PIdent x}

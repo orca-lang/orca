@@ -12,6 +12,7 @@ type unification_problem
   | Occur_check_syn of name  * syn_exp
   | Expressions_dont_unify of name list * exp * exp
   | Expressions_dont_unify_syn of name list * syn_exp * syn_exp
+  | Schemata_dont_unify of name list * schema * schema
   | Universes_dont_match of int * int
   | Unequal_number_params of exp list * exp list
   | Unequal_number_params_syn of syn_exp list * syn_exp list
@@ -25,6 +26,8 @@ let print_unification_problem = function
      "Occurs check failed for " ^ print_name n ^ " in expression " ^ print_exp e ^ "."
   | Occur_check_syn (n, e) ->
      "Occurs check failed for " ^ print_name n ^ " in expression " ^ print_syn_exp e ^ "."
+  | Schemata_dont_unify (flex, sch1, sch2) ->
+     "Schemata do not unify"
   | Expressions_dont_unify (flex, e1, e2) ->
      "Expressions\ne1 = " ^ print_exp e1
      ^ "\ne2 = " ^ print_exp e2
@@ -117,7 +120,6 @@ let rem n cG = let cG' = List.filter (fun (x, _) -> x <> n) cG in
                                       ^ " from context " ^ print_ctx cG
                                       ^ "\nyielding " ^ print_ctx cG'); cG'
 
-
 let rec unify_flex (sign, cG) flex e1 e2 =
   let unify_flex = unify_flex (sign, cG) flex in
   let unify_many cG e1 e2 = unify_flex_many (sign, cG) flex e1 e2 in
@@ -168,6 +170,15 @@ let rec unify_flex (sign, cG) flex e1 e2 =
   | Hole _, _ -> cG, []
   | _, _ ->
      raise (Unification_failure(Expressions_dont_unify (flex, e1', e2')))
+
+and unify_flex_schemata (sign, cG) flex sch1 sch2 =
+  match sch1, sch2 with
+  | SimpleType t1, SimpleType t2 ->
+     unify_flex_syn (sign, cG) Nil flex t1 t2
+  | ExistType (tel1, t1), ExistType (tel2, t2) ->
+     unify_flex_spi (sign, cG) Nil flex tel1 t1 tel2 t2
+
+  | _, _ -> raise(Unification_failure(Schemata_dont_unify (flex, sch1, sch2)))
 
 and unify_flex_syn (sign, cG) cP flex e1 e2 =
   let is_flex n = List.mem n flex in

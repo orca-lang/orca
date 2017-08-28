@@ -66,25 +66,32 @@ let lookup_cons_entry (sign : signature) (c : def_name) : tel * dsig =
   | Constructor (_, tel, dsig) -> tel, dsig
   | _ -> raise (Error.Error ("Constant " ^ c ^ " was expected to be a constructor."))
 
+
+
+(* abstracts the stel to produce a telescope where each meta-variable
+   corresponds to each variable in stel, a substitution to perform
+   the abstraction, and the shorter cP *)
+let abstract (cP : bctx) (tel : stel) : tel * syn_exp * bctx =
+  let extract_sigma sl = List.fold_right (fun (_, _, x) sigma -> Dot(sigma, x)) sl (Shift (List.length sl)) in
+  let extend_cP sl = List.fold_right (fun (x, s, _) cP' -> Snoc(cP', x, s)) sl cP in
+  let rec abstract tel sl =
+    match tel with
+    | [] -> [], sl
+    | (i, x, s)::tel' ->
+       let cP' = extend_cP sl in
+       let sigma = extract_sigma sl in
+       let xn = Name.gen_name x in
+       let sl' = (x, s, Unbox(Var xn, Shift 0, cP')) :: sl in
+       let tel'', sl'' = abstract tel' sl'  in
+       (i, xn, Box(cP, Clos (s, sigma, cP')))::tel'', sl''
+  in
+  let tel', sl = abstract tel [] in
+  tel', extract_sigma sl, extend_cP sl
+
 let lookup_syn_cons_entry (sign : signature) (c : def_name) (cP : bctx) : tel * spec_dsig =
   match lookup_sign_entry sign c with
   | SConstructor (_, tel, (n, es)) ->
-    let extract_sigma sl = List.fold_right (fun (_, _, x) sigma -> Dot(sigma, x)) sl (Shift (List.length sl)) in
-    let extend_cP sl = List.fold_right (fun (x, s, _) cP -> Snoc(cP, x, s)) sl cP in
-    let rec abstract tel sl =
-      match tel with
-      | [] -> [], sl
-      | (i, x, s)::tel' ->
-         let cP' = extend_cP sl in
-         let sigma = extract_sigma sl in
-         let xn = Name.gen_name x in
-         let sl' = (x, s, Unbox(Var xn, Shift 0, cP')) :: sl in
-         let tel'', sl'' = abstract tel' sl'  in
-         (i, xn, Box(cP, Clos (s, sigma, cP')))::tel'', sl''
-    in
-    let tel', sl = abstract tel [] in
-    let sigma = extract_sigma sl in
-    let cP' = extend_cP sl in
+     let tel', sigma, cP' = abstract cP tel in
     tel', (n, List.map (fun e -> Clos(e, sigma, cP')) es)
   | _ -> raise (Error.Error ("Constant " ^ c ^ " was expected to be a syntactic constructor."))
 

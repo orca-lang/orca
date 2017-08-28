@@ -28,7 +28,7 @@ type sign = E.name list (* The signature for types *)
 type ctx = (E.name * Name.name) list  (* The context for regular variables *)
 type bctx = E.name list            (* The context for bound variables *)
 
-let add_name_bvars c n : bctx = n @ c
+let add_name_bvars cP ns : bctx = ns @ cP
 
 let rec lookup cG n =
   match cG with
@@ -133,8 +133,7 @@ let rec pproc_exp (s : sign) (cG : ctx) (cP : bctx) (e : E.exp) : A.exp =
   let res = match content e with
   | E.Star -> A.Star
   | E.Set n -> A.Set n
-  | E.Ctx (E.SimpleType t) ->
-     A.Ctx (A.SimpleType (f t))
+  | E.Ctx sch -> A.Ctx (pproc_schema s cG cP sch)
 
   (* | E.Arr (t0, t1) when is_syntax -> *)
   (*   let tel, t' = pproc_stel s cG cP is_syntax e in *)
@@ -191,6 +190,21 @@ let rec pproc_exp (s : sign) (cG : ctx) (cP : bctx) (e : E.exp) : A.exp =
   | E.Hole None -> A.Hole (Name.gen_name "H")
   in Debug.deindent ();
   res
+
+and pproc_schema (s : sign) (cG : ctx) (cP : bctx) (sch : E.schema) : A.schema =
+  match sch with
+  | E.SimpleType t -> A.SimpleType (pproc_exp s cG cP t)
+  | E.ExistType (params, t) ->
+     let rec f cP = function
+       | [] -> cP, []
+       | (x, t) :: params ->
+          let s' = pproc_exp s cG cP t in
+          let cP', stel = f (x :: cP) params in
+          cP', (Implicit, x, s') :: stel
+     in
+     let cP', stel = f cP params in
+     let t' = pproc_exp s cG cP' t in
+     A.ExistType (stel, t')
 
 and pproc_comma (s : sign) (cG : ctx) (cP : bctx) (g : E.exp) : bctx * A.exp =
   match content g with

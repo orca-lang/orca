@@ -1,13 +1,14 @@
 spec tp where
-| bool : tp
+| unit : tp
 | arr : tp ->> tp ->> tp
 
 spec tm : tp ->> * where
 | app : (s : tp) ->> (t : tp) ->> tm (arr s t) ->> tm s ->> tm t
 | lam : (s : tp) ->> (t : tp) ->> (tm s ->> tm t) ->> tm (arr s t)
-| tt : tm bool
-| ff : tm bool
-| if : (t : tp) ->> tm bool ->> tm t ->> tm t ->> tm t
+| one : tm unit
 
-def copy : (g : ctx {s : tp} (tm s)) -> (t : |- tp) -> (g |- tm t) -> (g |- tm t)  = ?
-(*) | x => ?
+def copy : (g : ctx {s : tp} (tm s)) -> (t : |- tp) -> (g |- tm t) -> (g |- tm t)  where
+| g t[^] (app s[^] ._ M N) => app s t (copy g (arr s t) M) (copy g s N)
+| g (arr s[^] t[^]) (lam ._ ._ (\x. M)) => lam s t (\x. copy (g, x: tm s) t[^] M)
+| g unit one => one
+| g t (<: x) => x

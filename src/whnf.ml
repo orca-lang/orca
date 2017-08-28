@@ -463,7 +463,7 @@ let rec normalize sign (e : exp) =
   | Box (cP, e) ->
     let cP' = normalize_bctx sign cP in
     Box (cP', normalize_syn sign cP e)
-  | Ctx (SimpleType t)  -> Ctx (SimpleType (normalize_syn sign Nil t))
+  | Ctx sch  -> Ctx (normalize_schema sign sch)
   | Const n -> Const n
   | Var x -> Var x
   | Fn (xs, e) -> Fn (xs, norm e)
@@ -474,6 +474,21 @@ let rec normalize sign (e : exp) =
   | TermBox (cP, e) ->
     let cP' = normalize_bctx sign cP in
     Box (cP', normalize_syn sign cP e)
+
+and normalize_schema sign = function
+  | SimpleType t -> SimpleType (normalize_syn sign Nil t)
+  | ExistType (tel, t) ->
+     let tel', cP' = normalize_stel sign Nil tel in
+     let t' = normalize_syn sign cP' t in
+     ExistType (tel', t')
+
+and normalize_stel sign cP tel =
+  let f (tel, cP) (i, x, t) =
+    let t' = normalize_syn sign cP t in
+    (tel @ [i, x, t']), Snoc(cP, x, t')
+  in
+  List.fold_left f ([], cP) tel
+
 
 and normalize_syn sign cP e =
   let norm e = normalize_syn sign cP e in
@@ -494,14 +509,10 @@ and normalize_syn sign cP e =
    | ShiftS (n, s) -> ShiftS (n, normalize_syn sign (drop_suffix cP n) s)
    | Star  -> Star
    | SPi (tel, t) ->
-     let f (tel, cP) (i, x, t) =
-       let t' = normalize_syn sign cP t in
-       (tel @ [i, x, t']), Snoc(cP, x, t')
-     in
-     let tel', cP' = List.fold_left f ([], cP) tel in
+     let tel', cP' = normalize_stel sign cP tel in
      SPi (tel', normalize_syn sign cP' t)
    | SBCtx cP -> SBCtx (normalize_bctx sign cP)
-   | SCtx (SimpleType t) -> SCtx (SimpleType (norm t))
+   | SCtx sch -> SCtx (normalize_schema sign sch)
    | Unbox (e,s, cP') ->
      let cP'' = normalize_bctx sign cP' in
      Unbox (normalize sign e, norm s, cP'')

@@ -17,7 +17,7 @@ let rec fv cG =
   let fv e = fv cG e in
   function
   | Set _ -> []
-  | Ctx (SimpleType e) -> fv_syn cG e
+  | Ctx sch -> fv_schema cG sch
   | BCtx cP -> fv_ctx cG cP
   | Pi (tel, t) -> fv_pi cG tel t
   | Box (ctx, e) -> fv_ctx cG ctx @ fv_syn cG e
@@ -49,7 +49,11 @@ and fv_syn cG =
   | Unbox (e, s, cP) ->
      fv cG e @ fvs s @ fv_ctx cG cP
   | SBCtx cP -> fv_ctx cG cP
-  | SCtx (SimpleType t) -> fvs t
+  | SCtx sch -> fv_schema cG sch
+
+and fv_schema cG = function
+  | SimpleType t -> fv_syn cG t
+  | ExistType (tel, t) -> fv_spi cG tel t
 
 and fv_ctx cG = function
   | Nil -> []
@@ -247,7 +251,7 @@ let rec subst (x, es : single_subst) (e : exp) :  exp =
   let f e = subst (x, es) e in
   match e with
   | Set n -> Set n
-  | Ctx (SimpleType e) -> Ctx (SimpleType (subst_syn (x, es) e))
+  | Ctx sch -> Ctx (sub_schema (x, es) sch)
   | Pi (tel, t) ->
      let tel', t' = subst_pi (x, es) tel t in
      Pi(tel', t')
@@ -269,11 +273,16 @@ let rec subst (x, es : single_subst) (e : exp) :  exp =
   | Annot (e1, e2) -> Annot(f e1, f e2)
   | Hole s -> Hole s
 
+and sub_schema (x, es) = function
+  | SimpleType t -> SimpleType (subst_syn (x, es) t)
+  | ExistType (tel, t) ->
+     let tel', t' = subst_spi (x, es) tel t in
+     ExistType(tel', t')
 and subst_syn (x, es) e =
   let f e = subst_syn (x, es) e in
   match e with
   | Star -> Star
-  | SCtx (SimpleType t) -> SCtx (SimpleType (f t))
+  | SCtx sch -> SCtx (sub_schema (x, es) sch)
   | SPi (tel, t) ->
      let tel', t' = subst_spi (x, es) tel t in
      SPi(tel', t')
