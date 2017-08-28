@@ -10,10 +10,10 @@ open Recon
 module I = Syntax.Int
 module IP = Print.Int
 
-let opt_split = ref false
+let opt_split = ref true
 
-let set_split () =
-  opt_split := true
+let set_nosplit () =
+  opt_split := false
 
 let tc_constructor (sign , cG : signature * I.ctx) (u : I.universe) (tel : I.tel)
                    (n , tel', (n', es) : def_name * tel * dsig) : signature_entry * I.decl =
