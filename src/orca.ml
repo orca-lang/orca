@@ -41,8 +41,8 @@ let args = [("-ext", Arg.Unit set_print_external, "Print external syntax before 
            ;("-verbose", Arg.Unit Debug.set_verbose_on, "Turns on verbose debugging")
            ;("-no-beauty", Arg.Unit Name.disable_beautify, "Turns off beautification in pretty printing")
            ;("-ansi-off", Arg.Unit disable_ansi, "Turns off ansi colours in pretty printing")
-           ;("-nosplit", Arg.Unit Prog.set_nosplit, ("Does not use split tree for pattern matching. "
-             ^ "Necessary for copatterns but currently incompatible with specifications."))
+           ;("-pm", Arg.Symbol (["old" ; "split" ; "new"], Prog.parse_pm_option)
+             ," Select the pattern matching implementation (Default: split).")
            ]
 
 let execute_code (sign : Sign.signature) (program : Syntax.Ext.program list) : Sign.signature =

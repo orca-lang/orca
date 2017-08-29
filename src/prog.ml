@@ -10,10 +10,18 @@ open Recon
 module I = Syntax.Int
 module IP = Print.Int
 
-let opt_split = ref true
+type pattern_matching_option
+  = Old
+  | Split
+  | New
 
-let set_nosplit () =
-  opt_split := false
+let current_pm = ref Split
+
+let parse_pm_option = function
+  | "old" -> current_pm := Old
+  | "split" -> current_pm := Split
+  | "new" -> current_pm := New
+  | _ -> raise (Error.Violation "Unknown pattern matching processor specified")
 
 let tc_constructor (sign , cG : signature * I.ctx) (u : I.universe) (tel : I.tel)
                    (n , tel', (n', es) : def_name * tel * dsig) : signature_entry * I.decl =
@@ -165,7 +173,8 @@ let tc_program (sign : signature) : program -> signature * I.program =
     in
     let def' = List.map process_type def in
     let sign_temp = List.map (fun (n, tel, t, ds) -> Program (n, tel, t, [], Stuck)) def' @ sign in
-    if !opt_split then
+    begin match !current_pm with
+    | Split ->
       let rec process = function
         | (n, tel, t, ds) :: def ->
           Debug.print_string ("\nTypechecking pattern matching definition: " ^ n);
@@ -178,7 +187,20 @@ let tc_program (sign : signature) : program -> signature * I.program =
       in
       let sentries, def'' = process def' in
       sentries @ sign, I.DefPMTree def''
-    else
+    | New ->
+      let rec process = function
+        | (n, tel, t, ds) :: def ->
+          Debug.print_string ("\nTypechecking pattern matching definition: " ^ n ^ " using the new split checker");
+          Debug.indent ();
+          let sentry, tree = Newsplit.check_clauses sign_temp n (I.Pi(tel, t)) ds in
+          Debug.deindent ();
+          let sentries, def' = process def in
+          sentry :: sentries, (n, I.Pi(tel, t), tree) :: def'
+        | [] -> [], []
+      in
+      let sentries, def'' = process def' in
+      sentries @ sign, I.DefPMTree def''
+    | Old ->
       let rec process = function
         | (n, tel, t, ds) :: def ->
           Debug.print_string ("\nTypechecking pattern matching definition: " ^ n);
@@ -192,6 +214,7 @@ let tc_program (sign : signature) : program -> signature * I.program =
       in
       let sentries, def'' = process def' in
       sentries @ sign, I.DefPM def''
+    end
   | Def (n, t, e) ->
      Debug.print_string ("Typechecking definition: " ^ n);
      Debug.indent ();
