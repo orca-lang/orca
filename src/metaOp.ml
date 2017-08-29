@@ -107,7 +107,8 @@ let rec refresh_exp (rep : (name * name) list) : exp -> exp =
   function
   | Set n -> Set n
 
-  | Ctx (SimpleType e) -> Ctx (SimpleType (refresh_syn_exp rep e))
+  | Ctx sch -> Ctx (refresh_schema rep sch)
+
   | Pi (tel, t) -> let tel', t' = refresh_tel rep tel t in Pi(tel', t')
 
   | Box (cP, e) -> Box(refresh_bctx rep cP, refresh_syn_exp rep e)
@@ -132,7 +133,7 @@ and refresh_syn_exp rep =
   let f x = refresh_syn_exp rep x in
   function
   | Star -> Star
-  | SCtx (SimpleType t) -> SCtx (SimpleType (f t))
+  | SCtx sch -> SCtx (refresh_schema rep sch)
   | SPi (tel, t) -> let tel', t' = refresh_stel rep tel t in SPi(tel', t')
   | Lam (x, e) ->
      Lam(x, f e)
@@ -147,6 +148,12 @@ and refresh_syn_exp rep =
   | Dot (e1, e2) -> Dot (f e1, f e2)
   | Unbox (e1, e2, cP) -> Unbox (refresh_exp rep e1, f e2, refresh_bctx rep cP)
   | SBCtx cP -> SBCtx (refresh_bctx rep cP)
+
+and refresh_schema rep = function
+  | SimpleType t -> SimpleType (refresh_syn_exp rep t)
+  | ExistType (tel, t) ->
+     let tel', t' = refresh_stel rep tel t in
+     ExistType (tel', t')
 
 and refresh_bctx (rep : (name * name) list) : bctx -> bctx =
   function
@@ -181,7 +188,7 @@ let rec refresh_free_var (x , y : name * name) (e : exp) : exp =
   let f e = refresh_free_var (x, y) e in
   match e with
   | Set n -> Set n
-  | Ctx (SimpleType e) -> Ctx (SimpleType (refresh_free_var_syn (x, y) e))
+  | Ctx sch -> Ctx (refresh_schema (x, y) sch)
   | Pi (tel, t) ->
      let tel', t' = refresh_free_var_tel (x, y) tel t in
      Pi (tel', t')
@@ -201,7 +208,7 @@ and refresh_free_var_syn (x, y) e =
   let f e = refresh_free_var_syn (x, y) e in
   match e with
   | Star -> Star
-  | SCtx (SimpleType t) -> SCtx (SimpleType (f t))
+  | SCtx sch -> SCtx (refresh_schema (x, y) sch)
   | SPi (tel, t) ->
      let tel', t' = refresh_free_var_stel (x, y) tel t in
      SPi (tel', t')
@@ -217,6 +224,12 @@ and refresh_free_var_syn (x, y) e =
   | ShiftS (n, e) -> ShiftS (n, f e)
   | Dot (e1, e2) -> Dot (f e1, f e2)
   | SBCtx cP -> SBCtx (refresh_free_var_bctx (x, y) cP)
+
+and refresh_schema (x, y) = function
+  | SimpleType t -> SimpleType (refresh_free_var_syn (x, y) t)
+  | ExistType (tel, t) ->
+     let tel', t' = refresh_free_var_stel (x, y) tel t in
+     ExistType (tel', t')
 
 and refresh_free_var_bctx (x, y) cP =
   match cP with
