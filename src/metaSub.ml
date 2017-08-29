@@ -3,6 +3,8 @@ open Syntax
 open Syntax.Int
 open Print.Int
 
+(* Utilities *)
+
 let rec append_bctx cP cP' =
   match cP with
   | Nil -> cP'
@@ -64,57 +66,34 @@ let drop_suffix cP n =
     in
     keep cP n
 
-(* Applying syntactic substitutions *)
+(* Substitution utilities *)
 
-(* let syn_subst_stel (sigma : exp) (cP : bctx) (tel : stel) : stel * exp = *)
-(*   let rec do_something i cP tel = *)
-(*     match tel with *)
-(*     | [] -> [], i *)
-(*     | (icit, n, tt)::tel' -> *)
-(*        let tel'', i' = do_something (i+1) (Snoc (cP, n, tt)) tel' in *)
-(*        (icit, n, Clos(tt, ShiftS (i, sigma), cP))::tel'', i' *)
+(* let rec wkn_pat_subst_by_n s = *)
+(*   let rec shift = function *)
+(*     | CShift n -> CShift (n+1) *)
+(*     | CEmpty -> CEmpty *)
+(*     | CDot (s, n) -> CDot (shift s, n+1) *)
 (*   in *)
-(*   let tel', i = do_something 0 cP tel in *)
-(*   tel', ShiftS (i, sigma) *)
+(*   function *)
+(*   | 0 -> s *)
+(*   | n -> wkn_pat_subst_by_n (CDot (shift s , 0)) (n-1) *)
 
-(* let rec ss_syn_subst_spi (e : exp) cP (tel : stel) : stel * exp = *)
-(*   syn_subst_stel (Dot (Shift 0, e)) cP tel *)
-
-(* let rec ss_syn_subst_stel (e : exp) (tel : stel) : stel = *)
-(*   fst (ss_syn_subst_spi e tel) *)
-
-(* let rec syn_subst_spi (sigma : exp) (tel : stel) (t : exp) : stel * exp = *)
-(*   let tel', sigma' = syn_subst_stel sigma tel in *)
-(*   tel', Clos(t, sigma') *)
-
-let bctx_of_lam_pars cP xs = List.fold_left (fun cP (x, t) -> Snoc(cP, x, t)) cP xs
-
-let rec wkn_pat_subst_by_n s =
-  let rec shift = function
-    | CShift n -> CShift (n+1)
-    | CEmpty -> CEmpty
-    | CDot (s, n) -> CDot (shift s, n+1)
-  in
-  function
-  | 0 -> s
-  | n -> wkn_pat_subst_by_n (CDot (shift s , 0)) (n-1)
-
-let rec lookup_pat_subst err i s = match i, s with
-  | 0, CDot (_, j) -> j
-  | i, CDot (s', _) -> lookup_pat_subst err (i-1) s'
-  | i, CShift n -> (i + n)
-  | i, CEmpty -> raise (Error.Error err)
+(* let rec lookup_pat_subst err i s = match i, s with *)
+(*   | 0, CDot (_, j) -> j *)
+(*   | i, CDot (s', _) -> lookup_pat_subst err (i-1) s' *)
+(*   | i, CShift n -> (i + n) *)
+(*   | i, CEmpty -> raise (Error.Error err) *)
 
 
-let rec comp_pat_subst err s s' =
-  match s, s' with
-  | CShift n, CShift n' -> CShift (n + n')
-  | _, CEmpty -> CEmpty
-  | CEmpty, CShift _ -> raise (Error.Error err)
-  | CEmpty, CDot _ -> raise (Error.Error err)
-  | s, CDot(s', x) ->
-     CDot(comp_pat_subst err s s', lookup_pat_subst err x s)
-  | CDot (s', x), CShift n -> comp_pat_subst err s' (CShift (n-1))
+(* let rec comp_pat_subst err s s' = *)
+  (* match s, s' with *)
+  (* | CShift n, CShift n' -> CShift (n + n') *)
+  (* | _, CEmpty -> CEmpty *)
+  (* | CEmpty, CShift _ -> raise (Error.Error err) *)
+  (* | CEmpty, CDot _ -> raise (Error.Error err) *)
+  (* | s, CDot(s', x) -> *)
+  (*    CDot(comp_pat_subst err s s', lookup_pat_subst err x s) *)
+  (* | CDot (s', x), CShift n -> comp_pat_subst err s' (CShift (n-1)) *)
 
 exception Inv_fail
 

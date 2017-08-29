@@ -256,6 +256,8 @@ and refresh_free_var_stel (x, y) tel t =
 let refresh_free_vars (rep : (name * name) list) e =
   List.fold_left (fun e (y, y') -> refresh_free_var (y, y') e) e rep
 
+(* Operations on terms *)
+
 (* Substitution of regular variables *)
 
 let fv_subst cG sigma = List.concat (List.map (fun (n, e) -> fv cG e -- n) sigma)
@@ -424,3 +426,133 @@ let rec rename_ctx_using_subst (cG : ctx) (sigma : subst) =
      | _ -> (x, t) :: (rename_ctx_using_subst cG' sigma)
 
 let print_subst sigma = "[" ^ String.concat ", " (List.map (fun (x, e) -> print_exp e ^ "/" ^ print_name x) sigma) ^ "]"
+
+
+(* Operations on patterns *)
+
+let bctx_of_lam_pars cP xs = List.fold_left (fun cP (x, t) -> Snoc(cP, x, t)) cP xs
+
+(* Substitution utilities *)
+
+let rec wkn_pat_subst_by_n s =
+  let rec shift = function
+    | CShift n -> CShift (n+1)
+    | CEmpty -> CEmpty
+    | CDot (s, n) -> CDot (shift s, n+1)
+  in
+  function
+  | 0 -> s
+  | n -> wkn_pat_subst_by_n (CDot (shift s , 0)) (n-1)
+
+let rec lookup_pat_subst err i s = match i, s with
+  | 0, CDot (_, j) -> j
+  | i, CDot (s', _) -> lookup_pat_subst err (i-1) s'
+  | i, CShift n -> (i + n)
+  | i, CEmpty -> raise (Error.Error err)
+
+let rec comp_pat_subst err s s' =
+  match s, s' with
+  | CShift n, CShift n' -> CShift (n + n')
+  | _, CEmpty -> CEmpty
+  | CEmpty, CShift _ -> raise (Error.Error err)
+  | CEmpty, CDot _ -> raise (Error.Error err)
+  | s, CDot(s', x) ->
+     CDot(comp_pat_subst err s s', lookup_pat_subst err x s)
+  | CDot (s', x), CShift n -> comp_pat_subst err s' (CShift (n-1))
+
+type single_psubst = name * pat
+type psubst = single_psubst list
+
+let rec psubst sign (x, p') = function
+  | PVar n when n = x -> p'
+  | PVar n -> PVar n
+  | Inacc e -> Inacc (subst (x, exp_of_pat p') e)
+  | PConst (n, ps) -> PConst (n, List.map (psubst sign (x, p')) ps)
+  | PBCtx cP -> PBCtx (bctx_psubst sign (x, p') cP)
+  | PUnder -> PUnder
+  | PTBox (cP, p) -> let cP' = subst_bctx (x, exp_of_pat p') cP in
+                       PTBox (cP', syn_psubst sign cP' (x, p') p)
+and syn_psubst sign cP (x, p') = function
+  | PBVar i -> PBVar i
+  | PLam (xs, p) -> PLam (xs, syn_psubst sign (bctx_of_lam_pars cP xs) (x, p') p) (* What about shifts in p'? *)
+  | PSConst (n, ps) -> PSConst (n, List.map (syn_psubst sign cP (x, p')) ps)
+  | PUnbox (n, s, cP') when n = x ->
+     begin match p' with
+       | PVar m -> PUnbox (m, s, cP')
+       | Inacc e -> SInacc (e, s, cP')
+       | PTBox (cP'', q) ->  (* cP' should be equal to cP'' *)
+          let rec push_unbox (s, cP') = function
+            | PBVar i ->
+               PBVar (lookup_pat_subst ("Expected term " ^ print_syn_pat q ^ " to be closed") i s)
+            | PLam (xs , p) -> PLam(xs, push_unbox (wkn_pat_subst_by_n s (List.length xs), bctx_of_lam_pars cP' xs) p)
+            | PSConst (n,ps) -> PSConst (n, List.map (push_unbox (s, cP')) ps)
+            | PUnbox (m, s', cP'') ->
+               PUnbox (m, comp_pat_subst ("Mismatching substitution from term " ^ print_syn_pat q) s s', cP'')
+            | SInacc (e, s', cP'') ->
+               SInacc (e, comp_pat_subst ("Mismatching substitution from term " ^ print_syn_pat q) s s', cP'')
+            | PEmpty  -> PEmpty
+            | PShift n ->
+               let rec comp s n =
+                 match s, n with
+                 | _, 0 ->
+                    let rec convert = function
+                      | CEmpty -> PEmpty
+                      | CShift n -> PShift n
+                      | CDot (s, i) -> PDot (convert s, PBVar i)
+                    in
+                    convert s
+                 | CDot (s', _), _ -> comp s' (n-1)
+                 | CShift n', _ -> PShift (n+n')
+                 | CEmpty, _ -> raise (Error.Error ("Empty substitution applied to a shift."))
+               in
+               comp s n
+            | PDot (sigma, p) -> PDot (push_unbox (s, cP') sigma, push_unbox (s, cP') p)
+            | PPar n -> PPar n
+
+          in
+          push_unbox (s, cP') q
+       | _ -> assert false
+     end
+  | PUnbox (n, s, cP) -> PUnbox (n, s, cP)
+  | SInacc (e, s, cP) -> SInacc (subst (x, exp_of_pat p') e, s, cP)
+  | PEmpty -> PEmpty
+  | PShift n -> PShift n
+  | PDot (s, p) -> PDot (syn_psubst sign cP (x, p') s, syn_psubst sign cP (x, p') p)
+  | PPar n when n = x ->
+    begin match p' with
+    | PVar m -> PUnbox (m, pid_sub, cP)
+    | Inacc e -> SInacc (e, pid_sub, cP)
+    | PTBox (cP', q) -> assert false
+    | _ -> assert false
+    end
+  | PPar n -> PPar n
+
+
+and bctx_psubst sign (x, p') = function
+  | PNil -> PNil
+  | PSnoc (cP, s, t) -> PSnoc (bctx_psubst sign (x, p') cP, s, subst_syn (x, exp_of_pat p') t)
+  | PCtxVar n when n = x ->
+     begin match p' with
+     | PBCtx p -> p
+     | PVar m -> PCtxVar m
+     | _ -> raise (Error.Violation ("Why not?" ^ print_pat p'))
+     end
+  | PCtxVar n -> PCtxVar n
+
+let rec compose_single_with_psubst sign s = function
+  | [] -> []
+  | (y, t') :: sigma -> (y, psubst sign s t') :: (compose_single_with_psubst sign s sigma)
+
+let pats_of_psubst : psubst -> pats = List.map (fun (x, p) -> p)
+
+let simul_psubst sign sigma p =
+  List.fold_left (fun p s -> psubst sign s p) p sigma
+
+let simul_syn_psubst sign cP sigma p =
+  List.fold_left (fun p s -> syn_psubst sign cP s p) p sigma
+
+let simul_psubst_on_list sign sigma ps =
+  List.map (simul_psubst sign sigma) ps
+
+let simul_syn_psubst_on_list sign cP sigma ps =
+  List.map (simul_syn_psubst sign cP sigma) ps
