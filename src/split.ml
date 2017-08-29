@@ -50,41 +50,6 @@ and syn_check_all cP qs ps =
   | [], _ -> true
   | _ -> false  (* maybe we want to raise error/violation here... *)
 
-let rec rename (q : pat) (p : A.pat) : (name * name) list =
-  match q,p with
-  | PVar n, A.PVar m -> [n, m]
-  | PConst (_, qs), A.PConst (_, ps) -> rename_all qs ps
-  | PBCtx cP, p -> []
-  | PUnder, A.PUnder -> []
-  | PTBox (cP, q), p -> rename_syn q p
-  | Inacc (Var n), A.PVar m -> [n, m]
-  | PVar n, A.Inacc (A.Var m) -> [n, m]
-  | Inacc _, _ -> []                  (* can this be possible? *)
-  | _, A.Inacc _ -> []                    (* Should we do that here or in a check_inacc function? *)
-  | _, A.PWildcard -> []
-  | _ -> raise (Error.Violation "Renaming of tree node expects matching pattern with tree node")
-
-and rename_syn (q : syn_pat) (p : A.pat) : (name * name) list =
-  match q, p with
-  | PBVar _, A.PBVar _ -> []
-  | PPar n, A.PPar m -> [n, m]
-  | PLam (es, q), A.PLam (sl, p) -> rename_syn q p
-  | PSConst (_, qs), A.PConst (_, ps) -> rename_all_syn qs ps
-  | PUnbox (n, _, _), A.PVar m -> [n, m]
-  | SInacc _, A.Inacc _ -> []
-  | PEmpty, A.PEmpty -> []
-  | PShift _, A.PShift _ -> []
-  | PDot(sq, q), A.PDot (sp, p) -> rename_syn sq sp @ rename_syn q p
-  | PUnbox(n, s, cP), A.PClos(m, s') -> [n, m]
-  | PUnbox(n, s, cP), A.Inacc(A.Var m) -> [n, m]
-  | SInacc (Var n, s, cP), A.PVar m -> [n, m]
-  | _ -> raise (Error.Violation ("Renaming of tree node expects matching pattern with tree node\nq = "
-                                   ^ print_syn_pat q ^ "\np = " ^ AP.print_pat p))
-
-and rename_all (qs : pats) (ps : A.pats) : (name * name) list = List.concat (List.map2 rename qs ps)
-
-and rename_all_syn (qs : syn_pats) (ps : A.pats) : (name * name) list = List.concat (List.map2 rename_syn qs ps)
-
 let is_blocking = function
   | A.PVar _
   | A.PWildcard

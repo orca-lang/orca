@@ -556,3 +556,40 @@ let simul_psubst_on_list sign sigma ps =
 
 let simul_syn_psubst_on_list sign cP sigma ps =
   List.map (simul_syn_psubst sign cP sigma) ps
+
+
+
+let rec rename (q : pat) (p : Apx.pat) : (name * name) list =
+  match q,p with
+  | PVar n, Apx.PVar m -> [n, m]
+  | PConst (_, qs), Apx.PConst (_, ps) -> rename_all qs ps
+  | PBCtx cP, p -> []
+  | PUnder, Apx.PUnder -> []
+  | PTBox (cP, q), p -> rename_syn q p
+  | Inacc (Var n), Apx.PVar m -> [n, m]
+  | PVar n, Apx.Inacc (Apx.Var m) -> [n, m]
+  | Inacc _, _ -> []                  (* can this be possible? *)
+  | _, Apx.Inacc _ -> []                    (* Should we do that here or in a check_inacc function? *)
+  | _, Apx.PWildcard -> []
+  | _ -> raise (Error.Violation "Renaming of tree node expects matching pattern with tree node")
+
+and rename_syn (q : syn_pat) (p : Apx.pat) : (name * name) list =
+  match q, p with
+  | PBVar _, Apx.PBVar _ -> []
+  | PPar n, Apx.PPar m -> [n, m]
+  | PLam (es, q), Apx.PLam (sl, p) -> rename_syn q p
+  | PSConst (_, qs), Apx.PConst (_, ps) -> rename_all_syn qs ps
+  | PUnbox (n, _, _), Apx.PVar m -> [n, m]
+  | SInacc _, Apx.Inacc _ -> []
+  | PEmpty, Apx.PEmpty -> []
+  | PShift _, Apx.PShift _ -> []
+  | PDot(sq, q), Apx.PDot (sp, p) -> rename_syn sq sp @ rename_syn q p
+  | PUnbox(n, s, cP), Apx.PClos(m, s') -> [n, m]
+  | PUnbox(n, s, cP), Apx.Inacc(Apx.Var m) -> [n, m]
+  | SInacc (Var n, s, cP), Apx.PVar m -> [n, m]
+  | _ -> raise (Error.Violation ("Renaming of tree node expects matching pattern with tree node\nq = "
+                                   ^ print_syn_pat q ^ "\np = " ^ Print.Apx.print_pat p))
+
+and rename_all (qs : pats) (ps : Apx.pats) : (name * name) list = List.concat (List.map2 rename qs ps)
+
+and rename_all_syn (qs : syn_pats) (ps : Apx.pats) : (name * name) list = List.concat (List.map2 rename_syn qs ps)
