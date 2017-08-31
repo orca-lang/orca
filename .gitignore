@@ -30,3 +30,6 @@ setup.log
 # emacs lock files
 \.#*
 \#*#
+
+# other files
+*.agdai
