@@ -38,8 +38,7 @@ module Ext = struct
     | Ctx of schema
 
   and schema
-    = SimpleType of exp
-    | ExistType of (name * exp) list * exp
+    = Schema of (name * exp) list * (name * exp) list
 
   type pat =
     | PIdent of name
@@ -102,8 +101,7 @@ module Apx = struct
     | Hole of name
 
   and schema
-    = SimpleType of exp
-    | ExistType of stel * exp
+    = Schema of (string * exp) list * (string * exp) list
 
   and tel_entry = icit * name * exp
   and tel = tel_entry list
@@ -191,8 +189,7 @@ module Int = struct
     | Unbox of exp * syn_exp * bctx
 
   and schema
-    = SimpleType of syn_exp
-    | ExistType of stel * syn_exp
+    = Schema of (string * syn_exp) list * (string * syn_exp) list
 
   and bctx
     = Nil

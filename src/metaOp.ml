@@ -52,8 +52,8 @@ and fv_syn cG =
   | SCtx sch -> fv_schema cG sch
 
 and fv_schema cG = function
-  | SimpleType t -> fv_syn cG t
-  | ExistType (tel, t) -> fv_spi cG tel t
+  | Schema (impl, expl) -> List.concat (List.map (fun (_, t) -> fv_syn cG t) impl)
+                           @ List.concat (List.map (fun (_, t) -> fv_syn cG t) expl)
 
 and fv_ctx cG = function
   | Nil -> []
@@ -149,11 +149,11 @@ and refresh_syn_exp rep =
   | Unbox (e1, e2, cP) -> Unbox (refresh_exp rep e1, f e2, refresh_bctx rep cP)
   | SBCtx cP -> SBCtx (refresh_bctx rep cP)
 
-and refresh_schema rep = function
-  | SimpleType t -> SimpleType (refresh_syn_exp rep t)
-  | ExistType (tel, t) ->
-     let tel', t' = refresh_stel rep tel t in
-     ExistType (tel', t')
+and refresh_schema rep = assert false(* function *)
+  (* | SimpleType t -> SimpleType (refresh_syn_exp rep t) *)
+  (* | ExistType (tel, t) -> *)
+  (*    let tel', t' = refresh_stel rep tel t in *)
+  (*    ExistType (tel', t') *)
 
 and refresh_bctx (rep : (name * name) list) : bctx -> bctx =
   function
@@ -225,11 +225,11 @@ and refresh_free_var_syn (x, y) e =
   | Dot (e1, e2) -> Dot (f e1, f e2)
   | SBCtx cP -> SBCtx (refresh_free_var_bctx (x, y) cP)
 
-and refresh_schema (x, y) = function
-  | SimpleType t -> SimpleType (refresh_free_var_syn (x, y) t)
-  | ExistType (tel, t) ->
-     let tel', t' = refresh_free_var_stel (x, y) tel t in
-     ExistType (tel', t')
+and refresh_schema (x, y) = assert false (* function *)
+  (* | SimpleType t -> SimpleType (refresh_free_var_syn (x, y) t) *)
+  (* | ExistType (tel, t) -> *)
+  (*    let tel', t' = refresh_free_var_stel (x, y) tel t in *)
+  (*    ExistType (tel', t') *)
 
 and refresh_free_var_bctx (x, y) cP =
   match cP with
@@ -288,11 +288,11 @@ let rec subst (x, es : single_subst) (e : exp) :  exp =
   | Annot (e1, e2) -> Annot(f e1, f e2)
   | Hole s -> Hole s
 
-and sub_schema (x, es) = function
-  | SimpleType t -> SimpleType (subst_syn (x, es) t)
-  | ExistType (tel, t) ->
-     let tel', t' = subst_spi (x, es) tel t in
-     ExistType(tel', t')
+and sub_schema (x, es) = assert false (* function *)
+  (* | SimpleType t -> SimpleType (subst_syn (x, es) t) *)
+  (* | ExistType (tel, t) -> *)
+  (*    let tel', t' = subst_spi (x, es) tel t in *)
+  (*    ExistType(tel', t') *)
 and subst_syn (x, es) e =
   let f e = subst_syn (x, es) e in
   match e with

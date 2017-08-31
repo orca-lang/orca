@@ -12,20 +12,25 @@ spec oft : tm -> tp -> * where
 | t-app: (f e : tm) (s t : tp) -> oft f (arr s t) -> oft e s -> oft (app f e) t
 | t-lam: (e : tm ->> tm) (s t : tp) -> ((x:tm) ->> oft x s ->> oft (e x) t) -> oft (lam e) (arr s t)
 
-def copy : (g : ctx tm) -> (g |- tm) -> (g |- tm) where
-| g one => one
-| g (app M N) => app (copy g M) (copy g N)
-| g (lam (\x. M)) => lam (\x. copy (g, tm) M)
-| g (<:x) => x
+def copy-oft : (g : ctx {t : tp} (tm)) (m : (g |- tm)) (t : (|- tp)) -> (g |- oft m t) -> (g |- oft m t) = ?
 
+(*) def copy : (g : ctx tm) -> (g |- tm) -> (g |- tm) where
+(*) | g one => one
+(*) | g (app M N) => app (copy g M) (copy g N)
+(*) | g (lam (\x. M)) => lam (\x. copy (g, tm) M)
+(*) | g (<:x) => x
+
+
+(*
 def copy-oft : (g : ctx tm) (m : (g |- tm)) (t : (|- tp)) -> (g |- oft m t) -> (g |- oft m t) where
 | g one unit t-unit => t-unit
 | g (app f e) t (t-app .f .e s[^] .t d1 d2) =>
   t-app f e s t (copy-oft g f (arr s t) d1) (copy-oft g e s d2)
-| g (lam m) (arr s t) (t-lam .m .s .t d) =>
-  t-lam m s t (\x. \u. (copy-oft (g,x:tm,oft x s) (m x) t (d x u)))
-| g m t (<: d) => d
+(*) | g (lam m) (arr s t) (t-lam .m .s .t d) =>
+(*)   t-lam m s t (\x. \u. (copy-oft (g,x:tm,u: oft x s) (m x) t (d x u)))
+(*) | g m t (<: d) => d
 
+(*
 def oft-copy : (g : ctx tm) (m : (g |- tm)) (t : |- tp) -> (g |- oft m t) -> (g |- oft (copy g m) t) where
 | g one unit t-unit => t-unit
 | g (app m n) t (t-app .m .n s[^] .t d1 d2) =>
@@ -33,3 +38,5 @@ def oft-copy : (g : ctx tm) (m : (g |- tm)) (t : |- tp) -> (g |- oft m t) -> (g 
 | g (lam m) (arr s t) (t-lam .m .s .t d) =>
   t-lam (\x.copy (g,x:tm) (m x)) s t (\x. \u. (oft-copy (g,x:tm,oft x s) (m x) t (d x u)))
 | g m t (<: d) => d
+*)
+*)

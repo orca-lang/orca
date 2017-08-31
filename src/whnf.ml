@@ -475,12 +475,13 @@ let rec normalize sign (e : exp) =
     let cP' = normalize_bctx sign cP in
     Box (cP', normalize_syn sign cP e)
 
-and normalize_schema sign = function
-  | SimpleType t -> SimpleType (normalize_syn sign Nil t)
-  | ExistType (tel, t) ->
-     let tel', cP' = normalize_stel sign Nil tel in
-     let t' = normalize_syn sign cP' t in
-     ExistType (tel', t')
+and normalize_schema sign = assert false
+(* function *)
+  (* | SimpleType t -> SimpleType (normalize_syn sign Nil t) *)
+  (* | ExistType (tel, t) -> *)
+  (*    let tel', cP' = normalize_stel sign Nil tel in *)
+  (*    let t' = normalize_syn sign cP' t in *)
+  (*    ExistType (tel', t') *)
 
 and normalize_stel sign cP tel =
   let f (tel, cP) (i, x, t) =

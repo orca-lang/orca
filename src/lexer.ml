@@ -67,6 +67,7 @@ let rec main_scanner pos = lexer
   | 0x2192 -> add_word pos (Ulexing.lexeme_length lexbuf), ARR  (* → *)
   | 0x21A0 -> add_word pos (Ulexing.lexeme_length lexbuf), SARR (* ↠ *)
   | ":" -> add_word pos (Ulexing.lexeme_length lexbuf), COLON
+  | ",," -> add_word pos (Ulexing.lexeme_length lexbuf), COMMACOMMA
   | "," -> add_word pos (Ulexing.lexeme_length lexbuf), COMMA
   | ";" -> add_word pos (Ulexing.lexeme_length lexbuf), SEMICOLON
   | "#" numeral -> add_word pos (Ulexing.lexeme_length lexbuf)

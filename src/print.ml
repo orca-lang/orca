@@ -38,12 +38,9 @@ module Ext = struct
     | Hole None -> "?"
     | Ctx sch -> "ctx " ^ print_schema sch
 
-  and print_schema =
-    function
-    | SimpleType e -> print_exp e
-    | ExistType (params, e) -> "{" ^ String.concat ", "
-                                                   (List.map (fun (x, e) -> x ^ " : " ^ print_exp e) params)
-                               ^ "} " ^ print_exp e
+  and print_schema (Schema (impl, expl)) =
+    let f ps = String.concat ", " (List.map (fun (x, t) -> x ^ " : " ^ print_exp t) ps) in
+    "{" ^ f impl ^ "}(" ^ f expl ^ ")"
 
   let rec print_pat (p : pat) : string = match p with
     | PIdent n -> n
@@ -117,9 +114,10 @@ module Apx = struct
     | Annot (e1, e2) -> "(" ^ print_exp e1 ^ " : " ^ print_exp e2 ^ ")"
     | Hole s -> "?" ^ print_name s
 
-  and print_schema = function
-    | SimpleType t -> print_exp t
-    | ExistType (stel, e) -> "{" ^ print_stel stel ^ "} " ^ print_exp e
+  and print_schema _ = "* some schema *"
+  (* and print_schema = function *)
+  (*   | SimpleType t -> print_exp t *)
+  (*   | ExistType (stel, e) -> "{" ^ print_stel stel ^ "} " ^ print_exp e *)
 
   and print_pi tel t = match tel with
     | [] -> print_exp t
@@ -254,8 +252,11 @@ module Int = struct
     | SBCtx cP -> print_bctx cP
 
   and print_schema = function
-    | SimpleType t -> print_syn_exp t
-    | ExistType (stel, e) -> "{" ^ print_stel stel ^ "} " ^ print_syn_exp e
+    | Schema (impl, expl) -> "{" ^ print_block_entries impl ^ "} (" ^ print_block_entries expl ^ ")"
+
+  and print_block_entry (n, t) = n ^ " : " ^ print_syn_exp t
+
+  and print_block_entries ns = String.concat ", " (List.map print_block_entry ns)
 
   and print_bctx cP =
     let rec print = function

@@ -13,7 +13,7 @@ open Syntax.Ext
 %token <string>IDENT
 %token <string option>HOLE
 %token EOF
-%token COMMA EMPTYS DOT NIL
+%token COMMA EMPTYS DOT NIL COMMACOMMA
 %token <int>INDEX
 %token <int>SHIFT
 
@@ -115,13 +115,16 @@ raw_simple_exp:
 | n = INDEX {BVar n}
 | NIL {Nil}
 
-
 schema:
-| e = simple_exp {SimpleType e}
-| LCURLY params=separated_nonempty_list(COMMA, schema_ex) RCURLY e=simple_exp {ExistType (params, e)}
+| e = simple_exp {Schema ([], ["_", e])}
+(* | LCURLY impl=separated_nonempty_list(COMMA, schema_ex) RCURLY e = simple_exp {Schema (impl, ["_", e])} *)
+| LCURLY impl=separated_nonempty_list(COMMA, schema_ex) RCURLY LPAREN expl=separated_nonempty_list(COMMA, schema_ex) RPAREN
+   {Schema (impl, expl)}
+| LPAREN expl=separated_nonempty_list(COMMA, schema_ex) RPAREN { Schema([], expl) }
 
 schema_ex:
 | x=IDENT COLON e=simple_exp {x,e}
+| e = simple_exp {"_", e}
 
 simple_pattern:
 | x = IDENT {PIdent x}

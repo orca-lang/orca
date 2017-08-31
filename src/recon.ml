@@ -125,14 +125,14 @@ and infer_type (sign, cG : signature * I.ctx) (s : A.exp) : I.exp * I.universe =
      Debug.print (fun () -> "Assert universe failed for " ^ IP.print_exp e ^ ".") ;
      raise (Error.Error "Not a universe.")
 
-and check_schema (sign , cG : signature * I.ctx) (sch : A.schema) : I.schema =
-  match sch with
-  | A.SimpleType t ->
-     let t' = check_syn_type (sign, cG) I.Nil t in
-     I.SimpleType t'
-  | A.ExistType (tel, t) ->
-     let tel', t' = check_spi (sign, cG) I.Nil tel t in
-     I.ExistType (tel', t')
+and check_schema (sign , cG : signature * I.ctx) (sch : A.schema) : I.schema = assert false
+  (* match sch with *)
+  (* | A.SimpleType t -> *)
+  (*    let t' = check_syn_type (sign, cG) I.Nil t in *)
+  (*    I.SimpleType t' *)
+  (* | A.ExistType (tel, t) -> *)
+  (*    let tel', t' = check_spi (sign, cG) I.Nil tel t in *)
+  (*    I.ExistType (tel', t') *)
 
 and check (sign , cG : signature * I.ctx) (e : A.exp) (t : I.exp) : I.exp =
   let t' = Whnf.whnf sign t in
@@ -287,17 +287,17 @@ and is_ctx (sign, cG) g =
     end
   | _ -> raise (Error.Error ("Expression " ^ AP.print_exp g ^ " was expected to be a context."))
 
-and check_type_against_schema (sign, cG) cP e sch =
-  let t' = check_syn_type (sign, cG) cP e in
-  let _, sigma = match sch with (* For the moment we ignore the sigma *)
-  | I.SimpleType t ->
-     Unify.unify_syn (sign, cG) cP t t'
-  | I.ExistType (tel, t) ->
-     let tel', sigma, cP' = abstract cP tel in
-     let flex = List.map (fun (_, x, _) -> x) tel' in
-     Unify.unify_flex_syn (sign, cG) cP flex (I.Clos (t, sigma, cP')) t'
-  in
-  simul_subst_syn sigma t'
+and check_type_against_schema (sign, cG) cP e sch = assert false
+  (* let t' = check_syn_type (sign, cG) cP e in *)
+  (* let _, sigma = match sch with (\* For the moment we ignore the sigma *\) *)
+  (* | I.SimpleType t -> *)
+  (*    Unify.unify_syn (sign, cG) cP t t' *)
+  (* | I.ExistType (tel, t) -> *)
+  (*    let tel', sigma, cP' = abstract cP tel in *)
+  (*    let flex = List.map (fun (_, x, _) -> x) tel' in *)
+  (*    Unify.unify_flex_syn (sign, cG) cP flex (I.Clos (t, sigma, cP')) t' *)
+  (* in *)
+  (* simul_subst_syn sigma t' *)
 
 and check_syn (sign, cG) cP (e : A.exp) (t : I.syn_exp) =
   let t' = Whnf.rewrite sign cP t in

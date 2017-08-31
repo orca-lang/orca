@@ -164,21 +164,21 @@ let rec unify_flex (sign, cG) flex e1 e2 =
      else
        raise (Unification_failure (Occur_check (n, e1)))
   | Annot(e1, e2), Annot(e1', e2') -> unify_many cG [e1;e2] [e1';e2']
-  | Ctx (SimpleType t), Ctx (SimpleType t') -> unify_flex_syn (sign, cG) Nil flex t t'
+  | Ctx sch , Ctx sch' ->  unify_flex_schemata (sign, cG) flex sch sch'
   | BCtx cP, BCtx cP' -> unify_flex_bctx (sign, cG) flex cP cP'
   | _, Hole _
   | Hole _, _ -> cG, []
   | _, _ ->
      raise (Unification_failure(Expressions_dont_unify (flex, e1', e2')))
 
-and unify_flex_schemata (sign, cG) flex sch1 sch2 =
-  match sch1, sch2 with
-  | SimpleType t1, SimpleType t2 ->
-     unify_flex_syn (sign, cG) Nil flex t1 t2
-  | ExistType (tel1, t1), ExistType (tel2, t2) ->
-     unify_flex_spi (sign, cG) Nil flex tel1 t1 tel2 t2
+and unify_flex_schemata (sign, cG) flex sch1 sch2 = assert false
+  (* match sch1, sch2 with *)
+  (* | SimpleType t1, SimpleType t2 -> *)
+  (*    unify_flex_syn (sign, cG) Nil flex t1 t2 *)
+  (* | ExistType (tel1, t1), ExistType (tel2, t2) -> *)
+  (*    unify_flex_spi (sign, cG) Nil flex tel1 t1 tel2 t2 *)
 
-  | _, _ -> raise(Unification_failure(Schemata_dont_unify (flex, sch1, sch2)))
+  (* | _, _ -> raise(Unification_failure(Schemata_dont_unify (flex, sch1, sch2))) *)
 
 and unify_flex_syn (sign, cG) cP flex e1 e2 =
   let is_flex n = List.mem n flex in
@@ -209,7 +209,7 @@ and unify_flex_syn (sign, cG) cP flex e1 e2 =
   | ShiftS (n, e), ShiftS (n', e') when n = n' -> unify_flex_syn (sign, cG) (drop_suffix cP n) flex e e'
   | Dot(e1, e2), Dot(e1', e2') -> unify_many_syn [e1;e2] [e1';e2']
   | Comp (e1, cP, e2), Comp(e1', cP', e2') -> (* unify_many cG [e1;e2] [e1';e2'] *) assert false
-  | SCtx (SimpleType t), SCtx (SimpleType t') -> unify_flex_syn (sign, cG) cP flex t t'
+  | SCtx sch, SCtx sch' -> unify_flex_schemata (sign, cG) flex sch sch'
   | SBCtx cP, SBCtx cP' -> unify_flex_bctx (sign, cG) flex cP cP'
   | Star, Star -> cG, []
   (* (\* This is comparing eta long and eta short versions *\) *)

@@ -191,20 +191,20 @@ let rec pproc_exp (s : sign) (cG : ctx) (cP : bctx) (e : E.exp) : A.exp =
   in Debug.deindent ();
   res
 
-and pproc_schema (s : sign) (cG : ctx) (cP : bctx) (sch : E.schema) : A.schema =
-  match sch with
-  | E.SimpleType t -> A.SimpleType (pproc_exp s cG cP t)
-  | E.ExistType (params, t) ->
-     let rec f cP = function
-       | [] -> cP, []
-       | (x, t) :: params ->
-          let s' = pproc_exp s cG cP t in
-          let cP', stel = f (x :: cP) params in
-          cP', (Implicit, x, s') :: stel
-     in
-     let cP', stel = f cP params in
-     let t' = pproc_exp s cG cP' t in
-     A.ExistType (stel, t')
+and pproc_schema (s : sign) (cG : ctx) (cP : bctx) (E.Schema (impl, expl) : E.schema) : A.schema =
+  let rec pproc_params cP = function
+    | [] -> [], cP
+    | (x, t)::params ->
+       let cP' = x::cP in
+       let params', cP'' = pproc_params cP' params in
+       print_endline ("cP = " ^ String.concat ", " cP ^ "\t\tcP'' = " ^ String.concat ", " cP'');
+       (x, pproc_exp s cG cP t)::params', cP''
+  in
+
+  let impl', cP' = pproc_params cP impl in
+  print_endline ("cP = " ^ String.concat ", " cP ^ "\ncP' = " ^ String.concat ", " cP');
+  let expl', _ = pproc_params cP' expl in
+  A.Schema(impl', expl')
 
 and pproc_comma (s : sign) (cG : ctx) (cP : bctx) (g : E.exp) : bctx * A.exp =
   match content g with

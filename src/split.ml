@@ -189,21 +189,22 @@ let split_box (sign : signature) (cD : ctx) (qs : pats)
         Debug.print_string (Unify.print_unification_problem msg);
         None :: unify splits
   in
-  let rec admits_variables n = function
-    | Nil -> false
-    | CtxVar g -> begin try let _ = match lookup_ctx_fail cD g with
-                        | Ctx (SimpleType s) -> Unify.unify_syn (sign, cD) cP s t
-                        | Ctx (ExistType (tel, t')) ->
-                           let tel', sigma, cP' = abstract cP tel in
-                           let flex = List.map (fun (_, x, _) -> x) tel' in
-                           Unify.unify_flex_syn (sign, cD) cP flex (Clos (t, sigma, cP')) t'
-                        | _ -> raise (Error.Violation "Admits variable has bctx which is not a context")
-                      in true
-                  with Unify.Unification_failure _ -> false
-                  end
-    | Snoc (cP', _, s) -> try let _ = Unify.unify_syn (sign, cD) cP t (Clos (s, Shift (n+1), cP')) in true
-                          with Unify.Unification_failure _ -> admits_variables (n+1) cP'
-  in
+  let admits_variables _ = assert false in
+  (* let rec admits_variables n = function *)
+  (*   | Nil -> false *)
+  (*   | CtxVar g -> begin try let _ = match lookup_ctx_fail cD g with *)
+  (*                       | Ctx (SimpleType s) -> Unify.unify_syn (sign, cD) cP s t *)
+  (*                       | Ctx (ExistType (tel, t')) -> *)
+  (*                          let tel', sigma, cP' = abstract cP tel in *)
+  (*                          let flex = List.map (fun (_, x, _) -> x) tel' in *)
+  (*                          Unify.unify_flex_syn (sign, cD) cP flex (Clos (t, sigma, cP')) t' *)
+  (*                       | _ -> raise (Error.Violation "Admits variable has bctx which is not a context") *)
+  (*                     in true *)
+  (*                 with Unify.Unification_failure _ -> false *)
+  (*                 end *)
+  (*   | Snoc (cP', _, s) -> try let _ = Unify.unify_syn (sign, cD) cP t (Clos (s, Shift (n+1), cP')) in true *)
+  (*                         with Unify.Unification_failure _ -> admits_variables (n+1) cP' *)
+  (* in *)
   if admits_variables 0 cP then
     let x = Name.gen_name "X" in
     Some ((x, Box (cP, t)) :: cD, simul_psubst_on_list sign [n, PTBox (cP, PPar x)] qs, [n, Var x]) :: unify splits
