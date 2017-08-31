@@ -9,48 +9,69 @@ open Print.Int
 module A = Syntax.Apx
 module AP = Print.Apx
 
+type matching
+  = Yes
+  | Overlap
+  | No
+
+let (&&&) m n =
+  match (m, n) with
+  | No, _ -> No
+  | _, No -> No
+  | Overlap, _ -> Overlap
+  | _, Overlap -> Overlap
+  | _, _ -> Yes
+
+let is_match = function
+  | No -> false
+  | _ -> true
+
+let is_overlap = function
+  | Overlap -> true
+  | _ -> false
+
 let rec check_match (q : pat) (p : A.pat) =
   match q, p with
-  | PVar n, _ -> true
+  | PVar n, _ -> Yes
   | PConst (n, qs), A.PConst (n', ps) when n = n' -> check_all qs ps
-  | PConst (n, qs), A.PConst (n', ps) -> false
-  | Inacc _, _ -> true
+  | PConst (n, qs), A.PConst (n', ps) -> No
+  | Inacc _, _ -> Yes
   | PBCtx q, _ -> bctx_check_match q p
   | PTBox (cP, q), p -> syn_check_match cP q p
-  | _, A.PWildcard -> true
-  | _, A.PVar n -> true
-  | _ -> false
+  | _, A.PWildcard -> Yes
+  | _, A.PVar n -> Overlap
+  | _ -> No
 and syn_check_match cP q p =
   match q, p with
   | PLam (xs, q), A.PLam (ys, p) -> syn_check_match (bctx_of_lam_pars cP xs) q p
-  | PPar n, A.PPar n' -> true
-  | PUnbox (n, s, cP'), A.PClos (m, s') when s = s' -> true
-  | PUnbox (n, s, cP'), _ -> true
-  | SInacc _, _ -> true
-  | PEmpty, A.PEmpty -> true
-  | PShift n, A.PShift n' when n = n' -> true
-  | PBVar i, A.PBVar i' when i = i' -> true
+  | PPar n, A.PPar n' -> Yes
+  | PUnbox (n, s, cP'), A.PClos (m, s') when s = s' -> Yes
+  | PUnbox (n, s, cP'), _ -> Yes
+  | SInacc _, _ -> Yes
+  | PEmpty, A.PEmpty -> Yes
+  | PShift n, A.PShift n' when n = n' -> Yes
+  | PBVar i, A.PBVar i' when i = i' -> Yes
   | PSConst (n, qs), A.PConst (n', ps) when n = n' -> syn_check_all cP qs ps
-  | PSConst (n, ps), A.PConst (n', qs) -> false
-  | PDot (s, q'), A.PDot (s', p') -> syn_check_match cP s s' && syn_check_match cP q' p'
-  | _, A.PVar n -> true
-  | _ -> false
+  | PSConst (n, ps), A.PConst (n', qs) -> No
+  | PDot (s, q'), A.PDot (s', p') -> syn_check_match cP s s' &&& syn_check_match cP q' p'
+  | _, A.PVar n -> Overlap
+  | _ -> No
 and bctx_check_match q p =
   match q, p with
-  | PCtxVar x, A.PVar y  -> true
+  | PCtxVar x, A.PVar y  -> Yes
   | PSnoc (q1, _, q2), A.PSnoc (p1, _, p2) -> bctx_check_match q1 p1 (* @ (syn_check_match (bctx_of_pat_ctx p1) p2 q2) *)
-  | PNil, A.PNil -> true
-  | _ -> false
+  | PNil, A.PNil -> Yes
+  | _ -> No
 and check_all qs ps =
   match qs, ps with
-  | q :: qs, p :: ps -> check_match q p && check_all qs ps
-  | [], _ -> true
-  | _ -> false  (* maybe we want to raise error/violation here... *)
+  | q :: qs, p :: ps -> check_match q p &&& check_all qs ps
+  | [], _ -> Yes
+  | _ -> No  (* maybe we want to raise error/violation here... *)
 and syn_check_all cP qs ps =
   match qs, ps with
-  | q :: qs, p :: ps -> syn_check_match cP q p && syn_check_all cP qs ps
-  | [], _ -> true
-  | _ -> false  (* maybe we want to raise error/violation here... *)
+  | q :: qs, p :: ps -> syn_check_match cP q p &&& syn_check_all cP qs ps
+  | [], _ -> Yes
+  | _ -> No  (* maybe we want to raise error/violation here... *)
 
 let is_blocking = function
   | A.PVar _
@@ -225,7 +246,7 @@ let get_splits (sign : signature) (cD : ctx) (qs : pats)
    cD' |- sigma' cD
    . |- ps => cD'
  *)
-let rec split (sign : signature) (cD : ctx) (qs : pats)
+let rec split (sign : signature) (cD : ctx) (qs : pats) (over : matching)
     (ps, rhs : A.pats * A.rhs) (t : exp) : split_tree =
   Debug.print(fun () -> "Splitting qs = " ^ print_pats qs
     ^ "\nagainst ps = " ^ AP.print_pats ps
@@ -238,43 +259,47 @@ let rec split (sign : signature) (cD : ctx) (qs : pats)
       match Whnf.whnf sign t with
       | Pi((i, n, t0) :: tel, t1) ->
         let t' = if tel = [] then t1 else Pi (tel, t1) in
-        split sign ((n, t0) :: cD) (qs @ [PVar n]) (ps, rhs) t'
+        split sign ((n, t0) :: cD) (qs @ [PVar n]) over (ps, rhs) t'
       | _ -> assert false
     else
       let _ = Debug.print (fun () -> "Found leaf for " ^ AP.print_pats ps) in
-      let s = rename_all qs ps in
-      let qs' = simul_psubst_on_list sign (psubst_of_names s) qs in
-      let sigma' = subst_of_names s in
-      let rec subst_name n = function
-        | (n', m) :: sigma when n = n' -> m
-        | _ :: sigma -> subst_name n sigma
-        | [] -> n                         (* name stays the same *)
-      in
-      let rec subst_ctx = function
-        | (n, e) :: cD -> (subst_name n s, simul_subst sigma' e) :: subst_ctx cD
-        | [] -> []
-      in
-      let cD' = subst_ctx cD in
-      Debug.print (fun () -> "Renaming of qs = " ^ print_pats qs ^ " with " ^ AP.print_pats ps
-        ^ "\nresults in substitution " ^ print_subst sigma'
-        ^ "\nwhich moves context " ^ print_ctx cD ^ " to context " ^ print_ctx cD');
-    (* Need to check inaccessible? *)
-      Debug.indent ();
-      let rhs' = match rhs with
-        | A.Just e ->
-          Just (Recon.check (sign, cD') e (simul_subst sigma' t))
-        | A.Impossible n -> Impossible n (* Need to check if actually impossible *)
-      in
-      Debug.deindent ();
-      Leaf (cD', qs', simul_subst sigma' t, rhs')
+      if is_overlap over then
+        raise (Error.Error "Overlapping patterns not implemented yet.")
+      else
+        let s = rename_all qs ps in
+        let qs' = simul_psubst_on_list sign (psubst_of_names s) qs in
+        let sigma' = subst_of_names s in
+        let rec subst_name n = function
+          | (n', m) :: sigma when n = n' -> m
+          | _ :: sigma -> subst_name n sigma
+          | [] -> n                         (* name stays the same *)
+        in
+        let rec subst_ctx = function
+          | (n, e) :: cD -> (subst_name n s, simul_subst sigma' e) :: subst_ctx cD
+          | [] -> []
+        in
+        let cD' = subst_ctx cD in
+        Debug.print (fun () -> "Renaming of qs = " ^ print_pats qs ^ " with " ^ AP.print_pats ps
+                               ^ "\nresults in substitution " ^ print_subst sigma'
+                               ^ "\nwhich moves context " ^ print_ctx cD ^ " to context " ^ print_ctx cD');
+        (* Need to check inaccessible? *)
+        Debug.indent ();
+        let rhs' = match rhs with
+          | A.Just e ->
+             Just (Recon.check (sign, cD') e (simul_subst sigma' t))
+          | A.Impossible n -> Impossible n (* Need to check if actually impossible *)
+        in
+        Debug.deindent ();
+        Leaf (cD', qs', simul_subst sigma' t, rhs')
   | Some (n, p) ->
     Debug.print (fun () -> "Found blocking variable " ^ print_name n);
     let f = function
       | None -> None
       (* todo: figure out impossible branches for specific constructors *)
       | Some (cD', qs', sigma') ->
-        if check_all qs' ps then
-          Some (split sign cD' qs' (ps, rhs) (simul_subst sigma' t))
+         let over' = check_all qs' ps in
+        if is_match over' then
+          Some (split sign cD' qs' over' (ps, rhs) (simul_subst sigma' t))
         else
           Some (Incomplete (cD', qs',  simul_subst sigma' t))
     in
@@ -303,12 +328,14 @@ exception Backtrack
 let rec navigate (sign : signature) (tr : split_tree) (ps, rhs : A.pats * A.rhs) : split_tree =
   match tr with
   | Incomplete (cD, qs, t) ->
-    if check_all qs ps then
-      split sign cD qs (ps, rhs) t
+     let over = check_all qs ps in
+    if is_match over then
+      split sign cD qs over (ps, rhs) t
     else
       raise Backtrack
   | Node (cD, qs, t, n, tr') ->
-    if check_all qs ps then
+     let over = check_all qs ps in
+     if is_match over then
       let rec f = function
         | [] -> raise Backtrack
         | tr :: trs ->
@@ -318,7 +345,8 @@ let rec navigate (sign : signature) (tr : split_tree) (ps, rhs : A.pats * A.rhs)
     else
       raise Backtrack
   | Leaf (cD, qs, _, _) ->
-    if check_all qs ps then
+     let over = check_all qs ps in
+    if is_match over then
       raise (Error.Error ("Branch " ^ AP.print_pats ps ^ " cannot be reached."))
     else
       raise Backtrack
