@@ -1,6 +1,6 @@
 #!/bin/bash
 
-for f in examples/*
+for f in examples/*.kw
 do
     if [ -f $f ]
     then
