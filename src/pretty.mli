@@ -18,3 +18,4 @@ val print_syn_exp : ctx -> bctx -> syn_exp -> string
 val print_bctx : ctx -> bctx -> string
 val print_ctx : ctx -> string
 val print_stel : ctx -> bctx -> stel -> syn_exp -> string
+val print_tree : split_tree -> string

@@ -556,11 +556,12 @@ let rec ind sep = function
   | n -> sep ^ ind sep (n - 1)
 
 let rec fmt_tree dep pps = function
-  | Node (cG, pats, _t, n, trs) ->
-     Fmt.pf pps "%s* pats: [%a] split on: %a@,%a"
+  | Node (cG, pats, t, n, trs) ->
+     Fmt.pf pps "%s* pats: [%a] split on %a : %a@\n%a"
             (ind "  " dep)
             (fmt_pats cG) pats
             (comp_var cG) n
+            (fmt_exp cG never_paren) t
             (fmt_trees (dep+1)) trs
 
 
@@ -582,7 +583,7 @@ let rec fmt_tree dep pps = function
 
 and fmt_trees dep pps = function
   | tr :: trs ->
-     Fmt.pf pps "%a@,%a"
+     Fmt.pf pps "%a@\n%a"
             (fmt_tree dep) tr
             (fmt_trees dep) trs
   | [] -> ()
@@ -590,7 +591,7 @@ and fmt_trees dep pps = function
 
 let rec fmt_defpm_tree key pps = function
   | (n, t, tr) :: def ->
-      Fmt.pf pps "%a %a : %a %a@,%a@,%a"
+      Fmt.pf pps "%a %a : %a %a@\n%a@\n%a"
             keyword "def"
             const n
             (fmt_exp [] never_paren) t
@@ -722,3 +723,4 @@ let print_tel_entry cG te = produce_string (fmt_tel_entry cG) te
 let print_tel cG tel = produce_string (fmt_tel cG) tel
 let print_stel_entry cG cP te = produce_string (fmt_stel_entry cG cP) te
 let print_stel cG cP tel t = produce_string (fmt_stel cG cP) (tel, t)
+let print_tree tr = produce_string (fmt_tree 0) tr
