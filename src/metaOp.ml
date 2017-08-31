@@ -386,8 +386,14 @@ let name_list_of_ctx : ctx -> name list = List.map fst
 
 let var_list_of_ctx : ctx -> exp list = List.map (fun (x, _) -> Var x)
 
+let var_list_of_tel : tel -> exp list = List.map (fun (_, x, _) -> Var x)
+
+
 let unbox_list_of_ctx cP : ctx -> syn_exp list = List.map (fun (x, _) -> Unbox(Var x, id_sub, cP))
 let punbox_list_of_ctx cP : ctx -> syn_pat list = List.map (fun (x, _) -> PUnbox(x, pid_sub, cP))
+let unbox_list_of_tel cP : tel -> syn_exp list = List.map (fun (_, x, _) -> Unbox(Var x, id_sub, cP))
+let punbox_list_of_tel cP : tel -> syn_pat list = List.map (fun (_, x, _) -> PUnbox(x, pid_sub, cP))
+
 
 let rec ctx_subst s = function
   | (x, t) :: cG -> (x, subst s t) :: (ctx_subst s cG)
@@ -557,6 +563,11 @@ let simul_psubst_on_list sign sigma ps =
 let simul_syn_psubst_on_list sign cP sigma ps =
   List.map (simul_syn_psubst sign cP sigma) ps
 
+let inac_subst e = List.map (fun (x, e) -> x, Inacc e) e
+let pvar_list_of_tel : tel -> pats = List.map (fun (_, x, _) -> PVar x)
+let punbox_list_of_tel cP : tel -> syn_pat list = List.map (fun (_, x, _) -> PUnbox(x, pid_sub, cP))
+let psubst_of_names e = List.map (fun (n, m) -> n, PVar m) e
+let subst_of_names e = List.map (fun (n, m) -> n, Var m) e
 
 
 let rec rename (q : pat) (p : Apx.pat) : (name * name) list =

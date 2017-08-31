@@ -18,6 +18,7 @@ let rec check_match (q : pat) (p : A.pat) =
   | PBCtx q, _ -> bctx_check_match q p
   | PTBox (cP, q), p -> syn_check_match cP q p
   | _, A.PWildcard -> true
+  | _, A.PVar n -> true
   | _ -> false
 and syn_check_match cP q p =
   match q, p with
@@ -32,6 +33,7 @@ and syn_check_match cP q p =
   | PSConst (n, qs), A.PConst (n', ps) when n = n' -> syn_check_all cP qs ps
   | PSConst (n, ps), A.PConst (n', qs) -> false
   | PDot (s, q'), A.PDot (s', p') -> syn_check_match cP s s' && syn_check_match cP q' p'
+  | _, A.PVar n -> true
   | _ -> false
 and bctx_check_match q p =
   match q, p with
@@ -90,11 +92,6 @@ and choose_blocking (q : pat) (p : A.pat) : (name * A.pat) option =
   | PConst(c, qs), A.PConst (c', ps) -> choose_blocking_var qs ps
   | _ -> None
 
-let inac_subst = List.map (fun (x, e) -> x, Inacc e)
-let pvar_list_of_ctx : ctx -> pats = List.map (fun (x, _) -> PVar x)
-let punbox_list_of_ctx cP : ctx -> syn_pat list = List.map (fun (x, _) -> PUnbox(x, pid_sub, cP))
-let psubst_of_names = List.map (fun (n, m) -> n, PVar m)
-let subst_of_names = List.map (fun (n, m) -> n, Var m)
 
 let rec refresh_tel = function
   | (i, n, e) :: tel ->
@@ -114,11 +111,10 @@ let split_const (sign : signature) (cD : ctx) (qs : pats)
     | (c, tel, ts) :: cs' ->
       let sigma0, tel = refresh_tel (simul_subst_on_tel sigma_params tel) in
       let ts = simul_subst_on_list (sigma0 @ sigma_params) ts in
-      let cG = ctx_of_tel tel in
-      let cD' = cD @ cG @ params in
+      let cD' = cD @ (ctx_of_tel tel) @ params in
       let flex = List.map fst cD' in
-      (c, ts, cD', flex, (if cG == [] then Const c else App (Const c, var_list_of_ctx cG)),
-       PConst (c, pvar_list_of_ctx cG)) :: process cs'
+      (c, ts, cD', flex, (if tel == [] then Const c else App (Const c, var_list_of_tel tel)),
+       PConst (c, pvar_list_of_tel tel)) :: process cs'
   in
   process cs
 
@@ -130,11 +126,10 @@ let split_sconst (sign : signature) (cD : ctx) (cP : bctx) (qs : pats)
     | (c, tel, ts) :: cs' ->
       let sigma0, tel = refresh_tel tel in
       let ts = simul_subst_syn_on_list sigma0 ts in
-      let cG = ctx_of_tel tel in
-      let cD' = cD @ cG in
+      let cD' = cD @ (ctx_of_tel tel) in
       let flex = List.map fst cD' in
-      (ts, cD', flex, (if cG == [] then SConst c else AppL (SConst c, unbox_list_of_ctx cP cG)),
-       PSConst (c, punbox_list_of_ctx cP cG)) :: process cs'
+      (ts, cD', flex, (if tel == [] then SConst c else AppL (SConst c, unbox_list_of_tel cP tel)),
+       PSConst (c, punbox_list_of_tel cP tel)) :: process cs'
   in
   process cs
 
@@ -200,17 +195,19 @@ let get_splits (sign : signature) (cD : ctx) (qs : pats)
   let rec unify = function
     | [] -> []
     | (c, ts, cD', flex, e, p) :: splits ->
-      Debug.print (fun () -> "Unification of ts " ^ print_exps ts
-            ^ "\nwith sp " ^ print_exps sp
-            ^ "\nusing flex " ^ print_names flex);
+      Debug.print (fun () -> "Unification of ts = " ^ print_exps ts
+            ^ "\nwith sp = " ^ print_exps sp
+            ^ "\nusing flex = " ^ print_names flex);
       try let cD'', sigma = Unify.unify_flex_many (sign, cD') flex ts sp in
           Debug.print (fun () -> "Resulting Unification "
             ^ "moves context cD' = " ^ print_ctx cD'
-            ^ "\nto context " ^ print_ctx cD'');
+            ^ "\nto context " ^ print_ctx cD''
+            ^ "\nusing substitution " ^ print_subst sigma);
           let psigma = inac_subst sigma in
           let s = n, simul_subst sigma e in
           let psigma' = (n, simul_psubst sign psigma p) :: psigma in
           let cD''' = ctx_subst s (List.filter (fun (x, _) -> x <> n) cD'') in
+          Debug.print (fun () -> "Final subst is " ^ print_subst (s :: sigma));
           Some (cD''', simul_psubst_on_list sign psigma' qs, s :: sigma) :: unify splits
       with Unify.Unification_failure msg ->
         Debug.print (fun () -> "Splitting on constructor " ^ c

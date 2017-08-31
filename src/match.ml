@@ -22,7 +22,8 @@ let print_cos = function
   | Syn s -> IP.print_syn_exps s
   | Comp e -> IP.print_exps e
 
-let ctx_of_tel : I.tel -> I.ctx = List.map (fun (_, x, s) -> x, s)
+(* this function is duplicated, _nr means it does not reverse stuff, it should go *)
+let ctx_of_tel_nr : I.tel -> I.ctx = List.map (fun (_, x, s) -> x, s)
 
 (* Given the name of a type and a spine, return the parameter, the indices *)
 let split_idx_param (sign : signature) (cG : I.ctx) (n : def_name) (es1 : comp_or_syn)
@@ -154,7 +155,7 @@ let inac_subst = List.map (fun (x, e) -> x, I.Inacc e)
 
 let split_flex_unify (sign : signature) sigma0 maybe_g (p1 : pats) (thetatel : I.tel) (ps : pats)
                      (cD1 : I.ctx) (vs : comp_or_syn) (ws : comp_or_syn) =
-  let sigma, cT = rename_ctx_using_pats (simul_subst_on_ctx sigma0 (ctx_of_tel thetatel)) ps in
+  let sigma, cT = rename_ctx_using_pats (simul_subst_on_ctx sigma0 (ctx_of_tel_nr thetatel)) ps in
   Debug.print (fun () -> "Creating set of flexible variables\np1 = " ^ print_pats p1
     ^ "\nps = " ^ print_pats ps ^ "\ncD1 = " ^ IP.print_ctx cD1 ^ "\ncT = " ^ IP.print_ctx cT
     ^ "\nsigma0 = " ^ print_subst sigma0 ^ "\nsigma = " ^ print_subst sigma);
@@ -576,7 +577,7 @@ and check_inac (sign, cD : signature * I.ctx) (p : A.pat) (q : I.pat) (t : I.exp
   | A.PVar x, I.PVar y when x = y -> I.PVar x
   | A.PConst (n, sp), I.PConst (n', sq) when n = n' ->
      begin match lookup_sign_entry sign n with
-     | Constructor (_, tel, _) -> I.PConst (n, check_inacs (sign, cD) sp sq (ctx_of_tel tel))
+     | Constructor (_, tel, _) -> I.PConst (n, check_inacs (sign, cD) sp sq (ctx_of_tel_nr tel))
      | SConstructor (_, stel, _) -> (* raise (Error.Violation ("Syntactic constructor used with PConst")) *)
         let cP = match t with
           | I.Box(cP, _) -> cP
@@ -667,7 +668,7 @@ let check_clause (sign : signature) (f : def_name) (p : A.pats) (telG : I.tel) (
   Debug.print (fun () -> "Checking pattern clause:\nPattern spine: " ^ AP.print_pats p
     ^ "\nRHS: " ^ AP.print_rhs rhs);
   try
-    let cD, sigma = check_lhs sign p (ctx_of_tel telG) in
+    let cD, sigma = check_lhs sign p (ctx_of_tel_nr telG) in
     (* cD is currently a telescope so it's in reverse of what we want elsewhere *)
     let cD = List.rev cD in
     Debug.print (fun () -> "LHS was checked:\n cD = " ^ IP.print_ctx cD ^ "\n sigma = "^ IP.print_pats sigma ^ "\n telG = " ^ IP.print_tel telG);
