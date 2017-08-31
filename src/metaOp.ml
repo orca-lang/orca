@@ -598,6 +598,7 @@ and rename_syn (q : syn_pat) (p : Apx.pat) : (name * name) list =
   | PUnbox(n, s, cP), Apx.PClos(m, s') -> [n, m]
   | PUnbox(n, s, cP), Apx.Inacc(Apx.Var m) -> [n, m]
   | SInacc (Var n, s, cP), Apx.PVar m -> [n, m]
+  | SInacc (TermBox (_, Unbox(Var n, _, _)), _, _), Apx.PVar m -> [n, m]
   | _ -> raise (Error.Violation ("Renaming of tree node expects matching pattern with tree node\nq = "
                                    ^ print_syn_pat q ^ "\np = " ^ Print.Apx.print_pat p))
 

@@ -361,8 +361,9 @@ let check_clauses (sign : signature) (f : def_name) (t : exp) (ds : A.pat_decls)
       ^ "\nusing tree " ^ print_tree tr);
     try navigate sign' tr (ps, rhs)
     with Backtrack ->
-      raise (Error.Error ("Branch " ^ AP.print_pats ps
-                          ^ " was incompatible with current tree\n" ^ print_tree tr))
+      raise (Error.Error ("Branch: " ^ AP.print_pats ps
+                          ^ "\nwas incompatible with current tree\n" ^ Pretty.print_tree tr
+                          ^ "\nTry a different split by changing the inaccessible patterns."))
   in
   let tree = List.fold_left nav (Incomplete ([], [], t)) ds in
   Debug.print (fun () -> "Generated split tree for " ^ f ^ ":\n" ^ print_tree tree);
