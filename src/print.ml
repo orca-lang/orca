@@ -114,10 +114,9 @@ module Apx = struct
     | Annot (e1, e2) -> "(" ^ print_exp e1 ^ " : " ^ print_exp e2 ^ ")"
     | Hole s -> "?" ^ print_name s
 
-  and print_schema _ = "* some schema *"
-  (* and print_schema = function *)
-  (*   | SimpleType t -> print_exp t *)
-  (*   | ExistType (stel, e) -> "{" ^ print_stel stel ^ "} " ^ print_exp e *)
+  and print_schema (Schema (impl, expl)) =
+    let f ps = String.concat ", " (List.map (fun (x, t) -> x ^ " : " ^ print_exp t) ps) in
+    "{" ^ f impl ^ "}(" ^ f expl ^ ")"
 
   and print_pi tel t = match tel with
     | [] -> print_exp t
