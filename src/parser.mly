@@ -13,19 +13,14 @@ open Syntax.Ext
 %token <string>IDENT
 %token <string option>HOLE
 %token EOF
-%token COMMA EMPTYS DOT NIL COMMACOMMA
+%token COMMA EMPTYS DOT NIL
 %token <int>INDEX
 %token <int>SHIFT
 
-%nonassoc TURNSTILE TTS
-%nonassoc DOT RARR
+%nonassoc TTS
+%nonassoc DOT
 %left COMMA SEMICOLON
 %nonassoc COLON
-%right ARR SARR
-%left APPL
-
-%nonassoc STAR SHIFT SET EMPTYS IDENT NIL HOLE INDEX
-%right LPAREN
 
 %start <Syntax.Ext.program list>program
 
@@ -65,8 +60,8 @@ type_dec:
 | COLON t = exp { t }
 
 params:
-| LPAREN s = IDENT+ COLON t = exp RPAREN p = params {List.map (fun x -> (Explicit, x, t)) s @ p}
-| LCURLY s = IDENT+ COLON t = exp RCURLY p = params {List.map (fun x -> (Implicit, x, t)) s @ p}
+| LPAREN s = IDENT+ COLON t = exp_level2 RPAREN p = params {List.map (fun x -> (Explicit, x, t)) s @ p}
+| LCURLY s = IDENT+ COLON t = exp_level2 RCURLY p = params {List.map (fun x -> (Implicit, x, t)) s @ p}
 | (* empty *) {[]}
 
 decl:
@@ -76,39 +71,74 @@ def_decl:
 | p = simple_pattern+ RARR e = exp {p, e}
 
 exp:
-| e = located(raw_exp) {e}
-| e = almost_simple_exp {e}
+| e = exp_level1 {e}
 
-raw_exp:
-| g =  exp TTS e = exp {ABox (g, e)}
-| g = exp TURNSTILE e = exp {Box (g, e)}
-| TURNSTILE e = exp {Box (Loc.ghost Nil, e)}
-| e1 = exp e2 = almost_simple_exp {App (e1, e2)}
-| e1 = exp APPL e2 = exp {AppL (e1, e2)}
-| e1 = exp COLON e2 = exp {Annot (e1, e2)}
-| FN xs = IDENT+ RARR e = exp {Fn (xs, e)}
-| LAM x = IDENT+ DOT e = exp {Lam (x, e)}
-| s = exp ARR t = exp {Arr (s, t)}
-| s = exp SARR t = exp {SArr (s, t)}
-| s = exp COMMA e = exp {Comma (s, e)}
-| s = exp SEMICOLON e = exp {Semicolon (s, e)}
+exp_level1:
+| e = located(raw_exp_level1) {e}
+
+raw_exp_level1:
+| e1 = exp_level2 COLON e2 = exp_level2 {Annot(e1, e2)}
+| e = raw_exp_level2 {e}
+
+exp_level2:
+| e = located(raw_exp_level2) {e}
+
+raw_exp_level2:
+| FN xs = IDENT+ RARR e = exp_level2 {Fn (xs, e)}
+| LAM x = IDENT+ DOT e = exp_level2 {Lam (x, e)}
+| e = raw_exp_level3 {e}
+
+exp_level3:
+| e = located(raw_exp_level3) {e}
+
+raw_exp_level3:
+| s = exp_level4 ARR t = exp_level3 {Arr (s, t)}
+| s = exp_level4 SARR t = exp_level3 {SArr (s, t)}
+| e = raw_exp_level4 {e}
+
+exp_level4:
+| e = located(raw_exp_level4) {e}
+
+raw_exp_level4:
+| g = exp_level5 TURNSTILE e = exp_level5 {Box (g, e)}
+| TURNSTILE e = exp_level5 {Box (Loc.ghost Nil, e)}
+| g = exp_level5 TTS e = exp_level5 {ABox (g, e)}
 | CTX sch=schema {Ctx sch}
+| e = raw_exp_level5 {e}
 
-almost_simple_exp:
-| e = simple_exp {e}
-| e = located(raw_almost_simple_exp) {e}
+exp_level5:
+| e = located(raw_exp_level5) {e}
 
-raw_almost_simple_exp:
-| e1 = almost_simple_exp LSQUARE e2 = exp RSQUARE {Clos (e1, e2)}
+raw_exp_level5:
+| s = exp_level5 COMMA e = exp_level6 {Comma (s, e)}
+| s = exp_level5 SEMICOLON e = exp_level6 {Semicolon (s, e)}
+| e = raw_exp_level6 {e}
+
+exp_level6:
+| e = located(raw_exp_level6) {e}
+
+raw_exp_level6:
+| e1 = exp_level6 e2 = exp_level7 {App (e1, e2)}
+| e1 = exp_level6 APPL e2 = exp_level7 {AppL (e1, e2)}
+| e = raw_exp_level7 {e}
+
+exp_level7:
+| e = located(raw_exp_level7) {e}
+
+raw_exp_level7:
+| e1 = exp_level7 LSQUARE e2 = exp RSQUARE {Clos(e1, e2)}
+| e = raw_simple_exp {e}
+
+
 
 simple_exp:
-| LPAREN t = exp RPAREN {t}
 | e = located(raw_simple_exp) {e}
 
 raw_simple_exp:
+| LPAREN t = raw_exp_level1 RPAREN {t}
 | STAR {Star}
 | n = SET {Set n}
-| s = HOLE { Hole s }
+| s = HOLE {Hole s }
 | s = IDENT {Ident s}
 | EMPTYS {Empty}
 | n = SHIFT {Shift n}
@@ -120,11 +150,10 @@ schema:
 (* | LCURLY impl=separated_nonempty_list(COMMA, schema_ex) RCURLY e = simple_exp {Schema (impl, ["_", e])} *)
 | LCURLY impl=separated_nonempty_list(COMMA, schema_ex) RCURLY LPAREN expl=separated_nonempty_list(COMMA, schema_ex) RPAREN
    {Schema (impl, expl)}
-| LPAREN expl=separated_nonempty_list(COMMA, schema_ex) RPAREN { Schema([], expl) }
 
 schema_ex:
-| x=IDENT COLON e=simple_exp {x,e}
-| e = simple_exp {"_", e}
+| x=IDENT COLON e=exp_level6 {x,e}
+| e = exp_level6 {"_", e}
 
 simple_pattern:
 | x = IDENT {PIdent x}

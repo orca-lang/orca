@@ -9,6 +9,6 @@ spec tm : tp ->> * where
 
 def copy : (g : ctx {s : tp} (tm s)) -> (t : |- tp) -> (g |- tm t) -> (g |- tm t)  where
 | g t[^] (app s[^] ._ M N) => app s t (copy g (arr s t) M) (copy g s N)
-| g (arr s[^] t[^]) (lam ._ ._ (\x. M)) => lam s t (\x. copy (g, x: tm s) t[^] M)
+| g (arr s[^] t[^]) (lam ._ ._ (\x. M)) => lam s t (\x. copy (g,(x:tm s)) (t[^]) M) (*) (g, x: tm s) t[^] M)
 | g unit one => one
 | g t (<: x) => x

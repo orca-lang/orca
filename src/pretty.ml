@@ -57,6 +57,14 @@ let keyword = styled keyword_color string (* coloured word *)
 let def = styled def_color string
 let const = styled def_color string
 
+(* Precedence values *)
+let prec_else = 0
+let prec_app = 1
+let prec_box = 2
+let prec_pi = 3
+let prec_fun = 4
+let prec_annot = 5
+
 let comp_var, comp_new_var =
   let with_beautify f cG pps n =
     match f n cG with
@@ -146,10 +154,10 @@ and fmt_stel cG cP pps (tel, e) =
    If expression has lower precedence (higher number), parentheses are
    added. Current values are
    1 - Application
-   2 - Annotation
-   3 - Box
+   2 - Box
+   3 - Pi type
    4 - Function
-   5 - Pi type
+   5 - Annotation
    Note that term box are not being pretty printed so number passed
    to fmt_syn_exp is simply incremented by one (so applications match in
    precedence). This might need to be revised.
@@ -166,10 +174,10 @@ and fmt_exp cG parens pps e =
             const n
   | App(e, es) ->
     Fmt.pf pps "%s%a %a%s"
-      (open_paren 1)
-      (fmt_exp cG 1) e
-      (list ~sep:nbsp (fmt_exp cG 0)) es
-      (close_paren 1)
+      (open_paren prec_app)
+      (fmt_exp cG prec_app) e
+      (list ~sep:nbsp (fmt_exp cG prec_else)) es
+      (close_paren prec_app)
 
   | Var n -> comp_var cG pps n
 
@@ -179,20 +187,20 @@ and fmt_exp cG parens pps e =
 
   | Ctx sch ->
      Fmt.pf pps "ctx %a"
-            (fmt_schema cG 1) sch
+            (fmt_schema cG prec_app) sch
 
   | Pi (tel, e) ->
     Fmt.pf pps "%s%a%s"
-      (open_paren 5)
+      (open_paren prec_pi)
       (fmt_tel cG) (tel, e)
-      (close_paren 5)
+      (close_paren prec_pi)
 
   | Box (cP, e) ->
     Fmt.pf pps "%s%a |- %a%s"
-      (open_paren 3)
+      (open_paren prec_box)
       (fmt_bctx cG) cP
       (fmt_syn_exp cG cP 6) e
-      (close_paren 3)
+      (close_paren prec_box)
 
   | TermBox (cP, e) ->
      Fmt.pf pps "%a"
@@ -205,17 +213,17 @@ and fmt_exp cG parens pps e =
   | Fn (xs, e) ->
      let cG' = (List.map (fun x -> x, dt) xs) @ cG in
      Fmt.pf pps "%sfn %a => %a%s"
-       (open_paren 4)
+       (open_paren prec_fun)
        (list ~sep:nbsp (comp_var cG')) xs
-       (fmt_exp cG' 4) e
-       (close_paren 4)
+       (fmt_exp cG' prec_fun) e
+       (close_paren prec_fun)
 
   | Annot (e1, e2) ->
     Fmt.pf pps "%s%a : %a%s"
-      (open_paren 2)
-      (fmt_exp cG 2) e1
-      (fmt_exp cG 2) e2
-      (close_paren 2)
+      (open_paren prec_annot)
+      (fmt_exp cG prec_annot) e1
+      (fmt_exp cG prec_annot) e2
+      (close_paren prec_annot)
 
   | BCtx cP -> Fmt.pf pps "%s%a%s"
     (open_paren 2)
