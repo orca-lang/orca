@@ -188,8 +188,9 @@ module Int = struct
     | SCtx of schema
     | Unbox of exp * syn_exp * bctx
 
+  and schema_part = (string * syn_exp) list
   and schema
-    = Schema of (string * syn_exp) list * (string * syn_exp) list
+    = Schema of schema_part * schema_part
 
   and bctx
     = Nil

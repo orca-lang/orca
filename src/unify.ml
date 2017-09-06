@@ -13,6 +13,7 @@ type unification_problem
   | Expressions_dont_unify of name list * exp * exp
   | Expressions_dont_unify_syn of name list * syn_exp * syn_exp
   | Schemata_dont_unify of name list * schema * schema
+  | Schema_parts_dont_unify of name list * icit * schema_part * schema_part
   | Universes_dont_match of int * int
   | Unequal_number_params of exp list * exp list
   | Unequal_number_params_syn of syn_exp list * syn_exp list
@@ -28,6 +29,8 @@ let print_unification_problem = function
      "Occurs check failed for " ^ print_name n ^ " in expression " ^ print_syn_exp e ^ "."
   | Schemata_dont_unify (flex, sch1, sch2) ->
      "Schemata do not unify"
+  | Schema_parts_dont_unify (flex, _, _, _) ->
+     "Schema parts do not unify"
   | Expressions_dont_unify (flex, e1, e2) ->
      "Expressions\ne1 = " ^ print_exp e1
      ^ "\ne2 = " ^ print_exp e2
@@ -171,14 +174,31 @@ let rec unify_flex (sign, cG) flex e1 e2 =
   | _, _ ->
      raise (Unification_failure(Expressions_dont_unify (flex, e1', e2')))
 
-and unify_flex_schemata (sign, cG) flex sch1 sch2 = assert false
-  (* match sch1, sch2 with *)
-  (* | SimpleType t1, SimpleType t2 -> *)
-  (*    unify_flex_syn (sign, cG) Nil flex t1 t2 *)
-  (* | ExistType (tel1, t1), ExistType (tel2, t2) -> *)
-  (*    unify_flex_spi (sign, cG) Nil flex tel1 t1 tel2 t2 *)
+and unify_flex_schemata (sign, cG) flex (Schema (im1, ex1)) (Schema (im2, ex2)) =
+  let simul_subst_in_part sigma ps =
+    List.map (fun (n, e) -> n, simul_subst_syn sigma e) ps
+  in
+  let cG', sigma = unify_flex_schema_part (sign, cG) Nil flex Implicit im1 im2 in
+  let ex1' = simul_subst_in_part sigma ex1 in
+  let ex2' = simul_subst_in_part sigma ex2 in
+  unify_flex_schema_part (sign, cG') Nil flex Explicit ex1' ex2'
 
-  (* | _, _ -> raise(Unification_failure(Schemata_dont_unify (flex, sch1, sch2))) *)
+and unify_flex_schema_part (sign, cG: signature * ctx) cP (flex : name list) (i: icit) (ps1: schema_part)  (ps2 : schema_part) =
+  let simul_subst_in_part sigma ps =
+    List.map (fun (n, e) -> n, simul_subst_syn sigma e) ps
+  in
+  match ps1, ps2 with
+  | [], [] ->  cG, []
+  | _, [] -> raise (Unification_failure (Schema_parts_dont_unify (flex, i, ps1, ps2)))
+  | [], _ -> raise (Unification_failure (Schema_parts_dont_unify (flex, i, ps1, ps2)))
+  | (n1, e1)::ps1, (n2, e2)::ps2 ->
+     let cD, sigma' = unify_flex_syn (sign, cG) cP flex e1 e2 in
+     let ps1' = simul_subst_in_part sigma' ps1 in
+     let ps2' = simul_subst_in_part sigma' ps2 in
+     let cD', sigma'' = (unify_flex_schema_part (sign, cD) (Snoc (cP, n1, simul_subst_syn sigma' e1)) flex i ps1' ps2') in
+     cD', sigma' @ sigma''
+
+
 
 and unify_flex_syn (sign, cG) cP flex e1 e2 =
   let is_flex n = List.mem n flex in
