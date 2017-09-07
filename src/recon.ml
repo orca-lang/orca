@@ -272,7 +272,10 @@ and check_ctx (sign, cG) g sch =
   | A.Var x ->
     begin match lookup_ctx_fail cG x with
     | I.Ctx sch' ->
-       let _ = Unify.unify_flex_schemata (sign, cG) [] sch sch' in (* we ignore the sigma *)
+       let _ = try
+           Unify.unify_flex_schemata (sign, cG) [] sch sch' (* we ignore the sigma *)
+         with Unify.Unification_failure problem -> raise (Error.Error (Unify.print_unification_problem problem))
+       in
        I.CtxVar x     (* Maybe we want to have a type annotation with I.CtxVar *)
     | _ -> raise (Error.Error ("Variable " ^ print_name x ^ " was expected to be a context variable."))
     end
@@ -292,35 +295,47 @@ and is_ctx (sign, cG) g =
     end
   | _ -> raise (Error.Error ("Expression " ^ AP.print_exp g ^ " was expected to be a context."))
 
-and check_type_against_schema (sign, cG) cP e = function
-  | I.Schema (im, [_, t]) ->
-     let t' = check_syn_type (sign, cG) cP e in
-     let tel = part_to_stel Syntax.Implicit im in
-     let tel', sigma, cP' = abstract cP tel in
-     let flex = List.map (fun (_, x, _) -> x) tel' in
-     let _, sigma' = Unify.unify_flex_syn (sign, cG) cP flex (I.Clos (t, sigma, cP')) t' in
-     simul_subst_syn sigma' t'
+and check_type_against_schema (sign, cG) cP e = try
+    function
+    | I.Schema (im, [_, t]) ->
+       let t' = check_syn_type (sign, cG) cP e in
+       let tel = part_to_stel Syntax.Implicit im in
+       let tel', sigma, cP' = abstract cP tel in
+       let flex = List.map (fun (_, x, _) -> x) tel' in
+       let _, sigma' = try
+           Unify.unify_flex_syn (sign, cG) cP flex (I.Clos (t, sigma, cP')) t'
+         with Unify.Unification_failure problem ->
+           raise (Error.Error ("Unification failed when checking a type against a schema.\n"
+                               ^ Unify.print_unification_problem problem))
+       in
+       simul_subst_syn sigma' t'
 
-  | I.Schema (im, ex) ->
-     let tel = part_to_stel Syntax.Implicit im in
-     let tel', sigma, cP' = abstract cP tel in
-     let flex = List.map (fun (_, x, _) -> x) tel' in
-     let ex' = List.map (fun (n, t) -> (n, I.Clos(t, sigma, cP'))) ex in
-     let rec unify_explicit cG cP sigma = function
-       | [], [] -> cG, sigma
-       | (n, t)::bs', (m, t')::ex' when n = m  ->
-          let cG', sigma' = Unify.unify_flex_syn (sign, cG) cP flex t t' in
-          let sigma'' = compose_subst sigma' sigma in
-          unify_explicit cG' (I.Snoc (cP, n, simul_subst_syn sigma'' t)) sigma'' (bs', ex')
-       | _ -> raise (Error.Error "Wrong block")
-     in
-     let bs = match e with
-       | A.Block bs -> bs
-       | _ -> raise (Error. Error "Expected a block")
-     in
-     let bs' = List.map (fun (n, e) -> (n, check_syn_type (sign, cG) cP e)) bs in (* WRONG: this should extend cP with each n *)
-     let cG', sigma = unify_explicit cG I.Nil [] (bs', ex') in
-     simul_subst_syn sigma (I.Block bs')
+    | I.Schema (im, ex) ->
+       let tel = part_to_stel Syntax.Implicit im in
+       let tel', sigma, cP' = abstract cP tel in
+       let flex = List.map (fun (_, x, _) -> x) tel' in
+       let ex' = List.map (fun (n, t) -> (n, I.Clos(t, sigma, cP'))) ex in
+       let rec unify_explicit cG cP sigma = function
+         | [], [] -> cG, sigma
+         | (n, t)::bs', (m, t')::ex' when n = m  ->
+            let cG', sigma' = try
+                Unify.unify_flex_syn (sign, cG) cP flex t t'
+              with Unify.Unification_failure problem ->
+                raise (Error.Error ("Unification failed when checking a block against a schema.\n"
+                                    ^ Unify.print_unification_problem problem))
+            in
+            let sigma'' = compose_subst sigma' sigma in
+            unify_explicit cG' (I.Snoc (cP, n, simul_subst_syn sigma'' t)) sigma'' (bs', ex')
+         | _ -> raise (Error.Error "Wrong block")
+       in
+       let bs = match e with
+         | A.Block bs -> bs
+         | _ -> raise (Error. Error "Expected a block")
+       in
+       let bs' = List.map (fun (n, e) -> (n, check_syn_type (sign, cG) cP e)) bs in (* WRONG: this should extend cP with each n *)
+       let cG', sigma = unify_explicit cG I.Nil [] (bs', ex') in
+       simul_subst_syn sigma (I.Block bs')
+  with Unify.Unification_failure problem -> raise (Error.Error (Unify.print_unification_problem problem))
 
 and check_syn (sign, cG) cP (e : A.exp) (t : I.syn_exp) =
   let t' = Whnf.rewrite sign cP t in
