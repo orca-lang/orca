@@ -100,8 +100,9 @@ module Apx = struct
     | Annot of exp * exp
     | Hole of name
 
+  and schema_part = (string * exp) list
   and schema
-    = Schema of (string * exp) list * (string * exp) list
+    = Schema of schema_part * schema_part
 
   and tel_entry = icit * name * exp
   and tel = tel_entry list
