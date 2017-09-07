@@ -125,14 +125,19 @@ and infer_type (sign, cG : signature * I.ctx) (s : A.exp) : I.exp * I.universe =
      Debug.print (fun () -> "Assert universe failed for " ^ IP.print_exp e ^ ".") ;
      raise (Error.Error "Not a universe.")
 
-and check_schema (sign , cG : signature * I.ctx) (sch : A.schema) : I.schema = assert false
-  (* match sch with *)
-  (* | A.SimpleType t -> *)
-  (*    let t' = check_syn_type (sign, cG) I.Nil t in *)
-  (*    I.SimpleType t' *)
-  (* | A.ExistType (tel, t) -> *)
-  (*    let tel', t' = check_spi (sign, cG) I.Nil tel t in *)
-  (*    I.ExistType (tel', t') *)
+and check_schema (sign , cG : signature * I.ctx) (A.Schema (im, ex) : A.schema) : I.schema =
+  let rec check_many (sign, cG) cP (ps : A.schema_part)=
+    match ps with
+    | [] -> [], cP
+    | (x, s)::ps' ->
+       let s' = check_syn_type (sign, cG) cP s in
+       let cP' = (I.Snoc (cP, x, s')) in
+       let ps'', t' = check_many (sign, cG) cP' ps' in
+       ((x, s')::ps''), cP'
+  in
+  let im', cP = check_many (sign, cG) I.Nil im in
+  let ex', _ = check_many (sign, cG) cP ex in
+  I.Schema(im', ex')
 
 and check (sign , cG : signature * I.ctx) (e : A.exp) (t : I.exp) : I.exp =
   let t' = Whnf.whnf sign t in
