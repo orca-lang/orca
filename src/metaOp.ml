@@ -600,3 +600,6 @@ and rename_syn (q : syn_pat) (p : Apx.pat) : (name * name) list =
 and rename_all (qs : pats) (ps : Apx.pats) : (name * name) list = List.concat (List.map2 rename qs ps)
 
 and rename_all_syn (qs : syn_pats) (ps : Apx.pats) : (name * name) list = List.concat (List.map2 rename_syn qs ps)
+
+(* transform a schema part into a stel *)
+let part_to_stel (i : icit) ps = List.map (fun (n, t) -> (i, n, t)) ps
