@@ -323,31 +323,29 @@ and fmt_syn_exp cG cP parens pps e =
       (fmt_syn_exp cG cP 2) e2
       (close_paren 3)
 
-and fmt_schema cG parens pps = assert false
-  (* let fmt_entry cP pps (_, n, t) = *)
-  (*   Fmt.pf pps "%a : %a" *)
-  (*           bound_name n *)
-  (*           (fmt_syn_exp cG cP 3) t *)
-  (* in *)
-  (* function *)
-  (* | SimpleType t -> *)
-  (*    Fmt.pf pps "%a" *)
-  (*           (fmt_syn_exp cG Nil parens) t *)
-  (* | ExistType (tel, t) -> *)
-  (*    let rec pr_stel cP pps = function *)
-  (*      | (_, n, t) as se :: [] -> *)
-  (*         fmt_entry cP pps se *)
-  (*      | (_, n, t) as se :: tel -> *)
-  (*         Fmt.pf pps "%a, %a" *)
-  (*                (fmt_entry cP) se *)
-  (*                (pr_stel (Snoc(cP, n, t))) tel *)
-  (*      | [] -> () *)
-  (*    in *)
-  (*    Fmt.pf pps "{%a} %a" *)
-  (*        (pr_stel Nil) tel *)
-  (*        (fmt_syn_exp cG (bctx_of_names (List.map (fun (_, x, _) -> x) tel) Nil) 1) t *)
+and fmt_schema cG parens pps = function
+  |  (Schema ([], ex)) ->
+       Fmt.pf pps "%a"
+              (fmt_schema_part cG Nil parens) ex
+
+  |  (Schema (im, ex)) ->
+       Fmt.pf pps "{%a} %a"
+              (fmt_schema_part cG Nil parens) im
+              (fmt_schema_part cG Nil parens) ex
 
 
+and fmt_schema_part cG cP parens pps = function
+  | [] -> ()
+  | [(n, t)] ->
+     Fmt.pf pps "%s : %a"
+            n
+            (fmt_syn_exp cG cP parens) t
+
+  | (n, t)::ps' ->
+     Fmt.pf pps "%s : %a, %a"
+            n
+            (fmt_syn_exp cG cP parens) t
+            (fmt_schema_part cG (Snoc (cP, n, t)) parens) ps'
 
 and fmt_bctx cG pps = function
   | Nil -> string pps "0"
