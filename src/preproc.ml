@@ -188,8 +188,16 @@ let rec pproc_exp (s : sign) (cG : ctx) (cP : bctx) (e : E.exp) : A.exp =
   | E.Annot (e1, e2) -> A.Annot(f e1, f e2)
   | E.Hole (Some n) -> A.Hole (Name.gen_name n)
   | E.Hole None -> A.Hole (Name.gen_name "H")
+  | E.Block bs ->
+     let bs' = assert false in
+     A.Block bs'
   in Debug.deindent ();
   res
+
+and pproc_block (s : sign) (cG : ctx) (cP : bctx) : (E.name * E.exp) list -> (string * A.exp) list =
+  function
+  | [] -> []
+  | (n, e)::bs -> (n, pproc_exp s cG cP e)::pproc_block s cG (n::cP) bs
 
 and pproc_schema (s : sign) (cG : ctx) (cP : bctx) (E.Schema (impl, expl) : E.schema) : A.schema =
   let rec pproc_params cP = function
