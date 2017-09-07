@@ -70,6 +70,14 @@ let print_unification_problem = function
 
 exception Unification_failure of unification_problem
 
+(* Register the printer, if the exception is not catched, get some default error message *)
+let () =
+  Printexc.register_printer
+    (function
+      | Unification_failure problem -> Some (Printf.sprintf "Unification failure (%s)" (print_unification_problem problem))
+      | _ -> None (* for other exceptions *)
+    )
+
 let rec occur_check sign n e =
   let f e = occur_check sign n e in
   match Whnf.whnf sign e with
