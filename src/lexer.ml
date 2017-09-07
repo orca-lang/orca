@@ -12,7 +12,7 @@ let regexp lower = ['a'-'z']
 let regexp upper = ['A'-'Z']
 
 (* Old regexp: (lower | upper) (lower | upper | digit)* *)
-let regexp identifier = [^ '\x09'-'\x0a' '\x20' '\x0d' '(' ')' ':' ',' '\\' '.' '[' ']' ';' '{' '}']+
+let regexp identifier = [^ '\x09'-'\x0a' '\x20' '\x0d' '(' ')' ':' ',' '\\' '.' '[' ']' ';' '{' '}' '|']+
 
 let regexp hole = "?" identifier
 

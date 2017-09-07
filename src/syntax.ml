@@ -36,6 +36,7 @@ module Ext = struct
     | Nil
     | Annot of exp * exp
     | Ctx of schema
+    | Block of (name * exp) list
 
   and schema
     = Schema of (name * exp) list * (name * exp) list
@@ -99,6 +100,7 @@ module Apx = struct
     | Nil
     | Annot of exp * exp
     | Hole of name
+    | Block of (string * exp) list
 
   and schema_part = (string * exp) list
   and schema
@@ -185,6 +187,7 @@ module Int = struct
     | ShiftS of int * syn_exp
     | Star (* Universe of syntax *)
     | SPi of stel * syn_exp (* A syntactic type *)
+    | Block of (string * syn_exp) list
     | SBCtx of bctx
     | SCtx of schema
     | Unbox of exp * syn_exp * bctx

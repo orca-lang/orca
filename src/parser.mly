@@ -110,8 +110,15 @@ exp_level5:
 | e = located(raw_exp_level5) {e}
 
 raw_exp_level5:
-| s = exp_level5 COMMA e = exp_level6 {Comma (s, e)}
+| s = exp_level5 COMMA b = block {Comma (s, b)}
 | s = exp_level5 SEMICOLON e = exp_level6 {Semicolon (s, e)}
+| e = raw_exp_level6 {e}
+
+block:
+| b = located(raw_block) {b}
+
+raw_block:
+| MID ex=separated_nonempty_list(COMMA, schema_ex) MID { Block ex }
 | e = raw_exp_level6 {e}
 
 exp_level6:
@@ -128,8 +135,6 @@ exp_level7:
 raw_exp_level7:
 | e1 = exp_level7 LSQUARE e2 = exp RSQUARE {Clos(e1, e2)}
 | e = raw_simple_exp {e}
-
-
 
 simple_exp:
 | e = located(raw_simple_exp) {e}
