@@ -603,3 +603,7 @@ and rename_all_syn (qs : syn_pats) (ps : Apx.pats) : (name * name) list = List.c
 
 (* transform a schema part into a stel *)
 let part_to_stel (i : icit) ps = List.map (fun (n, t) -> (i, n, t)) ps
+
+let rec part_to_bctx = function
+  | [] -> Nil
+  | (n, t)::ps -> Snoc(part_to_bctx ps, n, t)

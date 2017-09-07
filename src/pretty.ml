@@ -329,9 +329,10 @@ and fmt_schema cG parens pps = function
               (fmt_schema_part cG Nil parens) ex
 
   |  (Schema (im, ex)) ->
+      let cP = MetaOp.part_to_bctx im in
        Fmt.pf pps "{%a} %a"
               (fmt_schema_part cG Nil parens) im
-              (fmt_schema_part cG Nil parens) ex
+              (fmt_schema_part cG cP parens) ex
 
 
 and fmt_schema_part cG cP parens pps = function

@@ -12,7 +12,7 @@ spec oft : tm -> tp -> * where
 | t-app: (f e : tm) (s t : tp) -> oft f (arr s t) -> oft e s -> oft (app f e) t
 | t-lam: (e : tm ->> tm) (s t : tp) -> ((x:tm) ->> oft x s ->> oft (e x) t) -> oft (lam e) (arr s t)
 
-def copy-oft : (g : ctx {t : tp} (tm)) (m : (g |- tm)) (t : (|- tp)) -> (g |- oft m t) -> (g |- oft m t) = ?
+def copy-oft : (g : ctx {t : tp} (e : tm, d: oft e t)) (m : (g |- tm)) (t : (|- tp)) -> (g |- oft m t) -> (g |- oft m t) = ?
 
 (*) def copy : (g : ctx tm) -> (g |- tm) -> (g |- tm) where
 (*) | g one => one
