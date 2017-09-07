@@ -197,12 +197,10 @@ and pproc_schema (s : sign) (cG : ctx) (cP : bctx) (E.Schema (impl, expl) : E.sc
     | (x, t)::params ->
        let cP' = x::cP in
        let params', cP'' = pproc_params cP' params in
-       print_endline ("cP = " ^ String.concat ", " cP ^ "\t\tcP'' = " ^ String.concat ", " cP'');
        (x, pproc_exp s cG cP t)::params', cP''
   in
 
   let impl', cP' = pproc_params cP impl in
-  print_endline ("cP = " ^ String.concat ", " cP ^ "\ncP' = " ^ String.concat ", " cP');
   let expl', _ = pproc_params cP' expl in
   A.Schema(impl', expl')
 
