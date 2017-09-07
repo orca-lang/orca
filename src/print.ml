@@ -37,6 +37,7 @@ module Ext = struct
     | Hole (Some s) -> "?" ^ s
     | Hole None -> "?"
     | Ctx sch -> "ctx " ^ print_schema sch
+    | Block bs -> "|" ^ String.concat ", " (List.map (fun (n, t) -> n  ^ " : " ^ print_exp t ) bs) ^ "|"
 
   and print_schema (Schema (impl, expl)) =
     let f ps = String.concat ", " (List.map (fun (x, t) -> x ^ " : " ^ print_exp t) ps) in
@@ -113,6 +114,7 @@ module Apx = struct
     | Nil -> "0"
     | Annot (e1, e2) -> "(" ^ print_exp e1 ^ " : " ^ print_exp e2 ^ ")"
     | Hole s -> "?" ^ print_name s
+    | Block bs -> "|" ^ String.concat ", " (List.map (fun (n, t) -> n  ^ " : " ^ print_exp t ) bs) ^ "|"
 
   and print_schema (Schema (impl, expl)) =
     let f ps = String.concat ", " (List.map (fun (x, t) -> x ^ " : " ^ print_exp t) ps) in
@@ -249,6 +251,7 @@ module Int = struct
     | Unbox (e, se, cP) -> "(ub " ^ print_exp e ^ "[" ^ print_syn_exp se ^ " : " ^ print_bctx cP  ^ "])"
     | SCtx sch -> "ctx " ^ print_schema sch
     | SBCtx cP -> print_bctx cP
+    | Block bs -> "|" ^ String.concat ", " (List.map (fun (n, t) -> n ^ " : " ^ print_syn_exp t) bs) ^ "|"
 
   and print_schema = function
     | Schema (impl, expl) -> "{" ^ print_block_entries impl ^ "} (" ^ print_block_entries expl ^ ")"
