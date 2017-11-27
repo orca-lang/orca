@@ -50,7 +50,7 @@ and fv_syn cG =
      fv cG e @ fvs s @ fv_ctx cG cP
   | SBCtx cP -> fv_ctx cG cP
   | SCtx sch -> fv_schema cG sch
-  | Block _ -> assert false
+  | Block block -> List.concat (List.map (fun (_, t) -> fvs t) block)
 
 and fv_schema cG = function
   | Schema (impl, expl) -> List.concat (List.map (fun (_, t) -> fv_syn cG t) impl)
@@ -224,7 +224,7 @@ and refresh_free_var_syn (x, y) e =
   | ShiftS (n, e) -> ShiftS (n, f e)
   | Dot (e1, e2) -> Dot (f e1, f e2)
   | SBCtx cP -> SBCtx (refresh_free_var_bctx (x, y) cP)
-  | Block _ -> assert false
+  | Block cs -> Block (List.map (fun (z, e) -> (z, f e)) cs) (* z has to be free *)
 
 and refresh_free_var_schema rep (Schema (im, ex)) =
   let f (n, t) = (n, refresh_free_var_syn rep t) in
@@ -311,7 +311,7 @@ and subst_syn (x, es) e =
   | Comp (e1, cP, e2) -> Comp (f e1, subst_bctx (x, es) cP, f e2)
   | Dot (e1, e2) -> Dot (f e1, f e2)
   | SBCtx cP -> SBCtx (subst_bctx (x, es) cP)
-  | Block _ -> assert false
+  | Block cs -> Block (List.map (fun (y, e) -> (y, subst_syn (x, es) e)) cs)
 
 and subst_bctx (x, es : single_subst) cP =
   match cP with

@@ -512,7 +512,7 @@ and normalize_syn sign cP e =
    | Unbox (e,s, cP') ->
      let cP'' = normalize_bctx sign cP' in
      Unbox (normalize sign e, norm s, cP'')
-   | Block _ -> failwith "Not implemented"
+   | Block cs -> Block (List.map (fun (x, e) -> x, norm e) cs)
 
 and normalize_bctx sign cP =
   match cP with
