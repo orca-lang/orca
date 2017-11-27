@@ -26,9 +26,16 @@ open Loc
 
 type sign = E.name list (* The signature for types *)
 type ctx = (E.name * Name.name) list  (* The context for regular variables *)
-type bctx = E.name list            (* The context for bound variables *)
+type bctx = (E.name list) list            (* The context for bound variables *)
 
-let add_name_bvars cP ns : bctx = ns @ cP
+let rec print_bctx =
+  let print_block ns = "| " ^  String.concat ", " ns ^ " |" in
+  function
+  | [] -> ""
+  | [n]::xs -> n ^ ", " ^ print_bctx xs
+  | ns::xs -> print_block ns
+
+let add_name_bvars cP ns : bctx = (List.map (fun n -> [n]) ns) @ cP
 
 let rec lookup cG n =
   match cG with
@@ -37,9 +44,18 @@ let rec lookup cG n =
   | [] -> None
 
 let index n cP =
+  let rec proj n i = function
+    | [n] when i = 0 -> Some None
+    | n' :: _ when n = n' -> Some (Some i)
+    | _ :: xs -> proj n (i + 1) xs
+    | [] -> None
+  in
   let rec index n i = function
-    | n' :: _ when n = n' -> Some i
-    | _ :: xs -> index n (i + 1) xs
+    | x :: xs ->
+       begin match proj n 0 x with
+       | None -> index n (i + 1) xs
+       | Some p -> Some (i, p)
+       end
     | [] -> None
   in
   index n 0 cP
@@ -102,8 +118,8 @@ let collect_pat_ctx (s : sign) (cG : ctx) (cP : bctx) (n : E.name) : ctx =
 
 let rec get_bound_var_ctx (e: E.exp) : bctx =
   match content e with
-  | E.Comma (g, P(_, E.Annot(P(_, E.Ident n), _))) -> n :: (get_bound_var_ctx g)
-  | E.Annot(P(_, E.Ident n), _) -> [n]
+  | E.Comma (g, P(_, E.Annot(P(_, E.Ident n), _))) -> [n] :: (get_bound_var_ctx g)
+  | E.Annot(P(_, E.Ident n), _) -> [[n]]
   | E.Nil -> []
   | _ -> []
 
@@ -121,7 +137,7 @@ let rec get_bound_var_ctx_no_annot (e : E.exp) : ctx =
 
 let rec get_bound_var_ctx_in_pat (p : E.pat) : bctx =
   match p with
-  | E.PComma (g, Some n, _) -> n :: (get_bound_var_ctx_in_pat g)
+  | E.PComma (g, Some n, _) -> [n] :: (get_bound_var_ctx_in_pat g)
   | E.PNil -> []
   | E.PIdent _ -> []            (* MMMM *)
   | p -> raise (Error.Error (EP.print_pat p ^ " is a forbidden pattern on the left hand side of :>"))
@@ -130,7 +146,8 @@ let rec pproc_exp (s : sign) (cG : ctx) (cP : bctx) (e : E.exp) : A.exp =
   Debug.print (fun () -> "Preprocessing expression " ^ EP.print_exp e);
   Debug.indent ();
   let f e = pproc_exp s cG cP e in
-  let res = match content e with
+  let res =
+match content e with
   | E.Star -> A.Star
   | E.Set n -> A.Set n
   | E.Ctx sch -> A.Ctx (pproc_schema s cG cP sch)
@@ -151,11 +168,8 @@ let rec pproc_exp (s : sign) (cG : ctx) (cP : bctx) (e : E.exp) : A.exp =
     else
       raise (Error.Error_loc (loc e, "Bound variables bindings (|-) cannot be nested"))
   | E.ABox (g, e) ->
-     if cP = [] then
        let cP' = get_bound_var_ctx g in
        pproc_exp s cG cP' e
-    else
-      raise (Error.Error_loc (loc e, "Bound variables bindings (:>) cannot be nested"))
 
   | E.Fn (ns, e) ->
      let cG', n' = add_names_ctx cG ns in
@@ -169,7 +183,7 @@ let rec pproc_exp (s : sign) (cG : ctx) (cP : bctx) (e : E.exp) : A.exp =
     let h, sp = pproc_app s cG cP e in
      A.AppL(h, sp)
   | E.Ident n -> find_name s cG cP (n, loc e)
-  | E.BVar i -> A.BVar i
+  | E.BVar i -> A.BVar (i, None)
   | E.Clos (e, P(_, E.Shift 0)) -> A.Clos(f e, A.Shift 0)
   | E.Clos (e1, e2) ->
      let e1' = try
@@ -189,7 +203,7 @@ let rec pproc_exp (s : sign) (cG : ctx) (cP : bctx) (e : E.exp) : A.exp =
   | E.Hole (Some n) -> A.Hole (Name.gen_name n)
   | E.Hole None -> A.Hole (Name.gen_name "H")
   | E.Block bs ->
-     let bs' = assert false in
+     let bs' = pproc_block s cG cP bs in
      A.Block bs'
   in Debug.deindent ();
   res
@@ -197,13 +211,15 @@ let rec pproc_exp (s : sign) (cG : ctx) (cP : bctx) (e : E.exp) : A.exp =
 and pproc_block (s : sign) (cG : ctx) (cP : bctx) : (E.name * E.exp) list -> (string * A.exp) list =
   function
   | [] -> []
-  | (n, e)::bs -> (n, pproc_exp s cG cP e)::pproc_block s cG (n::cP) bs
+  | (n, e)::bs ->
+     Debug.print (fun () -> "n = " ^ n ^ " cP = " ^ print_bctx cP );
+     (n, pproc_exp s cG cP e)::pproc_block s cG ([n]::cP) bs
 
 and pproc_schema (s : sign) (cG : ctx) (cP : bctx) (E.Schema (impl, expl) : E.schema) : A.schema =
   let rec pproc_params cP = function
     | [] -> [], cP
     | (x, t)::params ->
-       let cP' = x::cP in
+       let cP' = [x]::cP in
        let params', cP'' = pproc_params cP' params in
        (x, pproc_exp s cG cP t)::params', cP''
   in
@@ -220,13 +236,13 @@ and pproc_comma (s : sign) (cG : ctx) (cP : bctx) (g : E.exp) : bctx * A.exp =
     | e -> raise (Error.Error ("End of a comma expression needs to be a context variable. Instead found: " ^ AP.print_exp e))
     end
   | E.Annot (P(_, E.Ident n), e) ->
-     n::cP, A.Snoc(A.Nil, n, pproc_exp s cG cP e)
+     [n]::cP, A.Snoc(A.Nil, n, pproc_exp s cG cP e)
   | E.Nil -> cP, A.Nil
   | E.Comma(e1, e2) ->
     let cP', e1' = pproc_comma s cG cP e1 in
     begin match content e2 with
     | E.Annot (P(_, E.Ident n), e) ->
-       n::cP', A.Snoc(e1', n, pproc_exp s cG cP' e)
+       [n]::cP', A.Snoc(e1', n, pproc_exp s cG cP' e)
     | _ ->
        cP', A.Snoc(e1', "_", pproc_exp s cG cP' e2)
     end
@@ -312,7 +328,7 @@ and pproc_stel (s : sign) (cG : ctx) (cP : bctx) (e : E.exp) : A.stel * A.exp =
     tel @ tel', t
   | E.Arr (t0, t1)
   | E.SArr (t0, t1) ->
-     let tel, t = pproc_stel s cG ("_"::cP) t1 in
+     let tel, t = pproc_stel s cG (["_"]::cP) t1 in
      (Syntax.Explicit, "_", pproc_exp s cG cP t0) :: tel , t
   | t -> [], pproc_exp s cG cP (ghost t)
 
@@ -382,7 +398,7 @@ let rec collect_pat_vars (s : sign) cG cP p =
   | E.PIdent n -> collect_pat_ctx s cG cP n
   | E.Inacc e -> cG
   | E.PLam (xs, p) ->
-     collect_pat_vars s cG (xs@cP) p
+     collect_pat_vars s cG ((List.map (fun x -> [x]) xs)@cP) p
   | E.PConst (c, ps) ->
     List.fold_left (fun cG p -> collect_pat_vars s cG cP p) cG ps
   | E.PClos (x, e) -> collect_pat_ctx s cG cP x
@@ -397,11 +413,8 @@ let rec collect_pat_vars (s : sign) cG cP p =
      let cP' = get_bound_var_ctx_in_pat p1 in
      collect_pat_vars s cG' cP' p2
   | E.PBox (g, p) ->
-    if cP = [] then
       let cP' = get_bound_var_ctx_in_pat g in
       collect_pat_vars s cG cP' p
-    else
-      raise (Error.Error "Bound variables bindings (:>) cannot be nested")
   | E.PPar n ->collect_pat_ctx s cG cP n
   | E.PUnder -> cG
   | E.PWildcard -> cG
@@ -437,7 +450,7 @@ let rec pproc_pat (s : sign) cG cP p =
      Debug.print (fun () -> "Preprocessing inaccessible pattern " ^ EP.print_exp e ^ " in context " ^ print_ctx cG);
      A.Inacc (pproc_exp s cG [] e)
   | E.PLam (xs, p) ->
-    A.PLam (xs, pproc_pat s cG (xs@cP) p)
+    A.PLam (xs, pproc_pat s cG ((List.map (fun x -> [x]) xs)@cP) p)
   | E.PConst (c, ps) ->
     let ps' = List.map (pproc_pat s cG cP) ps in
     A.PConst (c, ps')
@@ -457,11 +470,8 @@ let rec pproc_pat (s : sign) cG cP p =
      Debug.print(fun () -> "resulting in \np1' = " ^ AP.print_pat p1' ^ "\np2' = " ^ AP.print_pat p2');
      A.PSnoc(p1', x, p2')
   | E.PBox (g, p) ->
-    if cP = [] then
       let cP' = get_bound_var_ctx_in_pat g in
       pproc_pat s cG cP' p
-    else
-      raise (Error.Error "Bound variables bindings (:>) cannot be nested")
   | E.PUnder -> A.PUnder
   | E.PWildcard -> A.PWildcard
 

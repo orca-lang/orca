@@ -1,10 +1,21 @@
 type icit = Explicit | Implicit
 type def_name = string
 
+type index = int * (int option)
+
+
+
+let inc_idx (n, p) = (n + 1, p)
+let dec_idx (n, p) = (n - 1, p)
+let shift_idx (n, p) m = (n + m , p)
+
+let zidx = (0, None)
+
+
 type pat_subst
   = CShift of int
   | CEmpty
-  | CDot of pat_subst * int
+  | CDot of pat_subst * index
 
 let pid_sub = CShift 0
 
@@ -37,6 +48,7 @@ module Ext = struct
     | Annot of exp * exp
     | Ctx of schema
     | Block of (name * exp) list
+    | TTSBlock of name list
 
   and schema
     = Schema of (name * exp) list * (name * exp) list
@@ -75,7 +87,6 @@ end
 module Apx = struct
   open Name
 
-  type index = int
   type universe = int
 
   type exp
@@ -157,7 +168,6 @@ end
 module Int = struct
   open Name
 
-  type index = int
   type universe = int
 
   type exp

@@ -148,6 +148,7 @@ and refresh_syn_exp rep =
   | Dot (e1, e2) -> Dot (f e1, f e2)
   | Unbox (e1, e2, cP) -> Unbox (refresh_exp rep e1, f e2, refresh_bctx rep cP)
   | SBCtx cP -> SBCtx (refresh_bctx rep cP)
+  | Block bs -> Block (List.map (fun (n, t) -> (n, f t)) bs)
 
 and refresh_schema rep (Schema (im, ex)) =
   let f (n, t) = (n, refresh_syn_exp rep t) in
@@ -439,16 +440,16 @@ let rec wkn_pat_subst_by_n s =
   let rec shift = function
     | CShift n -> CShift (n+1)
     | CEmpty -> CEmpty
-    | CDot (s, n) -> CDot (shift s, n+1)
+    | CDot (s, n) -> CDot (shift s, (fst n+1, snd n))
   in
   function
   | 0 -> s
-  | n -> wkn_pat_subst_by_n (CDot (shift s , 0)) (n-1)
+  | n -> wkn_pat_subst_by_n (CDot (shift s, zidx)) (n-1)
 
 let rec lookup_pat_subst err i s = match i, s with
-  | 0, CDot (_, j) -> j
-  | i, CDot (s', _) -> lookup_pat_subst err (i-1) s'
-  | i, CShift n -> (i + n)
+  | (0, _), CDot (_, j) -> j
+  | i, CDot (s', _) -> lookup_pat_subst err (dec_idx i) s'
+  | i, CShift n -> shift_idx i n
   | i, CEmpty -> raise (Error.Error err)
 
 let rec comp_pat_subst err s s' =

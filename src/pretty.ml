@@ -29,13 +29,13 @@ let rec beautify_bound_names xs cP =
     let x' = beautify_bound_name x cP in
     x'::beautify_bound_names xs (Snoc (cP, x, Star)) (* star is a dummy type *)
 
-let rec beautify_idx i cP =
+let rec beautify_idx (n, proj) cP =
   if not (do_beautify ()) then None
-  else match i, cP with
+  else match n, cP with
   | _, CtxVar _
   | _, Nil -> None
   | 0, Snoc(cP', x, _) -> Some (beautify_bound_name x cP')
-  | i, Snoc(cP', _, _) -> beautify_idx (i-1) cP'
+  | i, Snoc(cP', _, _) -> beautify_idx (n-1, proj) cP'
 
 (* This is meant as higher than any other paren level. Raise if needed *)
 let never_paren = 20
@@ -73,13 +73,19 @@ let comp_var, comp_new_var =
   in
   with_beautify Name.beautify_name, with_beautify Name.beautify_new_name
 
-let bound_var = styled bound_var_color Fmt.int
+let bound_var pps i =
+  let bv = function
+    | (i, None) -> Fmt.pf pps "%d" i
+    | (i, Some j) -> Fmt.pf pps "%d.%d" i j
+  in
+  (* styled bound_var_color *) (bv i) (* TODO pretty colours? *)
+
 let bound_name = styled `Bold (styled bound_var_color string)
 
 let bound_var_name cG pps i =
   match beautify_idx i cG with
   | None -> bound_var pps i
-  | Some s -> bound_name pps s
+  | Some s -> bound_name pps s (* TODO print the projection? *)
 
 (* some dummy types *)
 let dt = Set 0
@@ -322,6 +328,8 @@ and fmt_syn_exp cG cP parens pps e =
       (fmt_syn_exp cG cP 3) e1
       (fmt_syn_exp cG cP 2) e2
       (close_paren 3)
+  | Block bs ->
+     Fmt.pf pps "bloooooock"
 
 and fmt_schema cG parens pps = function
   |  (Schema ([], ex)) ->

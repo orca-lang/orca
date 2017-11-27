@@ -20,10 +20,15 @@ let lookup_bound_name cP x =
   in
   lookup cP 0
 
-let lookup_bound cP x =
+let lookup_bound cP (x, j) =
+  let proj = function
+    | Block bs, Some j' -> snd (List.nth bs j')
+    | t, None -> t
+    | _ -> raise (Error.Error "Projection of something that is not a block.")
+  in
   let rec lookup cP0 i =
     match cP0 with
-    | Snoc (_, _, t) when i = 0 -> Clos(t, Shift (x+1), cP)
+    | Snoc (_, _, t) when i = 0 -> Clos(proj (t, j), Shift (x+1), cP)
     | Snoc (cP', _, _) -> lookup cP' (i-1)
     | _ -> raise (Error.Error ("Bound variable had index larger than bound context"))
   in
@@ -100,15 +105,15 @@ exception Inv_fail
 let apply_inv_pat_subst e s =
   let rec add_id_cdot n s =
     if n = 0 then s
-    else CDot(add_id_cdot (n-1) s, n-1)
+    else CDot(add_id_cdot (n-1) s, (n-1, None))
   in
   let rec apply_inv e s =
     let rec apply_inv' n s cnt =
       match s with
-      | CDot (s, m) when n = m -> BVar cnt
+      | CDot (s, m) when n = m -> BVar (cnt, None)
       | CDot (s, _) -> apply_inv' n s (cnt+1)
-      | CShift m when n < m -> raise Inv_fail
-      | CShift m -> BVar (n - m)
+      | CShift m when fst n < m -> raise Inv_fail
+      | CShift m -> BVar (fst n - m, None) (* We lose the projection. Fix plox *)
       | CEmpty -> raise Inv_fail
     in
     match e, s with
@@ -117,7 +122,7 @@ let apply_inv_pat_subst e s =
     | Star, _ -> Star
     | SPi(tel, t'),_ ->
       SPi(List.map (fun (i,x,e) -> i, x, apply_inv e s) tel, apply_inv t' (add_id_cdot (List.length tel) s))
-    | Lam (x, e), _ -> Lam(x, apply_inv e (CDot (s, 0)))
+    | Lam (x, e), _ -> Lam(x, apply_inv e (CDot (s, (0, None))))
     | AppL (e, es), _ -> AppL(apply_inv e s, List.map (fun e -> apply_inv e s) es)
     | SBCtx cP, _ -> SBCtx cP
     | Clos (e, s', cP), _ -> Clos(e, apply_inv s' s, cP)
@@ -133,6 +138,7 @@ let apply_inv_pat_subst e s =
     | SCtx t, _ -> SCtx t
     | SConst n, _ -> SConst n
     | Unbox(e, s', cP), _ -> Unbox (e, apply_inv s' s, cP)
+    | Block _, _ -> assert false
   in
   try Some (apply_inv e s)
   with Inv_fail -> None
@@ -140,15 +146,15 @@ let apply_inv_pat_subst e s =
 let apply_inv_subst e s =
   let rec add_id_cdot n s =
     if n = 0 then s
-    else Dot(add_id_cdot (n-1) s, BVar (n-1))
+    else Dot(add_id_cdot (n-1) s, BVar (n-1, None))
   in
   let rec apply_inv e s =
     let rec apply_inv' n s cnt =
       match s with
-      | Dot (s, BVar m) when n = m -> BVar cnt
+      | Dot (s, BVar m) when n = m -> BVar (cnt, None)
       | Dot (s, _) -> apply_inv' n s (cnt+1)
-      | Shift m when n < m -> raise Inv_fail
-      | Shift m -> BVar (n - m)
+      | Shift m when fst n < m -> raise Inv_fail
+      | Shift m -> BVar (fst n - m, snd n) (* This is suspicious. Please revisit when broken *)
       | Empty -> raise Inv_fail
       | ShiftS _ -> assert false
       | Comp _ -> assert false

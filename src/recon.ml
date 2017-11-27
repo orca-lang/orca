@@ -2,6 +2,7 @@ open MetaOp
 open MetaSub
 open Sign
 open Name
+open Structures
 
 module A = Syntax.Apx
 module AP = Print.Apx
@@ -314,10 +315,16 @@ and check_type_against_schema (sign, cG) cP e = try
        let tel = part_to_stel Syntax.Implicit im in
        let tel', sigma, cP' = abstract cP tel in
        let flex = List.map (fun (_, x, _) -> x) tel' in
-       let ex' = List.map (fun (n, t) -> (n, I.Clos(t, sigma, cP'))) ex in
+       let rec subst_in_schema i cP = function
+         | [] -> []
+         | (n, t) :: ex ->
+            let t' = I.Clos(t, (if i > 0 then I.ShiftS (i, sigma) else sigma), cP) in
+            (n, t') :: subst_in_schema (i+1) (I.Snoc(cP, n, t')) ex
+       in
+       let ex' = subst_in_schema 0 cP' ex in
        let rec unify_explicit cG cP sigma = function
          | [], [] -> cG, sigma
-         | (n, t)::bs', (m, t')::ex' when n = m  ->
+         | (n, t)::bs', (m, t')::ex' ->
             let cG', sigma' = try
                 Unify.unify_flex_syn (sign, cG) cP flex t t'
               with Unify.Unification_failure problem ->
@@ -329,13 +336,18 @@ and check_type_against_schema (sign, cG) cP e = try
          | _ -> raise (Error.Error "Wrong block")
        in
        let bs = match e with
-         | A.Block bs -> bs
+         | A.Block bs -> check_block (sign, cG) cP bs
          | _ -> raise (Error. Error "Expected a block")
        in
-       let bs' = List.map (fun (n, e) -> (n, check_syn_type (sign, cG) cP e)) bs in (* WRONG: this should extend cP with each n *)
-       let cG', sigma = unify_explicit cG I.Nil [] (bs', ex') in
-       simul_subst_syn sigma (I.Block bs')
+       let cG', sigma = unify_explicit cG I.Nil [] (bs, ex') in
+       simul_subst_syn sigma (I.Block bs)
   with Unify.Unification_failure problem -> raise (Error.Error (Unify.print_unification_problem problem))
+
+and check_block (sign, cG) cP = function
+  | [] -> []
+  | (n, e)::bs ->
+     let e' = check_syn_type (sign, cG) cP e in
+     (n, e')::(check_block (sign, cG) (I.Snoc(cP, n, e')) bs)
 
 and check_syn (sign, cG) cP (e : A.exp) (t : I.syn_exp) =
   let t' = Whnf.rewrite sign cP t in
@@ -466,7 +478,7 @@ and infer_syn (sign, cG) cP (e : A.exp) =
 
     | A.BVar i ->
        let t = lookup_bound cP i in
-       Debug.print (fun () -> "Looking bound variable " ^ string_of_int i ^ " resulted in type " ^ PP.print_syn_exp cG cP t
+       Debug.print (fun () -> "Looking bound variable " ^ Print.print_index i ^ " resulted in type " ^ PP.print_syn_exp cG cP t
                               ^ "\n Context is " ^ PP.print_bctx cG (Whnf.whnf_bctx sign cP));
        I.BVar i, t
     | A.Clos (e, s) ->

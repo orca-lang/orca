@@ -274,30 +274,30 @@ and rewrite (sign : signature) cP (e : syn_exp) : syn_exp =
   | Clos (e, Empty, _) -> w (dmsg "Empty" (fun () -> e))
 
   (* VarShift 1 *)
-  | Clos(BVar n, Shift n', _) -> (dmsg "VarShift 1" (fun () -> (BVar (n + n'))))
+  | Clos(BVar n, Shift n', _) -> (dmsg "VarShift 1" (fun () -> (BVar (shift_idx n n'))))
 
   (* VarShift 2 *)
-  | Clos(BVar n, Comp(s, cP, Shift n'), _) -> w (dmsg "VarShift 2" (fun () -> (Clos(BVar (n + n'), s, cP))))
+  | Clos(BVar n, Comp(s, cP, Shift n'), _) -> w (dmsg "VarShift 2" (fun () -> (Clos(BVar (shift_idx n n'), s, cP))))
 
   (* FVarsCons *)
-  | Clos(BVar 0, Dot (s, e), _) -> w (dmsg "FVarsCons" (fun () -> e))
+  | Clos(BVar zidx, Dot (s, e), _) -> w (dmsg "FVarsCons" (fun () -> e))
 
   (* FVarLift 1 *)
-  | Clos(BVar i, ShiftS (n, s), _) when i < n -> (dmsg "FVarLift 1" (fun () -> (BVar i)))
+  | Clos(BVar i, ShiftS (n, s), _) when fst i < n -> (dmsg "FVarLift 1" (fun () -> (BVar i)))
 
   (* FVarLift 2 *)
-  | Clos(BVar i, Comp(s2, cP, ShiftS (n, s1)), _) when i < n -> w (dmsg "FVarLift 2" (fun () -> (Clos(BVar i, s2, cP))))
+  | Clos(BVar i, Comp(s2, cP, ShiftS (n, s1)), _) when fst i < n -> w (dmsg "FVarLift 2" (fun () -> (Clos(BVar i, s2, cP))))
 
   (* RVarCons *)
-  | Clos (BVar n, Dot(s, _), Snoc (cP, _, _)) when n > 0 -> w (dmsg "RVarCons" (fun () -> (Clos(BVar (n-1), s, cP))))
+  | Clos (BVar n, Dot(s, _), Snoc (cP, _, _)) when fst n > 0 -> w (dmsg "RVarCons" (fun () -> (Clos(BVar (dec_idx n), s, cP))))
 
   (* RVarLift 1 *)
-  | Clos (BVar n, ShiftS (m, s), cP) when n >= m ->
-     w (dmsg "RVarLift 1" (fun () -> (Clos(BVar (n-m), Comp(Shift m, keep_suffix cP m, s), drop_suffix cP m))))
+  | Clos (BVar n, ShiftS (m, s), cP) when fst n >= m ->
+     w (dmsg "RVarLift 1" (fun () -> (Clos(BVar (shift_idx n (-m)), Comp(Shift m, keep_suffix cP m, s), drop_suffix cP m))))
 
   (* RVarLift 2 *)
-  | Clos (BVar n, Comp(s2, cP1, ShiftS (m, s1)), cP) when n >= m ->
-     w (dmsg "RVarLift 2" (fun () -> (Clos(BVar (n-m), Comp (Comp(s2, cP1, Shift m), drop_suffix cP1 m, s1), drop_suffix cP m))))
+  | Clos (BVar n, Comp(s2, cP1, ShiftS (m, s1)), cP) when fst n >= m ->
+     w (dmsg "RVarLift 2" (fun () -> (Clos(BVar (shift_idx n (-m)), Comp (Comp(s2, cP1, Shift m), drop_suffix cP1 m, s1), drop_suffix cP m))))
 
   (* AssEnv *)
   | Comp(s1, cP1, Comp(s2, cP2, s3)) -> w (dmsg "AssEnv" (fun () -> (Comp(Comp(s1, cP1, s2), cP2, s3))))
@@ -396,7 +396,7 @@ and rewrite (sign : signature) cP (e : syn_exp) : syn_exp =
       let rec tailify s =
         function
         | 0 -> Comp (Shift n, drop_suffix cP n, s)
-        | m -> Dot (tailify s (m-1), BVar (n-m))
+        | m -> Dot (tailify s (m-1), BVar (n-m, None))
       in
       w (tailify s n)
 
@@ -475,13 +475,8 @@ let rec normalize sign (e : exp) =
     let cP' = normalize_bctx sign cP in
     Box (cP', normalize_syn sign cP e)
 
-and normalize_schema sign = assert false
-(* function *)
-  (* | SimpleType t -> SimpleType (normalize_syn sign Nil t) *)
-  (* | ExistType (tel, t) -> *)
-  (*    let tel', cP' = normalize_stel sign Nil tel in *)
-  (*    let t' = normalize_syn sign cP' t in *)
-  (*    ExistType (tel', t') *)
+and normalize_schema sign (Schema (im, ex)) =
+  Schema (im, ex)               (* TODO add normalization *)
 
 and normalize_stel sign cP tel =
   let f (tel, cP) (i, x, t) =
@@ -517,6 +512,7 @@ and normalize_syn sign cP e =
    | Unbox (e,s, cP') ->
      let cP'' = normalize_bctx sign cP' in
      Unbox (normalize sign e, norm s, cP'')
+   | Block _ -> failwith "Not implemented"
 
 and normalize_bctx sign cP =
   match cP with

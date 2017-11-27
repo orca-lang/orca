@@ -2,11 +2,15 @@
    always available without contexts *)
 open Syntax
 
+let print_index = function
+  | i, None -> string_of_int i
+  | i, Some j -> string_of_int i ^ "." ^ string_of_int j
+
 let rec print_pat_subst : pat_subst -> string =
   function
   | CShift n -> "^" ^ string_of_int n
   | CEmpty -> "^"
-  | CDot (s, i) -> "(" ^ print_pat_subst s ^ "; i" ^ string_of_int i ^ ")"
+  | CDot (s, i) -> "(" ^ print_pat_subst s ^ "; i" ^ print_index i ^ ")"
 
 
 module Ext = struct
@@ -105,7 +109,8 @@ module Apx = struct
     | AppL (e1, es) -> "(" ^ print_exp e1 ^ " ' " ^ String.concat " ' " (List.map print_exp es) ^ ")"
     | Const n -> n
     | Var n -> Name.print_name n
-    | BVar i -> "i" ^ string_of_int i
+    | BVar (i, None) -> "i" ^ string_of_int i
+    | BVar (i, Some j) -> "i" ^ string_of_int i ^ "." ^ string_of_int j
     | Clos (e1, e2) -> "(" ^ print_exp e1 ^ " [" ^ print_exp e2 ^ "])"
     | Empty -> "^"
     | Shift n -> "^" ^ string_of_int n
@@ -139,7 +144,8 @@ module Apx = struct
   let rec print_pat (p : pat) : string = match p with
     | PVar n -> print_name n
     | PPar n -> "(<: " ^ print_name n ^ ")"
-    | PBVar n -> "i" ^ string_of_int n
+    | PBVar (i, None) -> "i" ^ string_of_int i
+    | PBVar (i, Some j) -> "i" ^ string_of_int i ^ "." ^ string_of_int j
     | Inacc e -> "." ^ print_exp e
     | PLam (fs, p) -> "(\ " ^ String.concat " " fs ^ " " ^ print_pat p ^ ")"
     | PConst (n, ps) -> "(" ^ n ^ " " ^ (String.concat " " (List.map (fun p -> "(" ^ print_pat p ^ ")") ps)) ^ ")"
@@ -240,7 +246,7 @@ module Int = struct
     | Lam (fs, e) ->
        "(\\ " ^ String.concat " " (List.map (fun (x, t) -> "("^ x ^ " : " ^ print_syn_exp t ^ ")") fs) ^ " " ^ print_syn_exp e ^ ")"
     | AppL (e1, es) -> "(" ^ print_syn_exp e1 ^ " ' " ^ String.concat " ' " (List.map print_syn_exp es) ^ ")"
-    | BVar i -> "i" ^ string_of_int i
+    | BVar i -> "i" ^ print_index i
     | SConst n -> n ^ "%"
     | Empty -> "^"
     | Shift n -> "^" ^ string_of_int n
@@ -293,7 +299,7 @@ module Int = struct
     | PTBox (cP, p) -> "(" ^ print_bctx cP ^ " " ^ print_syn_pat p ^ ")"
 
   and print_syn_pat = function
-    | PBVar i -> "i" ^ string_of_int i
+    | PBVar i -> "i" ^ print_index i
     | PPar n -> "(<: " ^ print_name n ^ ")"
 
     | PLam (fs, p) -> "(\ " ^ String.concat " " (List.map (fun (x, t) -> "("^ x ^ " : " ^ print_syn_exp t ^ ")") fs) ^ " " ^ print_syn_pat p ^ ")"

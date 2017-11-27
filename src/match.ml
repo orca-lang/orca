@@ -365,7 +365,7 @@ let split_clos (sign : signature) (p1 : pats) (n, s : name * pat_subst) (cD1 : I
 (*   let pss = x, I.PBCtx (I.PSnoc (I.PCtxVar g', y, I.PUnbox (p', pid_sub, I.CtxVar g'))) in *)
 (*   compute_split_map sign ss pss cD1 x cD2 [] [] (cD1 @ [g', I.Ctx]) *)
 
-let split_bvar (sign : signature) (p1 : pats) (y : I.index) (cD1 : I.ctx)
+let split_bvar (sign : signature) (p1 : pats) (y : index) (cD1 : I.ctx)
     (x, t : name * I.exp) (cD2 : I.ctx) : I.ctx * I.pats =
   let cP, t = match Whnf.whnf sign t with
     | I.Box(cP, t) -> cP, t

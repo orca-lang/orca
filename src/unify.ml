@@ -213,10 +213,11 @@ and unify_flex_syn (sign, cG) cP flex e1 e2 =
   let unify_spi = unify_flex_spi (sign, cG) cP flex in
   let unify_many_syn e1 e2 = unify_flex_many_syn (sign, cG) cP flex e1 e2 in
   let e1', e2' =  Whnf.normalize_syn sign cP e1, Whnf.normalize_syn sign cP e2 in
-  Debug.print ~verbose:true (fun () -> "Unifying syntactic expressions in context " ^ Pretty.print_ctx (Whnf.whnf_ctx sign cG)
-    ^ "\ne1 = " ^ Pretty.print_syn_exp cG cP e1 ^ "\ne2 = " ^ Pretty.print_syn_exp cG cP e2
-    ^ "\ne1' = " ^ Pretty.print_syn_exp cG cP e1'
-    ^ "\ne2' = " ^ Pretty.print_syn_exp cG cP e2');
+  Debug.print ~verbose:true (fun () -> "Unifying syntactic expressions in context " ^ print_ctx (Whnf.whnf_ctx sign cG)
+    ^ "\ncP = " ^ print_bctx cP
+    ^ "\ne1 = " ^ print_syn_exp e1 ^ "\ne2 = " ^ print_syn_exp e2
+    ^ "\ne1' = " ^ print_syn_exp e1'
+    ^ "\ne2' = " ^ print_syn_exp e2');
   match e1', e2' with
   | SPi (tel, t), SPi(tel', t') -> unify_spi tel t tel' t'
   | Lam(_,e), Lam(xs, e') -> unify_flex_syn (sign, cG) (bctx_of_lam_pars cP xs) flex e e'
@@ -246,11 +247,11 @@ and unify_flex_syn (sign, cG) cP flex e1 e2 =
     let n = List.length xs in
     let rec is_eta n =
       function
-      | BVar m :: es when n = m -> is_eta (n-1) es
+      | BVar m :: es when n = m -> is_eta (dec_idx n) es
       | [] -> true
       | _ -> false
     in
-    if is_eta (n-1) es then
+    if is_eta (n-1, None) es then
       unify_flex_syn (sign, cG) cP flex s' (Comp (Shift n, bctx_of_lam_pars cP xs, s))
     else
       raise (Unification_failure(Expressions_dont_unify_syn (flex, e1', e2')))
@@ -259,11 +260,11 @@ and unify_flex_syn (sign, cG) cP flex e1 e2 =
     let n = List.length xs in
     let rec is_eta n =
       function
-      | BVar m :: es when n = m -> is_eta (n-1) es
+      | BVar m :: es when n = m -> is_eta (dec_idx n) es
       | [] -> true
       | _ -> false
     in
-    if is_eta (n-1) es then
+    if is_eta (n-1, None) es then
       unify_flex_syn (sign, cG) cP flex s' (Comp (Shift n, bctx_of_lam_pars cP xs, s))
     else
       raise (Unification_failure(Expressions_dont_unify_syn (flex, e1', e2')))

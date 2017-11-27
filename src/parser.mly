@@ -17,9 +17,9 @@ open Syntax.Ext
 %token <int>INDEX
 %token <int>SHIFT
 
-%nonassoc TTS
 %nonassoc DOT
 %left COMMA SEMICOLON
+%nonassoc TTS
 %nonassoc COLON
 
 %start <Syntax.Ext.program list>program
