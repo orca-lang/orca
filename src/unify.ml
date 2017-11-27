@@ -20,7 +20,16 @@ type unification_problem
   | Unification_didnt_solve_all_problems of exp * exp * ctx * name list * ctx
   | Unification_didnt_solve_all_syn_problems of syn_exp * syn_exp * ctx * name list * ctx
 
-let print_unification_problem = function
+let print_unification_problem =
+  let print_flexible_variables flex =
+    let len = List.length flex in
+    let vars = String.concat ", " (List.map print_name flex) in
+    if len = 0 then "Do not unify (there are no flexible variables)"
+    else if len = 1 then "Do not unify given flexible variable :" ^ vars
+    else "Do not unify given flexible variables :" ^ vars
+  in
+
+  function
   | Different_constuctors (n, n') ->
      "Constructor " ^ n ^ " and " ^ n' ^ " do not unify."
   | Occur_check (n, e) ->
@@ -34,13 +43,11 @@ let print_unification_problem = function
   | Expressions_dont_unify (flex, e1, e2) ->
      "Expressions\ne1 = " ^ print_exp e1
      ^ "\ne2 = " ^ print_exp e2
-     ^ "\nDo not unify given flexible variable" ^ (if List.length flex > 1 then "s" else "")
-     ^ ": " ^ String.concat ", " (List.map print_name flex)
+     ^ "\n" ^ print_flexible_variables flex
   | Expressions_dont_unify_syn (flex, e1, e2) ->
      "Expressions\ne1 = " ^ print_syn_exp e1
      ^ "\ne2 = " ^ print_syn_exp e2
-     ^ "\nDo not unify given flexible variable" ^ (if List.length flex > 1 then "s" else "")
-     ^ ": " ^ String.concat ", " (List.map print_name flex)
+     ^ "\n" ^ print_flexible_variables flex
 
   | Universes_dont_match (n, n') ->
      "Universe " ^ string_of_int n
