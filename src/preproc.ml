@@ -45,7 +45,7 @@ let rec lookup cG n =
 
 let index n cP =
   let rec proj n i = function
-    | [n] when i = 0 -> Some None
+    | [n'] when i = 0 && n = n' -> Some None
     | n' :: _ when n = n' -> Some (Some i)
     | _ :: xs -> proj n (i + 1) xs
     | [] -> None
@@ -205,6 +205,7 @@ match content e with
   | E.Block bs ->
      let bs' = pproc_block s cG cP bs in
      A.Block bs'
+  | E.TTSBlock _ -> assert false
   in Debug.deindent ();
   res
 
