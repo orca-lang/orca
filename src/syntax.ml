@@ -48,7 +48,6 @@ module Ext = struct
     | Annot of exp * exp
     | Ctx of schema
     | Block of (name * exp) list
-    | TTSBlock of name list
 
   and schema
     = Schema of (name * exp) list * (name * exp) list

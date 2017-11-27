@@ -123,14 +123,21 @@ let rec get_bound_var_ctx (e: E.exp) : bctx =
   | E.Nil -> []
   | _ -> []
 
-let rec get_bound_var_ctx_no_annot (e : E.exp) : ctx =
+let rec get_bound_var_ctx_no_annot (e : E.exp) : bctx =
   match content e with
   | E.Comma (g, P(_, E.Annot(P(_, E.Ident n), _))) ->
-     fst(add_name_ctx (get_bound_var_ctx_no_annot g) n)
+     [n] :: (get_bound_var_ctx_no_annot g)
   | E.Comma (g, P(_, E.Ident n)) ->
-     fst(add_name_ctx (get_bound_var_ctx_no_annot g) n)
+     [n] :: (get_bound_var_ctx_no_annot g)
+  | E.Comma (g, P(_, E.Block l)) ->
+     let f = function
+       |  (_, P(_, E.Ident n)) -> n
+       | _ -> raise (Error.Error ("Block in left-hand side of :> should only be identifiers"))
+     in
+     List.map f l :: get_bound_var_ctx_no_annot g
   | E.Annot(P(_, E.Ident n), _) ->
-     fst (add_name_ctx [] n)
+     [[n]]
+
   | E.Nil -> []
   | E.Ident _ -> []
   | _ -> raise (Error.Error_loc (loc e, EP.print_exp e ^ " is a forbidden expression on the left hand side of :>"))
@@ -168,8 +175,8 @@ match content e with
     else
       raise (Error.Error_loc (loc e, "Bound variables bindings (|-) cannot be nested"))
   | E.ABox (g, e) ->
-       let cP' = get_bound_var_ctx g in
-       pproc_exp s cG cP' e
+     let cP' = get_bound_var_ctx_no_annot g in
+     pproc_exp s cG cP' e
 
   | E.Fn (ns, e) ->
      let cG', n' = add_names_ctx cG ns in
@@ -205,7 +212,6 @@ match content e with
   | E.Block bs ->
      let bs' = pproc_block s cG cP bs in
      A.Block bs'
-  | E.TTSBlock _ -> assert false
   in Debug.deindent ();
   res
 
