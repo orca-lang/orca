@@ -280,7 +280,7 @@ and rewrite (sign : signature) cP (e : syn_exp) : syn_exp =
   | Clos(BVar n, Comp(s, cP, Shift n'), _) -> w (dmsg "VarShift 2" (fun () -> (Clos(BVar (shift_idx n n'), s, cP))))
 
   (* FVarsCons *)
-  | Clos(BVar zidx, Dot (s, e), _) -> w (dmsg "FVarsCons" (fun () -> e))
+  | Clos(BVar (0, None), Dot (s, e), _) -> w (dmsg "FVarsCons" (fun () -> e))
 
   (* FVarLift 1 *)
   | Clos(BVar i, ShiftS (n, s), _) when fst i < n -> (dmsg "FVarLift 1" (fun () -> (BVar i)))
