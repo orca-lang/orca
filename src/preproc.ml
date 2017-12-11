@@ -202,6 +202,9 @@ match content e with
      A.Clos(e1' , f e2)
   | E.Empty -> A.Empty
   | E.Shift n -> A.Shift n
+  | E.Semicolon (e1, P(_, E.Block l)) ->
+     let l' = List.map (fun (_, e) -> pproc_exp s cG cP e) l in
+     A.Dot(f e1, A.TBlock l')
   | E.Semicolon (e1, e2) -> A.Dot(f e1, f e2)
   | E.Comma (e1, e2) ->
     snd (pproc_comma s cG [] e)

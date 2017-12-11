@@ -339,15 +339,16 @@ and check_type_against_schema (sign, cG) cP e = try
          | A.Block bs -> check_block (sign, cG) cP bs
          | _ -> raise (Error. Error "Expected a block")
        in
-       let cG', sigma = unify_explicit cG I.Nil [] (bs, ex') in
+       let cG', sigma = unify_explicit cG I.Nil [] (Rlist.to_list bs, ex') in
        simul_subst_syn sigma (I.Block bs)
   with Unify.Unification_failure problem -> raise (Error.Error (Unify.print_unification_problem problem))
 
-and check_block (sign, cG) cP = function
-  | [] -> []
-  | (n, e)::bs ->
+and check_block (sign, cG) cP : 'b -> 'a Rlist.rlist = function
+  | Rlist.RNil -> Rlist.RNil
+  | Rlist.RCons (bs, (n, e)) ->
      let e' = check_syn_type (sign, cG) cP e in
-     (n, e')::(check_block (sign, cG) (I.Snoc(cP, n, e')) bs)
+     Rlist.RCons ((check_block (sign, cG) (I.Snoc(cP, n, e')) bs), (n, e'))
+
 
 and check_syn (sign, cG) cP (e : A.exp) (t : I.syn_exp) =
   let t' = Whnf.rewrite sign cP t in
@@ -387,6 +388,11 @@ and check_syn (sign, cG) cP (e : A.exp) (t : I.syn_exp) =
     | A.Dot (s, e), I.SBCtx (I.Snoc (cP', _, t)) ->
       let s' = check_syn (sign, cG) cP s (I.SBCtx cP') in
       I.Dot (s', check_syn (sign, cG) cP e (I.Clos(t, s', cP')))
+    | A.TBlock tbs, I.Block bs ->
+       let tbs', _ =
+         List.fold_left2 (fun (b, cP) e (x,t) -> check_syn (sign, cG) cP e t :: b, I.Snoc (cP, x, t)) ([], cP) tbs bs
+       in
+       I.TBlock tbs'
     | e, t when is_syntax e ->
       Debug.print(fun ()-> "Expression " ^ AP.print_exp e ^ " is syntactic and thus being inferred");
       let e', t' = match infer_syn (sign, cG) cP e with
@@ -423,6 +429,8 @@ and infer_syn (sign, cG) cP (e : A.exp) =
        let e, t = infer (sign, cG) e in
        begin match t with
        | I.Box (cP', t') ->
+          Debug.print (fun () -> "Infering type " ^ Pretty.print_exp cG t ^ "\nfor term " ^ Pretty.print_exp cG e);
+          Debug.print (fun () -> "Weakening context " ^ Pretty.print_bctx cG cP' ^ "\ninto context " ^ Pretty.print_bctx cG cP);
           let sigma = compute_wkn (sign, cG) e cP cP' in
           I.Unbox (e, sigma, cP'), I.Clos (t', sigma, cP')
        | _ -> raise (Error.Error ("Expected a box type, got " ^ IP.print_exp t))

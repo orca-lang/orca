@@ -361,6 +361,14 @@ and rewrite (sign : signature) cP (e : syn_exp) : syn_exp =
   | Clos (SPi(tel, t), s, cP) ->
      let tel', s, cP' = cong_stel tel s cP in
     (dmsg "CongClosSPi" (fun () -> (SPi (tel', Clos (t, s, cP')))))
+  | Clos (Block bs, s, cP') ->
+     let rec f n cP' =
+       let s = if n = 0 then s else ShiftS (n, s) in
+       function
+       | [] -> []
+       | (x, t) :: bs' -> let t' = Clos(t, s, cP') in (x, t') :: f (n+1) (Snoc(cP', x, t')) bs'
+     in
+     Block (f 0 cP' bs)
 
  (* Contexts bind their own variables *)
   (* | Clos (Ctx, s) -> Ctx *)

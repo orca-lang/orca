@@ -22,7 +22,7 @@ let lookup_bound_name cP x =
 
 let lookup_bound cP (x, j) =
   let proj = function
-    | Block bs, Some j' -> snd (List.nth bs j')
+    | Block bs, Some j' -> snd (Rlist.nth bs j')
     | t, None -> t
     | _ -> raise (Error.Error "Projection of something that is not a block.")
   in

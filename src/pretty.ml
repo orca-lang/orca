@@ -329,7 +329,12 @@ and fmt_syn_exp cG cP parens pps e =
       (fmt_syn_exp cG cP 2) e2
       (close_paren 3)
   | Block bs ->
-     Fmt.pf pps "bloooooock"
+     Fmt.pf pps "|%a|" (fmt_block cG cP parens) bs
+
+and fmt_block cG cP parens pps = function
+  | [] -> ()
+  | (x, t)::[] -> Fmt.pf pps "%s : %a" x (fmt_syn_exp cG cP parens) t
+  | (x, t)::bs -> Fmt.pf pps "%s : %a, %a" x (fmt_syn_exp cG cP parens) t (fmt_block cG cP parens) bs
 
 and fmt_schema cG parens pps = function
   |  (Schema ([], ex)) ->

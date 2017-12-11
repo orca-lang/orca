@@ -1,0 +1,30 @@
+spec tp :* where
+| c : tp
+| arr : tp ->> tp ->> tp
+
+spec tm : tp ->> * where
+| app : (s : tp) ->> (t : tp) ->> tm (arr s t) ->> tm s ->> tm t
+| lam : (s : tp) ->> (t : tp) ->> (tm s ->> tm t) ->> tm (arr s t)
+| cc : tm c
+
+data C : set where
+| con-C : C
+
+spec LFC where
+| LFc : LFC
+
+def ct : (T : |- tp) -> set where
+| c => C
+| (arr S T) => ((ct S) -> (ct T))
+
+data env : (g : ctx) -> set where
+| empty : env \0
+| cons : (g : ctx) (T : |- tp) -> ct (T) -> env g -> env (g, x: tm T)
+
+def lookup : (g : ctx)(T : |- tp) -> (x : (g |- tm T)) -> env g -> ct T = ?
+
+def embed : (g : ctx) (T : |- tp) -> (g |- tm T) -> env g -> (ct T) where
+| g c cc rho => con-C
+| g T[^] (app S[^] .T M N) rho => (embed g (arr S T) M rho) (embed g S N rho)
+| g (arr S[^] T[^]) (lam .S .T (\x. M)) rho =>  (fn foo => embed (g, x: tm S) T M (cons g S foo rho))
+| g T[^] x rho => lookup g T ? rho

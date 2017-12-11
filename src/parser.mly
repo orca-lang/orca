@@ -2,6 +2,7 @@
 
 open Syntax
 open Syntax.Ext
+open Rlist
 
 %}
 
@@ -111,14 +112,14 @@ exp_level5:
 
 raw_exp_level5:
 | s = exp_level5 COMMA b = block {Comma (s, b)}
-| s = exp_level5 SEMICOLON e = exp_level6 {Semicolon (s, e)}
+| s = exp_level5 SEMICOLON e = block {Semicolon (s, e)}
 | e = raw_exp_level6 {e}
 
 block:
 | b = located(raw_block) {b}
 
 raw_block:
-| MID ex=separated_nonempty_list(COMMA, schema_ex) MID { Block ex }
+| MID ex=separated_nonempty_list(COMMA, schema_ex) MID { Block (from_list (List.rev ex)) }
 | e = raw_exp_level6 {e}
 
 exp_level6:
