@@ -364,9 +364,9 @@ and rewrite (sign : signature) cP (e : syn_exp) : syn_exp =
   | Clos (Block bs, s, cP') ->
      let rec f n cP' =
        let s = if n = 0 then s else ShiftS (n, s) in
-       function
-       | [] -> []
-       | (x, t) :: bs' -> let t' = Clos(t, s, cP') in (x, t') :: f (n+1) (Snoc(cP', x, t')) bs'
+       let open Rlist in function
+       | RNil -> RNil
+       | RCons (bs', (x, t)) -> let t' = Clos(t, s, cP') in RCons (f (n+1) (Snoc(cP', x, t')) bs', (x, t'))
      in
      Block (f 0 cP' bs)
 
@@ -520,7 +520,8 @@ and normalize_syn sign cP e =
    | Unbox (e,s, cP') ->
      let cP'' = normalize_bctx sign cP' in
      Unbox (normalize sign e, norm s, cP'')
-   | Block cs -> Block (List.map (fun (x, e) -> x, norm e) cs)
+   | Block cs -> Block (Rlist.map (fun (x, e) -> x, norm e) cs)
+   | TBlock _ -> assert false
 
 and normalize_bctx sign cP =
   match cP with

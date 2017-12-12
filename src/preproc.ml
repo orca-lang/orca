@@ -134,7 +134,7 @@ let rec get_bound_var_ctx_no_annot (e : E.exp) : bctx =
        |  (_, P(_, E.Ident n)) -> n
        | _ -> raise (Error.Error ("Block in left-hand side of :> should only be identifiers"))
      in
-     List.map f l :: get_bound_var_ctx_no_annot g
+     List.map f (Rlist.to_list l) :: get_bound_var_ctx_no_annot g
   | E.Annot(P(_, E.Ident n), _) ->
      [[n]]
 
@@ -203,7 +203,7 @@ match content e with
   | E.Empty -> A.Empty
   | E.Shift n -> A.Shift n
   | E.Semicolon (e1, P(_, E.Block l)) ->
-     let l' = List.map (fun (_, e) -> pproc_exp s cG cP e) l in
+     let l' = Rlist.map (fun (_, e) -> pproc_exp s cG cP e) l in
      A.Dot(f e1, A.TBlock l')
   | E.Semicolon (e1, e2) -> A.Dot(f e1, f e2)
   | E.Comma (e1, e2) ->
@@ -218,12 +218,12 @@ match content e with
   in Debug.deindent ();
   res
 
-and pproc_block (s : sign) (cG : ctx) (cP : bctx) : (E.name * E.exp) list -> (string * A.exp) list =
-  function
-  | [] -> []
-  | (n, e)::bs ->
+and pproc_block (s : sign) (cG : ctx) (cP : bctx) : (E.name * E.exp) Rlist.rlist -> (string * A.exp) Rlist.rlist =
+  let open Rlist in function
+  |  RNil -> RNil
+  | RCons (bs, (n, e)) ->
      Debug.print (fun () -> "n = " ^ n ^ " cP = " ^ print_bctx cP );
-     (n, pproc_exp s cG cP e)::pproc_block s cG ([n]::cP) bs
+     RCons(pproc_block s cG ([n]::cP) bs, (n, pproc_exp s cG cP e))
 
 and pproc_schema (s : sign) (cG : ctx) (cP : bctx) (E.Schema (impl, expl) : E.schema) : A.schema =
   let rec pproc_params cP = function

@@ -390,7 +390,7 @@ and check_syn (sign, cG) cP (e : A.exp) (t : I.syn_exp) =
       I.Dot (s', check_syn (sign, cG) cP e (I.Clos(t, s', cP')))
     | A.TBlock tbs, I.Block bs ->
        let tbs', _ =
-         List.fold_left2 (fun (b, cP) e (x,t) -> check_syn (sign, cG) cP e t :: b, I.Snoc (cP, x, t)) ([], cP) tbs bs
+         Rlist.fold2 (fun (b, cP) e (x,t) -> Rlist.RCons (b, check_syn (sign, cG) cP e t), I.Snoc (cP, x, t)) (Rlist.RNil, cP) tbs bs
        in
        I.TBlock tbs'
     | e, t when is_syntax e ->
