@@ -154,8 +154,11 @@ raw_simple_exp:
 schema:
 | e = simple_exp {Schema ([], ["_", e])}
 (* | LCURLY impl=separated_nonempty_list(COMMA, schema_ex) RCURLY e = simple_exp {Schema (impl, ["_", e])} *)
-| LCURLY impl=separated_nonempty_list(COMMA, schema_ex) RCURLY LPAREN expl=separated_nonempty_list(COMMA, schema_ex) RPAREN
+| LCURLY impl=separated_nonempty_list(COMMA, schema_ex_impl) RCURLY LPAREN expl=separated_nonempty_list(COMMA, schema_ex) RPAREN
    {Schema (impl, expl)}
+
+schema_ex_impl:
+| x=IDENT COLON LPAREN e=exp_level4 RPAREN {x,e}
 
 schema_ex:
 | x=IDENT COLON e=exp_level6 {x,e}
@@ -176,8 +179,12 @@ pattern:
 | LAM x = IDENT+ DOT p = pattern {PLam (x, p)}
 | c = IDENT ps = simple_pattern+ {PConst (c, ps)}
 | p1 = pattern SEMICOLON p2 = pattern {PDot (p1, p2)}
+| s = pattern COMMA MID e=separated_nonempty_list(COMMA, schema_pat) MID {PCommaBlock (s, e)}
 | s = pattern COMMA e = pattern {PComma (s, None, e)}
 | s = pattern COMMA x = IDENT COLON e = pattern {PComma (s, Some x, e)}
 | p1 = pattern TTS p2 = pattern {PBox (p1, p2)}
 | STT x = IDENT {PPar x}
 | p = simple_pattern {p}
+
+schema_pat:
+| x = IDENT {x}

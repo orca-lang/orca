@@ -1,0 +1,45 @@
+spec s-tp where
+| bool : s-tp
+| arr : s-tp ->> s-tp ->> s-tp
+
+spec s-tm : s-tp ->> * where
+| app : (s : s-tp) ->> (t : s-tp) ->> s-tm (arr s t) ->> s-tm s ->> s-tm t
+| lam : (s : s-tp) ->> (t : s-tp) ->> (s-tm s ->> s-tm t) ->> s-tm (arr s t)
+| tt : s-tm bool
+| ff : s-tm bool
+| if : (t : s-tp) ->> s-tm bool ->> s-tm t ->> s-tm t ->> s-tm t
+
+spec t-tp where
+| tunit : t-tp
+| tsum : t-tp ->> t-tp ->> t-tp
+| tarr : t-tp ->> t-tp ->> t-tp
+
+spec t-tm : t-tp ->> * where
+| tapp : (s : t-tp) ->> (t : t-tp) ->> t-tm (tarr s t) ->> t-tm s ->> t-tm t
+| tlam : (s : t-tp) ->> (t : t-tp) ->> (t-tm s ->> t-tm t) ->> t-tm (tarr s t)
+| tone : t-tm tunit
+| tinl : (s : t-tp) ->> (t : t-tp) ->> t-tm s ->> t-tm (tsum s t)
+| tinr : (s : t-tp) ->> (t : t-tp) ->> t-tm t ->> t-tm (tsum s t)
+| tcase : (s : t-tp) ->> (t : t-tp) ->> (r : t-tp) ->>
+          t-tm (tsum s t) ->> (t-tm s ->> t-tm r) ->> (t-tm t ->> t-tm r) ->> t-tm r
+
+def tran-tp : (|- s-tp) -> (|- t-tp) where
+| bool => tsum tunit tunit
+| (arr s t) => tarr (tran-tp s) (tran-tp t)
+
+data rel: ctx -> ctx -> set where
+| empty : rel \0 \0
+| cons : (g h : ctx) (t : |- s-tp) -> rel g h -> rel (g, x: s-tm t) (h, y: t-tm (tran-tp t))
+
+
+def tran : (g h : ctx) -> rel g h -> (st : |- s-tp) -> (g |- s-tm st) -> (h |- t-tm (tran-tp st)) where
+| g h r t (app s[^] .t m n) => tapp (tran-tp s) (tran-tp t) (tran g h r (arr s t) m) (tran g h r s n)
+| g h r (arr s[^] t[^]) (lam .s .t m) =>
+  tlam (tran-tp s) (tran-tp t) (\x. tran (g,x:s-tm s) (h,x:t-tm (tran-tp s)) (cons g h s r) t (m x))
+| g h r bool tt => tinl tunit tunit tone
+| g h r bool ff => tinr tunit tunit tone
+| g h r t (if .t b e1 e2) => tcase tunit tunit (tran-tp t) (tran g h r bool b)
+                              (\x. tran g h r t e1) (\x. tran g h r t e2)
+
+| ._ ._ (cons g h .t r) t (g, x: s-tm t :> x) => (h, x: t-tm (tran-tp t) :> x)
+| ._ ._ (cons g h t r) s (v[^1]) => tran g h r s v

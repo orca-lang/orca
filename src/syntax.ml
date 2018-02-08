@@ -66,6 +66,7 @@ module Ext = struct
     | PDot of pat * pat
     | PNil
     | PComma of pat * name option * pat
+    | PCommaBlock of pat * name list
     | PBox of pat * pat
     | PUnder
     | PWildcard                 (* Inaccessible pattern wildcard *)
@@ -115,9 +116,10 @@ module Apx = struct
     | Block of (string * exp) rlist
     | TBlock of exp rlist
 
-  and schema_part = (string * exp) list
+  and schema_impl = (name * exp) list
+  and schema_expl = (string * exp) list
   and schema
-    = Schema of schema_part * schema_part
+    = Schema of schema_impl * schema_expl
 
   and tel_entry = icit * name * exp
   and tel = tel_entry list
@@ -205,9 +207,10 @@ module Int = struct
     | SCtx of schema
     | Unbox of exp * syn_exp * bctx
 
-  and schema_part = (string * syn_exp) list
+  and schema_impl = (name * bctx * syn_exp) list
+  and schema_expl = (string * syn_exp) list
   and schema
-    = Schema of schema_part * schema_part
+    = Schema of schema_impl * schema_expl
 
   and bctx
     = Nil

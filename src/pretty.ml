@@ -341,16 +341,29 @@ and fmt_block cG cP parens pps =
 and fmt_schema cG parens pps = function
   |  (Schema ([], ex)) ->
        Fmt.pf pps "%a"
-              (fmt_schema_part cG Nil parens) ex
+              (fmt_schema_expl cG Nil parens) ex
 
   |  (Schema (im, ex)) ->
-      let cP = MetaOp.part_to_bctx im in
+      let cG' = MetaOp.impl_to_ctx im in
        Fmt.pf pps "{%a} %a"
-              (fmt_schema_part cG Nil parens) im
-              (fmt_schema_part cG cP parens) ex
+              (fmt_schema_impl cG parens) im
+              (fmt_schema_expl cG' Nil parens) ex
 
 
-and fmt_schema_part cG cP parens pps = function
+and fmt_schema_impl cG parens pps = function
+  | [] -> ()
+  | [(n, cP, t)] ->
+     Fmt.pf pps "%a : %a"
+            fmt_name n
+            (fmt_exp cG parens) (Box (cP, t))
+
+  | (n, cP, t)::ps' ->
+     Fmt.pf pps "%a : %a, %a"
+            fmt_name n
+            (fmt_exp cG parens) (Box (cP, t))
+            (fmt_schema_impl ((n, Box(cP, t))::cG) parens) ps'
+
+and fmt_schema_expl cG cP parens pps = function
   | [] -> ()
   | [(n, t)] ->
      Fmt.pf pps "%s : %a"
@@ -361,7 +374,7 @@ and fmt_schema_part cG cP parens pps = function
      Fmt.pf pps "%s : %a, %a"
             n
             (fmt_syn_exp cG cP parens) t
-            (fmt_schema_part cG (Snoc (cP, n, t)) parens) ps'
+            (fmt_schema_expl cG (Snoc (cP, n, t)) parens) ps'
 
 and fmt_bctx cG pps = function
   | Nil -> string pps "0"

@@ -60,6 +60,7 @@ module Ext = struct
     | PNil -> "0"
     | PComma (p1, None, p2) -> "(, " ^ print_pat p1 ^ " " ^ print_pat p2 ^ ")"
     | PComma (p1, Some x, p2) -> "(, " ^ print_pat p1 ^ " " ^ x ^ " : " ^ print_pat p2 ^ ")"
+    | PCommaBlock (p, ns) -> "(, " ^ print_pat p ^ " |" ^ String.concat ", " ns ^ "|)"
     | PPar x -> "(<:" ^ x ^ ")"
     | PUnder -> "_"
     | PWildcard -> "._"
@@ -123,8 +124,9 @@ module Apx = struct
     | TBlock bs -> "|t " ^ Rlist.to_string print_exp bs ^ "|"
 
   and print_schema (Schema (impl, expl)) =
-    let f ps = String.concat ", " (List.map (fun (x, t) -> x ^ " : " ^ print_exp t) ps) in
-    "{" ^ f impl ^ "}(" ^ f expl ^ ")"
+    let f ps = String.concat ", " (List.map (fun (x, t) -> print_name x ^ " : " ^ print_exp t) ps) in
+    let g ps = String.concat ", " (List.map (fun (x, t) -> x ^ " : " ^ print_exp t) ps) in
+    "{" ^ f impl ^ "}(" ^ g expl ^ ")"
 
   and print_pi tel t = match tel with
     | [] -> print_exp t
@@ -262,11 +264,13 @@ module Int = struct
     | TBlock bs -> "|" ^ Rlist.to_string print_syn_exp bs ^ "|"
 
   and print_schema = function
-    | Schema (impl, expl) -> "{" ^ print_block_entries impl ^ "} (" ^ print_block_entries expl ^ ")"
+    | Schema (impl, expl) -> "{" ^ print_block_entries_impl impl ^ "} (" ^ print_block_entries_expl expl ^ ")"
 
-  and print_block_entry (n, t) = n ^ " : " ^ print_syn_exp t
+  and print_block_entry_impl (n, cP, t) = print_name n ^ " : " ^ print_bctx cP ^ " |- " ^ print_syn_exp t
+  and print_block_entry_expl (n, t) = n ^ " : " ^ print_syn_exp t
 
-  and print_block_entries ns = String.concat ", " (List.map print_block_entry ns)
+  and print_block_entries_impl ns = String.concat ", " (List.map print_block_entry_impl ns)
+  and print_block_entries_expl ns = String.concat ", " (List.map print_block_entry_expl ns)
 
   and print_bctx cP =
     let rec print = function

@@ -145,6 +145,7 @@ let rec get_bound_var_ctx_no_annot (e : E.exp) : bctx =
 let rec get_bound_var_ctx_in_pat (p : E.pat) : bctx =
   match p with
   | E.PComma (g, Some n, _) -> [n] :: (get_bound_var_ctx_in_pat g)
+  | E.PCommaBlock (g, ns) -> ns :: (get_bound_var_ctx_in_pat g)
   | E.PNil -> []
   | E.PIdent _ -> []            (* MMMM *)
   | p -> raise (Error.Error (EP.print_pat p ^ " is a forbidden pattern on the left hand side of :>"))
@@ -226,16 +227,22 @@ and pproc_block (s : sign) (cG : ctx) (cP : bctx) : (E.name * E.exp) Rlist.rlist
      RCons(pproc_block s cG ([n]::cP) bs, (n, pproc_exp s cG cP e))
 
 and pproc_schema (s : sign) (cG : ctx) (cP : bctx) (E.Schema (impl, expl) : E.schema) : A.schema =
-  let rec pproc_params cP = function
-    | [] -> [], cP
+  let rec pproc_impl cG = function
+    | [] -> [], cG
+    | (x, t)::params ->
+       let cG', x' = add_name_ctx cG x in
+       let params', cG'' = pproc_impl cG' params in
+       (x', pproc_exp s cG cP t)::params', cG''
+  in
+  let rec pproc_expl cG cP = function
+    | [] -> []
     | (x, t)::params ->
        let cP' = [x]::cP in
-       let params', cP'' = pproc_params cP' params in
-       (x, pproc_exp s cG cP t)::params', cP''
+       let params' = pproc_expl cG cP' params in
+       (x, pproc_exp s cG cP t)::params'
   in
-
-  let impl', cP' = pproc_params cP impl in
-  let expl', _ = pproc_params cP' expl in
+  let impl', cG' = pproc_impl cG impl in
+  let expl' = pproc_expl cG' cP expl in
   A.Schema(impl', expl')
 
 and pproc_comma (s : sign) (cG : ctx) (cP : bctx) (g : E.exp) : bctx * A.exp =

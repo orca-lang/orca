@@ -127,17 +127,27 @@ and infer_type (sign, cG : signature * I.ctx) (s : A.exp) : I.exp * I.universe =
      raise (Error.Error "Not a universe.")
 
 and check_schema (sign , cG : signature * I.ctx) (A.Schema (im, ex) : A.schema) : I.schema =
-  let rec check_many (sign, cG) cP (ps : A.schema_part)=
+  let rec check_many_impl (sign, cG) (ps : A.schema_impl)=
+    match ps with
+    | [] -> [], cG
+    | (x, A.Box (cP, s))::ps' ->
+       let cP' = is_ctx (sign, cG) cP in
+       let s' = check_syn_type (sign, cG) cP' s in
+       let ps'', cG' = check_many_impl (sign, (x, I.Box (cP', s')) :: cG) ps' in
+       ((x, cP', s')::ps''), cG'
+    | _ -> raise (Error.Error "Schema expects implicit parameters of boxed type.")
+  in
+  let rec check_many_expl (sign, cG) cP (ps : A.schema_expl)=
     match ps with
     | [] -> [], cP
     | (x, s)::ps' ->
        let s' = check_syn_type (sign, cG) cP s in
        let cP' = (I.Snoc (cP, x, s')) in
-       let ps'', t' = check_many (sign, cG) cP' ps' in
+       let ps'', t' = check_many_expl (sign, cG) cP' ps' in
        ((x, s')::ps''), cP'
   in
-  let im', cP = check_many (sign, cG) I.Nil im in
-  let ex', _ = check_many (sign, cG) cP ex in
+  let im', cG' = check_many_impl (sign, cG) im in
+  let ex', _ = check_many_expl (sign, cG') I.Nil ex in
   I.Schema(im', ex')
 
 and check (sign , cG : signature * I.ctx) (e : A.exp) (t : I.exp) : I.exp =
@@ -300,11 +310,10 @@ and check_type_against_schema (sign, cG) cP e = try
     function
     | I.Schema (im, [_, t]) ->
        let t' = check_syn_type (sign, cG) cP e in
-       let tel = part_to_stel Syntax.Implicit im in
-       let tel', sigma, cP' = abstract cP tel in
-       let flex = List.map (fun (_, x, _) -> x) tel' in
+       let tel = impl_to_tel im in
+       let flex = List.map (fun (_, x, _) -> x) tel in
        let _, sigma' = try
-           Unify.unify_flex_syn (sign, cG) cP flex (I.Clos (t, sigma, cP')) t'
+           Unify.unify_flex_syn (sign, cG) cP flex t t'
          with Unify.Unification_failure problem ->
            raise (Error.Error ("Unification failed when checking a type against a schema.\n"
                                ^ Unify.print_unification_problem problem))
@@ -312,16 +321,15 @@ and check_type_against_schema (sign, cG) cP e = try
        simul_subst_syn sigma' t'
 
     | I.Schema (im, ex) ->
-       let tel = part_to_stel Syntax.Implicit im in
-       let tel', sigma, cP' = abstract cP tel in
-       let flex = List.map (fun (_, x, _) -> x) tel' in
+       let tel = impl_to_tel im in
+       let flex = List.map (fun (_, x, _) -> x) tel in
        let rec subst_in_schema i cP = function
          | [] -> []
          | (n, t) :: ex ->
-            let t' = I.Clos(t, (if i > 0 then I.ShiftS (i, sigma) else sigma), cP) in
+            let t' = if i > 0 then I.Clos(t, I.ShiftS (i, I.id_sub), cP) else t in
             (n, t') :: subst_in_schema (i+1) (I.Snoc(cP, n, t')) ex
        in
-       let ex' = subst_in_schema 0 cP' ex in
+       let ex' = subst_in_schema 0 cP ex in
        let rec unify_explicit cG cP sigma = function
          | [], [] -> cG, sigma
          | (n, t)::bs', (m, t')::ex' ->
@@ -343,7 +351,7 @@ and check_type_against_schema (sign, cG) cP e = try
        simul_subst_syn sigma (I.Block bs)
   with Unify.Unification_failure problem -> raise (Error.Error (Unify.print_unification_problem problem))
 
-and check_block (sign, cG) cP : 'b -> 'a Rlist.rlist = function
+and check_block (sign, cG) cP = function
   | Rlist.RNil -> Rlist.RNil
   | Rlist.RCons (bs, (n, e)) ->
      let e' = check_syn_type (sign, cG) cP e in

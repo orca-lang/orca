@@ -27,9 +27,9 @@ def tran-tp : (|- s-tp) -> (|- t-tp) where
 | bool => tsum tunit tunit
 | (arr s t) => tarr (tran-tp s) (tran-tp t)
 
-data rel: ctx -> ctx -> set where
-| empty : rel \0 \0
-| cons : (g h : ctx) (t : |- s-tp) -> rel g h -> rel (g, x: s-tm t) (h, y: t-tm (tran-tp t))
+(*) data rel: ctx (s-tm T) -> ctx (t-tm (tran-tp T) -> set where
+(*) | empty : rel \0 \0
+(*) | cons : (g h : ctx) (t : |- s-tp) -> rel g h -> rel (g, x: s-tm t) (h, y: t-tm (tran-tp t))
 
 
 (*) This function was inlined in tran
@@ -37,13 +37,23 @@ data rel: ctx -> ctx -> set where
 (*) | .(g, x:s-tm t) .(h, x:t-tm (tran-tp t)) (cons g h .t r) t (g, x: s-tm t :> x) => (h, x: t-tm (tran-tp t) :> x)
 (*) | .(g, x:s-tm t) .(h, x:t-tm (tran-tp t)) (cons g h t r) s (v[^1]) => lookup g h r s v
 
-def tran : (g h : ctx) -> rel g h -> (st : |- s-tp) -> (g |- s-tm st) -> (h |- t-tm (tran-tp st)) where
-| g h r t (app s[^] .t m n) => tapp (tran-tp s) (tran-tp t) (tran g h r (arr s t) m) (tran g h r s n)
-| g h r (arr s[^] t[^]) (lam .s .t m) => tlam (tran-tp s) (tran-tp t) (\x. tran (g,x:s-tm s[^]) (h,x:t-tm (tran-tp s)) (cons g h s r) t (m x))
-| g h r bool tt => tinl tunit tunit tone
-| g h r bool ff => tinr tunit tunit tone
-| g h r t (if .t b e1 e2) => tcase tunit tunit (tran-tp t) (tran g h r bool b)
-                              (\x. tran g h r t e1) (\x. tran g h r t e2)
+def tran : (g : ctx {t : (|- s-tp)} (s-tm t , t-tm (tran-tp t))) -> (st : |- s-tp) -> (g |- s-tm st) -> (g |- t-tm (tran-tp st)) where
+| g .bool tt => tinl tunit tunit tone
+| g .bool ff => tinr tunit tunit tone
+| g t (if .t b e1 e2) => tcase tunit tunit (tran-tp t) (tran g bool b)
+                              (\x. tran g t e1) (\x. tran g t e2)
+| g t (app s[^] .t m n) => tapp (tran-tp s) (tran-tp t) (tran g (arr s t) m) (tran g s n)
+| g .(arr s t) (lam s[^] t[^] m) => tlam (tran-tp s) (tran-tp t) (\x. tran (g,|x:s-tm s[^], y: t-tm (tran-tp s[^])|) t (m x))
 
-| ._ ._ (cons g h .t r) t (g, x: s-tm t :> x) => (h, x: t-tm (tran-tp t) :> x)
-| ._ ._ (cons g h t r) s (v[^1]) => tran g h r s v
+(*)| ._ t (<: x)#0 => (g, |x, y| :> y)
+
+
+(*) | g h r t (app s[^] .t m n) => tapp (tran-tp s) (tran-tp t) (tran g h r (arr s t) m) (tran g h r s n)
+(*) | g h r (arr s[^] t[^]) (lam .s .t m) => tlam (tran-tp s) (tran-tp t) (\x. tran (g,x:s-tm s[^]) (h,x:t-tm (tran-tp s)) (cons g h s r) t (m x))
+(*) | g h r bool tt => tinl tunit tunit tone
+(*) | g h r bool ff => tinr tunit tunit tone
+(*) | g h r t (if .t b e1 e2) => tcase tunit tunit (tran-tp t) (tran g h r bool b)
+(*)                               (\x. tran g h r t e1) (\x. tran g h r t e2)
+
+(*) | ._ ._ (cons g h .t r) t (g, x: s-tm t :> x) => (h, x: t-tm (tran-tp t) :> x)
+(*) | ._ ._ (cons g h t r) s (v[^1]) => tran g h r s v

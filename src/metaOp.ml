@@ -53,7 +53,9 @@ and fv_syn cG =
   | Block block -> List.concat (Rlist.mapl (fun (_, t) -> fvs t) block)
 
 and fv_schema cG = function
-  | Schema (impl, expl) -> List.concat (List.map (fun (_, t) -> fv_syn cG t) impl)
+  | Schema (impl, expl) -> snd (List.fold_left (fun (cG, names) (n, cP, t) -> (n,Box(cP, t)) :: cG,
+                                                                                 fv cG (Box(cP, t)) @ names)
+                                                  (cG, []) impl)
                            @ List.concat (List.map (fun (_, t) -> fv_syn cG t) expl)
 
 and fv_ctx cG = function
@@ -153,7 +155,11 @@ and refresh_syn_exp rep =
 
 and refresh_schema rep (Schema (im, ex)) =
   let f (n, t) = (n, refresh_syn_exp rep t) in
-  Schema (List.map f im, List.map f ex)
+  Schema (List.fold_left
+               (fun (acc, rep) (n, cP, t) ->
+                 let n' = refresh_name n in
+                 (n', refresh_bctx rep cP, refresh_syn_exp rep t) :: acc, (n,n')::rep)
+               ([], rep) im |> fst, List.map f ex)
 
 and refresh_bctx (rep : (name * name) list) : bctx -> bctx =
   function
@@ -226,9 +232,14 @@ and refresh_free_var_syn (x, y) e =
   | SBCtx cP -> SBCtx (refresh_free_var_bctx (x, y) cP)
   | Block cs -> Block (Rlist.map (fun (z, e) -> (z, f e)) cs) (* z has to be free *)
 
-and refresh_free_var_schema rep (Schema (im, ex)) =
-  let f (n, t) = (n, refresh_free_var_syn rep t) in
-  Schema (List.map f im, List.map f ex)
+and refresh_free_var_schema (x, y as rep) (Schema (im, ex)) =
+  let f (n, cP, t) =
+    if n <> x then
+      (n, refresh_free_var_bctx rep cP, refresh_free_var_syn rep t)
+    else
+      raise (Error.Violation "Duplicate name in refresh_free_var_schema") in
+  let g (n, t) = (n, refresh_free_var_syn rep t) in
+  Schema (List.map f im, List.map g ex)
 
 and refresh_free_var_bctx (x, y) cP =
   match cP with
@@ -288,8 +299,9 @@ let rec subst (x, es : single_subst) (e : exp) :  exp =
   | Hole s -> Hole s
 
 and sub_schema s (Schema (im, ex)) =
-  let f (n, e) = (n, subst_syn s e) in
-  Schema (List.map f im, List.map f ex)
+  let f (n, cP, e) = (n, subst_bctx s cP, subst_syn s e) in
+  let g (n, e) = (n, subst_syn s e) in
+  Schema (List.map f im, List.map g ex)
 
 and subst_syn (x, es) e =
   let f e = subst_syn (x, es) e in
@@ -611,8 +623,14 @@ and rename_all (qs : pats) (ps : Apx.pats) : (name * name) list = List.concat (L
 and rename_all_syn (qs : syn_pats) (ps : Apx.pats) : (name * name) list = List.concat (List.map2 rename_syn qs ps)
 
 (* transform a schema part into a stel *)
-let part_to_stel (i : icit) ps = List.map (fun (n, t) -> (i, n, t)) ps
+let impl_to_tel ps = List.map (fun (n, cP, t) -> (Syntax.Implicit, n, Box (cP, t))) ps
 
-let rec part_to_bctx = function
-  | [] -> Nil
-  | (n, t)::ps -> Snoc(part_to_bctx ps, n, t)
+let rec impl_to_ctx = function
+  | [] -> []
+  | (n, cP, t)::ps -> (n, Box(cP, t)) :: impl_to_ctx ps
+
+let simul_subst_in_impl sigma ps =
+    List.map (fun (n, cP, e) -> n, simul_subst_on_bctx sigma cP, simul_subst_syn sigma e) ps
+
+let simul_subst_in_expl sigma ps =
+    List.map (fun (n, e) -> n, simul_subst_syn sigma e) ps

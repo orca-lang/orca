@@ -164,6 +164,11 @@ let split_lam (sign : signature) (cD : ctx) (cP : bctx) (qs : pats)
   let p = PUnbox (m, pid_sub, cP') in
   [[], cD', [], Lam (xs, e), PLam (xs, p)]
 
+type scheme_in_var
+  = No
+  | Yes
+  | YesBlock of int * syn_exp
+
 let split_box (sign : signature) (cD : ctx) (qs : pats)
     (n, p : name * A.pat) (cP, t : bctx * syn_exp) =
   let splits, sp = match Whnf.rewrite sign cP t with
@@ -190,31 +195,32 @@ let split_box (sign : signature) (cD : ctx) (qs : pats)
         None :: unify splits
   in
   let rec admits_variables n = function
-    | Nil -> false
+    | Nil -> No
     | CtxVar g ->
        begin match lookup_ctx_fail cD g with
                    | Ctx (Schema (im, ex)) ->
-                      let tel = part_to_stel Implicit im in
-                      let tel', sigma, cP' = abstract cP tel in
-                      let flex = List.map (fun (_, x, _) -> x) tel' in
-                      let unify_with_one (_, t') =
-                        try
-                          let _ = Unify.unify_flex_syn (sign, cD) cP flex (Clos (t, sigma, cP')) t' in
-                          true
-                        with Unify.Unification_failure _ -> false
-                      in
-                      List.exists unify_with_one ex
+                      let tel = impl_to_tel im in
+                      let flex = List.map (fun (_, x, _) -> x) tel in
+                      let rec find n = function
+                        | [] -> No
+                        | (_, t')::ex' ->
+                           try
+                             let _, sigma = Unify.unify_flex_syn (sign, cD) cP flex t t' in
+                             YesBlock (n, Block(simul_subst_in_expl sigma ex |> Rlist.from_list)) (* possible wrong order *)
+                           with Unify.Unification_failure _ -> find (n+1) ex'
+                      in find 0 ex
 
                    | _ -> raise (Error.Violation "Admits variable has bctx which is not a context")
        end
-    | Snoc (cP', _, s) -> try let _ = Unify.unify_syn (sign, cD) cP t (Clos (s, Shift (n+1), cP')) in true
+    | Snoc (cP', _, s) -> try let _ = Unify.unify_syn (sign, cD) cP t (Clos (s, Shift (n+1), cP')) in Yes
                           with Unify.Unification_failure _ -> admits_variables (n+1) cP'
   in
-  if admits_variables 0 cP then
-    let x = Name.gen_name "X" in
-    Some ((x, Box (cP, t)) :: cD, simul_psubst_on_list sign [n, PTBox (cP, PPar x)] qs, [n, Var x]) :: unify splits
-  else
-    unify splits
+  match admits_variables 0 cP with
+  | No -> unify splits
+  | Yes ->
+     let x = Name.gen_name "X" in
+     Some ((x, Box (cP, t)) :: cD, simul_psubst_on_list sign [n, PTBox (cP, PPar x)] qs, [n, Var x]) :: unify splits
+  | YesBlock  _ -> assert false
 
 let get_splits (sign : signature) (cD : ctx) (qs : pats)
     (n, p : name * A.pat) (c, sp : def_name * exp list) : (ctx * pats * subst) option list =
