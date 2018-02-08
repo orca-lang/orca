@@ -273,11 +273,14 @@ and check_syn_type (sign, cG) cP (e : A.exp) : I.syn_exp =
   in Debug.deindent (); res
 
 and check_ctx (sign, cG) g sch =
+  Debug.print (fun () -> "check_ctx: g = " ^ AP.print_exp g);
   match g with
   | A.Snoc (g, x, e) ->
      let cP = check_ctx (sign, cG) g sch in
      let t' = check_type_against_schema (sign, cG) cP e sch in
-     I.Snoc (cP, x, t')
+     let cP' =  I.Snoc (cP, x, t') in
+     Debug.print (fun () -> "check_ctx: cP' = " ^ IP.print_bctx cP');
+     cP'
 
   | A.Nil -> I.Nil
   | A.Var x ->
@@ -333,6 +336,7 @@ and check_type_against_schema (sign, cG) cP e = try
        let rec unify_explicit cG cP sigma = function
          | [], [] -> cG, sigma
          | (n, t)::bs', (m, t')::ex' ->
+           Debug.print(fun () -> "Checking block: Trying to unify " ^ IP.print_syn_exp t ^ "\nwith " ^ IP.print_syn_exp t');
             let cG', sigma' = try
                 Unify.unify_flex_syn (sign, cG) cP flex t t'
               with Unify.Unification_failure problem ->
@@ -347,16 +351,20 @@ and check_type_against_schema (sign, cG) cP e = try
          | A.Block bs -> check_block (sign, cG) cP bs
          | _ -> raise (Error. Error "Expected a block")
        in
-       let cG', sigma = unify_explicit cG I.Nil [] (Rlist.to_list bs, ex') in
+       let cG', sigma = unify_explicit cG I.Nil [] (Rlist.to_list bs, List.rev ex') in (* Trying to rev here because suspect shema are in non context order... *)
        simul_subst_syn sigma (I.Block bs)
   with Unify.Unification_failure problem -> raise (Error.Error (Unify.print_unification_problem problem))
 
-and check_block (sign, cG) cP = function
-  | Rlist.RNil -> Rlist.RNil
-  | Rlist.RCons (bs, (n, e)) ->
-     let e' = check_syn_type (sign, cG) cP e in
-     Rlist.RCons ((check_block (sign, cG) (I.Snoc(cP, n, e')) bs), (n, e'))
-
+and check_block (sign, cG) cP bs =
+  let rec check_block' = function
+    | Rlist.RNil -> Rlist.RNil, cP
+    | Rlist.RCons (bs, (n, e)) ->
+      let bs', cP' = check_block' bs in
+      let e' = check_syn_type (sign, cG) cP' e in
+      Rlist.RCons (bs', (n, e')), I.Snoc(cP', n, e')
+  in
+  let bs', _ = check_block' bs in
+  bs'
 
 and check_syn (sign, cG) cP (e : A.exp) (t : I.syn_exp) =
   let t' = Whnf.rewrite sign cP t in

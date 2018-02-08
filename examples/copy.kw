@@ -23,7 +23,7 @@ def copy-oft : (g : ctx {t : tp} (e : tm, d: oft e t)) (m : (g |- tm)) (t : (|- 
 (*) | g (app f e) t (t-app .f .e s[^] .t d1 d2) =>
 (*)   t-app f e s t (copy-oft g f (arr s t) d1) (copy-oft g e s d2)
 | g (lam m) (arr s t) (t-lam .m .s .t d) =>
-  t-lam m s t (\x. \u. (copy-oft (g, |x:tm, u: oft x s|) (g,|foo, u| :> m foo) t ?)[^2; |u , x|]) (*) (g, |x, u| :> d x u)))
+  t-lam m s t (\x. \u. (copy-oft (g, |x:tm, u: oft x s|) (g,|foo, u| :> m foo) t ?)[^1; |x , u|]) (*) (g, |x, u| :> d x u)))
 (*) | g m t (<: d) => d
 
 

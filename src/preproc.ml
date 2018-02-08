@@ -219,12 +219,17 @@ match content e with
   in Debug.deindent ();
   res
 
-and pproc_block (s : sign) (cG : ctx) (cP : bctx) : (E.name * E.exp) Rlist.rlist -> (string * A.exp) Rlist.rlist =
-  let open Rlist in function
-  |  RNil -> RNil
-  | RCons (bs, (n, e)) ->
-     Debug.print (fun () -> "n = " ^ n ^ " cP = " ^ print_bctx cP );
-     RCons(pproc_block s cG ([n]::cP) bs, (n, pproc_exp s cG cP e))
+and pproc_block (s : sign) (cG : ctx) (cP : bctx) (bs : (E.name * E.exp) Rlist.rlist) : (string * A.exp) Rlist.rlist =
+  let open Rlist in
+  let rec pproc_block' = function
+    | RNil -> RNil, cP
+    | RCons (bs, (n, e)) ->
+      let bs', cP' = pproc_block' bs in
+      Debug.print (fun () -> "n = " ^ n ^ " cP = " ^ print_bctx cP' );
+      (RCons(bs', (n, pproc_exp s cG cP' e)), [n]::cP')
+  in
+  let bs', _ = pproc_block' bs in
+  bs'
 
 and pproc_schema (s : sign) (cG : ctx) (cP : bctx) (E.Schema (impl, expl) : E.schema) : A.schema =
   let rec pproc_impl cG = function

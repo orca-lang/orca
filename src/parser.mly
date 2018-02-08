@@ -126,7 +126,7 @@ exp_level6:
 | e = located(raw_exp_level6) {e}
 
 raw_exp_level6:
-| e1 = exp_level6 e2 = exp_level7 {App (e1, e2)}
+        | e1 = exp_level6 e2 = exp_level7 {App (e1, e2)}
 | e1 = exp_level6 APPL e2 = exp_level7 {AppL (e1, e2)}
 | e = raw_exp_level7 {e}
 
@@ -158,7 +158,7 @@ schema:
    {Schema (impl, expl)}
 
 schema_ex_impl:
-| x=IDENT COLON LPAREN e=exp_level4 RPAREN {x,e}
+| x=IDENT COLON e=exp_level6 {x,e}
 
 schema_ex:
 | x=IDENT COLON e=exp_level6 {x,e}

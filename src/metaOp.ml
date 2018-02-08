@@ -323,7 +323,7 @@ and subst_syn (x, es) e =
   | Comp (e1, cP, e2) -> Comp (f e1, subst_bctx (x, es) cP, f e2)
   | Dot (e1, e2) -> Dot (f e1, f e2)
   | SBCtx cP -> SBCtx (subst_bctx (x, es) cP)
-  | Block cs -> Block (Rlist.map (fun (y, e) -> (y, subst_syn (x, es) e)) cs)
+  | Block cs -> Block (subst_block (x, es) cs)
 
 and subst_bctx (x, es : single_subst) cP =
   match cP with
@@ -336,6 +336,11 @@ and subst_bctx (x, es : single_subst) cP =
      | e -> raise (Error.Violation ("I don't believe you! " ^ print_exp e))
      end
   | CtxVar n -> CtxVar n
+
+and subst_block (x, es : single_subst) cP =
+  let open Rlist in match cP with
+  | RCons (l, (y, e)) -> RCons (subst_block (x, es) l, (y, subst_syn (x, es) e))
+  | RNil -> RNil
 
 and subst_pi (x, es) tel t =
   match tel with

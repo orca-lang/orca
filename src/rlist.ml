@@ -33,4 +33,4 @@ let rec nth l i = match l with
   | RCons (l, _) -> nth l (i-1)
 
 
-let rec to_string ?(sep = ", ") f l = fold (fun l e -> l ^ sep ^ f e) "" l
+let rec to_string ?(sep = ", ") f l = fold (fun l e -> f e ^ sep ^ l) "" l
