@@ -597,8 +597,9 @@ let rec rename (q : pat) (p : Apx.pat) : (name * name) list =
   | PVar n, Apx.Inacc (Apx.Var m) -> [n, m]
   | Inacc _, _ -> []                  (* can this be possible? *)
   | _, Apx.Inacc _ -> []                    (* Should we do that here or in a check_inacc function? *)
+  (* | PVar n, Apx.PClos (m, s0) -> [n, m] (\* MMMMMMM *\) *)
   | _, Apx.PWildcard -> []
-  | _ -> raise (Error.Violation ("Renaming of tree node expects matching pattern with tree node\np = " ^ Print.Apx.print_pat p ^"\nq = " ^ print_pat q))
+  | _ -> raise (Error.Violation ("2. Renaming of tree node expects matching pattern with tree node\np = " ^ Print.Apx.print_pat p ^"\nq = " ^ print_pat q))
 
 and rename_syn (q : syn_pat) (p : Apx.pat) : (name * name) list =
   match q, p with
@@ -613,6 +614,7 @@ and rename_syn (q : syn_pat) (p : Apx.pat) : (name * name) list =
   | PDot(sq, q), Apx.PDot (sp, p) -> rename_syn sq sp @ rename_syn q p
   | PUnbox(n, s, cP), Apx.PClos(m, s') -> [n, m]
   | PUnbox(n, s, cP), Apx.Inacc(Apx.Var m) -> [n, m]
+  | _, Apx.PWildcard -> []
   | SInacc (e, s, cP), Apx.PVar m ->
      let rec dig = function
        | Var n -> [n, m]
@@ -620,7 +622,7 @@ and rename_syn (q : syn_pat) (p : Apx.pat) : (name * name) list =
        | _ -> raise (Error.Violation "Digging failed")
      in
      dig e
-  | _ -> raise (Error.Violation ("Renaming of tree node expects matching pattern with tree node\nq = "
+  | _ -> raise (Error.Violation ("1. Renaming of tree node expects matching pattern with tree node\nq = "
                                    ^ print_syn_pat q ^ "\np = " ^ Print.Apx.print_pat p))
 
 and rename_all (qs : pats) (ps : Apx.pats) : (name * name) list = List.concat (List.map2 rename qs ps)
