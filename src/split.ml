@@ -197,8 +197,14 @@ let split_box (sign : signature) (cD : ctx) (qs : pats)
   let rec admits_variables n = function
     | Nil -> No
     | CtxVar g ->
-       begin match lookup_ctx_fail cD g with
-                   | Ctx (Schema (im, ex)) ->
+      begin match lookup_ctx_fail cD g with
+        | Ctx (Schema (im, [_,t'])) -> (* Schema has a 1-tuple, no projections needed *)
+          (* let _tel = impl_to_tel im in *)
+          begin try let _ = Unify.unify_syn (sign, cD) cP t (Clos (t', Shift (n+1), CtxVar g))
+                    in Yes
+                with Unify.Unification_failure _ -> No
+          end
+        | Ctx (Schema (im, ex)) ->
                       let tel = impl_to_tel im in
                       let flex = List.map (fun (_, x, _) -> x) tel in
                       let rec find n = function
