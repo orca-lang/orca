@@ -33,3 +33,7 @@ setup.log
 
 # other files
 *.agdai
+
+# floobits files
+.floo
+.flooignore
