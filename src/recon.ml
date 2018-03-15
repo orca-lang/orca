@@ -135,7 +135,7 @@ and check_schema (sign , cG : signature * I.ctx) (A.Schema (im, ex) : A.schema) 
        let s' = check_syn_type (sign, cG) cP' s in
        let ps'', cG' = check_many_impl (sign, (x, I.Box (cP', s')) :: cG) ps' in
        ((x, cP', s')::ps''), cG'
-    | _ -> raise (Error.Error "Schema expects implicit parameters of boxed type.")
+    | _ -> raise (Error.Error "Schema expects implicit parameters of boxed type (they have to be meta-vars).")
   in
   let rec check_many_expl (sign, cG) cP (ps : A.schema_expl)=
     match ps with

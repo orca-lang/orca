@@ -46,6 +46,8 @@ and syn_check_match cP q p =
   | PLam (xs, q), A.PLam (ys, p) -> syn_check_match (bctx_of_lam_pars cP xs) q p
   | PPar n, A.PPar n' -> Yes
   | PUnbox (n, s, cP'), A.PClos (m, s') when s = s' -> Yes
+  | PUnbox (n, s, cP'), A.PBVar i' ->
+    begin try let _ = apply_inv_pat_subst (BVar i') s in Yes with _ -> No end
   | PUnbox (n, s, cP'), _ -> Yes
   | SInacc _, _ -> Yes
   | PEmpty, A.PEmpty -> Yes
