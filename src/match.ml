@@ -69,7 +69,7 @@ let compose_maps sign (sigma : I.pats) (cD : I.ctx) (delta : I.pats) : I.pats =
   let delta_names = List.map2 (fun (x, _) p -> x, p) cD delta in
   Debug.print(fun () -> "Composing maps\nsigma = " ^ IP.print_pats sigma
      ^ "\ndelta = " ^ IP.print_pats delta ^ "\ndelta_names" ^ print_psubst delta_names);
-  List.map (simul_psubst sign delta_names) sigma
+  assert false (* List.map (simul_psubst sign delta_names) sigma *)
 
 let matching (p : I.pat) (q : pat) : pats =
   match q with
@@ -200,7 +200,7 @@ let compute_split_map sign (ss:I.single_subst) (pss:single_psubst) (cD1:I.ctx) (
   let pdelta = compose_psubst sign pdelta id_cD' in
   Debug.print (fun () -> "pdelta = " ^ print_psubst pdelta);
   let pdelta_shift = pdelta @ [x, I.PVar x] in
-  let pdelta' = compose_single_with_psubst sign pss pdelta_shift in
+  let pdelta' = assert false in (*compose_single_with_psubst sign pss pdelta_shift in*)
   Debug.print (fun () -> "pdelta' = " ^ print_psubst pdelta');
   let cD'', delta'' = cD' @ (simul_subst_on_ctx delta' cD2),
     (pats_of_psubst (shift_psubst_by_ctx pdelta' cD2)) in
@@ -251,9 +251,9 @@ let split_lam (sign : signature) (p1 : pats) (xs, p : string list * pat) (cD1 : 
   in
   let xs' = List.map2 (fun x (_,_,t) -> x, t) xs tel0 in
   let ss = x, I.TermBox (g, I.Lam (xs', I.Unbox(e, I.id_sub, bctx_of_lam_pars g xs'))) in
-  let p' = match simul_syn_psubst_on_list sign g pdelta (punbox_list_of_ctx g cT) with
-    | [p'] -> p'
-    | _ -> raise (Error.Violation ("Split_lam obtained more than one parameter out of substituting in cT"))
+  let p' = assert false (* match simul_syn_psubst_on_list sign g pdelta (punbox_list_of_ctx g cT) with *)
+    (* | [p'] -> p' *)
+    (* | _ -> raise (Error.Violation ("Split_lam obtained more than one parameter out of substituting in cT")) *)
   in
   let pss = x, I.PTBox(g, I.PLam (xs', p')) in
   let res = compute_split_map sign ss pss cD1 x cD2 delta pdelta cD' in
@@ -305,9 +305,9 @@ let split_const (sign : signature) (p1 : pats) (c, ps : def_name * pats)
                x, I.App (I.Const c, var_list_of_ctx td) in
     let pss = if is_syn_con sign c then
                let cP = get_cP maybe_g in
-               x, I.PTBox(cP, I.PSConst (c, simul_syn_psubst_on_list sign cP pdelta (punbox_list_of_ctx cP cT)))
+               x, I.PTBox(cP, I.PSConst (c, simul_syn_psubst_on_list cP pdelta (punbox_list_of_ctx cP cT)))
              else
-               x, I.PConst (c, simul_psubst_on_list sign pdelta (pvar_list_of_ctx cT)) in
+               x, I.PConst (c, simul_psubst_on_list pdelta (pvar_list_of_ctx cT)) in
     let res = compute_split_map sign ss pss cD1 x cD2 delta pdelta cD' in
     Debug.deindent (); res
   else

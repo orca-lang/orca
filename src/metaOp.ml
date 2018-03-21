@@ -404,16 +404,22 @@ let var_list_of_ctx : ctx -> exp list = List.map (fun (x, _) -> Var x)
 
 let var_list_of_tel : tel -> exp list = List.map (fun (_, x, _) -> Var x)
 
-
 let unbox_list_of_ctx cP : ctx -> syn_exp list = List.map (fun (x, _) -> Unbox(Var x, id_sub, cP))
 let punbox_list_of_ctx cP : ctx -> syn_pat list = List.map (fun (x, _) -> PUnbox(x, pid_sub, cP))
 let unbox_list_of_tel cP : tel -> syn_exp list = List.map (fun (_, x, _) -> Unbox(Var x, id_sub, cP))
 let punbox_list_of_tel cP : tel -> syn_pat list = List.map (fun (_, x, _) -> PUnbox(x, pid_sub, cP))
 
-
 let rec ctx_subst s = function
   | (x, t) :: cG -> (x, subst s t) :: (ctx_subst s cG)
   | [] -> []
+
+let ctx_var_subst (x, y) cG =
+  let rec replace_var_in_subst (x, y) = function
+    | (z, t) :: cG when x = z -> (y, t) :: replace_var_in_subst (x, y) cG
+    | (z, t) :: cG  -> (z, t) :: replace_var_in_subst (x, y) cG
+    | [] -> []
+  in
+  ctx_subst (x, Var y) (replace_var_in_subst (x, y) cG)
 
 let shift_subst_by_ctx sigma cG =
   let sigma' = sigma @ (List.map (fun (x, _) -> x, Var x) cG) in
@@ -485,19 +491,19 @@ let rec comp_pat_subst err s s' =
 type single_psubst = name * pat
 type psubst = single_psubst list
 
-let rec psubst sign (x, p') = function
+let rec psubst (x, p') = function
   | PVar n when n = x -> p'
   | PVar n -> PVar n
   | Inacc e -> Inacc (subst (x, exp_of_pat p') e)
-  | PConst (n, ps) -> PConst (n, List.map (psubst sign (x, p')) ps)
-  | PBCtx cP -> PBCtx (bctx_psubst sign (x, p') cP)
+  | PConst (n, ps) -> PConst (n, List.map (psubst (x, p')) ps)
+  | PBCtx cP -> PBCtx (bctx_psubst (x, p') cP)
   | PUnder -> PUnder
   | PTBox (cP, p) -> let cP' = subst_bctx (x, exp_of_pat p') cP in
-                       PTBox (cP', syn_psubst sign cP' (x, p') p)
-and syn_psubst sign cP (x, p') = function
+                       PTBox (cP', syn_psubst cP' (x, p') p)
+and syn_psubst cP (x, p') = function
   | PBVar i -> PBVar i
-  | PLam (xs, p) -> PLam (xs, syn_psubst sign (bctx_of_lam_pars cP xs) (x, p') p) (* What about shifts in p'? *)
-  | PSConst (n, ps) -> PSConst (n, List.map (syn_psubst sign cP (x, p')) ps)
+  | PLam (xs, p) -> PLam (xs, syn_psubst (bctx_of_lam_pars cP xs) (x, p') p) (* What about shifts in p'? *)
+  | PSConst (n, ps) -> PSConst (n, List.map (syn_psubst cP (x, p')) ps)
   | PUnbox (n, s, cP') when n = x ->
      begin match p' with
        | PVar m -> PUnbox (m, s, cP')
@@ -539,7 +545,7 @@ and syn_psubst sign cP (x, p') = function
   | SInacc (e, s, cP) -> SInacc (subst (x, exp_of_pat p') e, s, cP)
   | PEmpty -> PEmpty
   | PShift n -> PShift n
-  | PDot (s, p) -> PDot (syn_psubst sign cP (x, p') s, syn_psubst sign cP (x, p') p)
+  | PDot (s, p) -> PDot (syn_psubst cP (x, p') s, syn_psubst cP (x, p') p)
   | PPar n when n = x ->
     begin match p' with
     | PVar m -> PUnbox (m, pid_sub, cP)
@@ -550,9 +556,9 @@ and syn_psubst sign cP (x, p') = function
   | PPar n -> PPar n
 
 
-and bctx_psubst sign (x, p') = function
+and bctx_psubst (x, p') = function
   | PNil -> PNil
-  | PSnoc (cP, s, t) -> PSnoc (bctx_psubst sign (x, p') cP, s, subst_syn (x, exp_of_pat p') t)
+  | PSnoc (cP, s, t) -> PSnoc (bctx_psubst (x, p') cP, s, subst_syn (x, exp_of_pat p') t)
   | PCtxVar n when n = x ->
      begin match p' with
      | PBCtx p -> p
@@ -561,23 +567,23 @@ and bctx_psubst sign (x, p') = function
      end
   | PCtxVar n -> PCtxVar n
 
-let rec compose_single_with_psubst sign s = function
+let rec compose_single_with_psubst s = function
   | [] -> []
-  | (y, t') :: sigma -> (y, psubst sign s t') :: (compose_single_with_psubst sign s sigma)
+  | (y, t') :: sigma -> (y, psubst s t') :: (compose_single_with_psubst s sigma)
 
 let pats_of_psubst : psubst -> pats = List.map (fun (x, p) -> p)
 
-let simul_psubst sign sigma p =
-  List.fold_left (fun p s -> psubst sign s p) p sigma
+let simul_psubst sigma p =
+  List.fold_left (fun p s -> psubst s p) p sigma
 
-let simul_syn_psubst sign cP sigma p =
-  List.fold_left (fun p s -> syn_psubst sign cP s p) p sigma
+let simul_syn_psubst cP sigma p =
+  List.fold_left (fun p s -> syn_psubst cP s p) p sigma
 
-let simul_psubst_on_list sign sigma ps =
-  List.map (simul_psubst sign sigma) ps
+let simul_psubst_on_list sigma ps =
+  List.map (simul_psubst sigma) ps
 
-let simul_syn_psubst_on_list sign cP sigma ps =
-  List.map (simul_syn_psubst sign cP sigma) ps
+let simul_syn_psubst_on_list cP sigma ps =
+  List.map (simul_syn_psubst cP sigma) ps
 
 let inac_subst e = List.map (fun (x, e) -> x, Inacc e) e
 let pvar_list_of_tel : tel -> pats = List.map (fun (_, x, _) -> PVar x)
@@ -585,6 +591,7 @@ let punbox_list_of_tel cP : tel -> syn_pat list = List.map (fun (_, x, _) -> PUn
 let psubst_of_names e = List.map (fun (n, m) -> n, PVar m) e
 let subst_of_names e = List.map (fun (n, m) -> n, Var m) e
 
+let subst_of_psubst sigma = List.map (fun (x, q) -> (x, exp_of_pat q)) sigma
 
 let rec rename (q : pat) (p : Apx.pat) : (name * name) list =
   match q,p with

@@ -95,7 +95,7 @@ module Apx = struct
   open Name
 
   (* Pretty printer -- could be prettier *)
-  let print_universe = string_of_int
+  let print_universe i = "set " ^ string_of_int i
 
   let rec print_exp = function
     | Set n -> print_universe n
@@ -225,7 +225,7 @@ module Int = struct
   open Name
 
   (* Pretty printer -- could be prettier *)
-  let print_universe = string_of_int
+  let print_universe i = "set " ^ string_of_int i
 
   let rec print_exp = function
     | Set n -> print_universe n

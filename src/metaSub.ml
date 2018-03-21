@@ -183,7 +183,7 @@ let apply_inv_subst e s =
     | SCtx t, _ -> SCtx t
     | SConst n, _ -> SConst n
     | Unbox(e, s', cP), _ -> Unbox (e, apply_inv s' s, cP)
-    | _ -> raise (Error.Violation ("FOOFOO Failed to apply inverse substitution " ^ print_syn_exp s
+    | _ -> raise (Error.Violation ("Failed to apply inverse substitution " ^ print_syn_exp s
                                    ^ " because it was not a substitution."))
   in
   try Some (apply_inv e s)

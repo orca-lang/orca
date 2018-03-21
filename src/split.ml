@@ -23,103 +23,88 @@ let is_overlap = function
   | Overlap -> true
   | _ -> false
 
-let rec check_match (q : pat) (p : A.pat) =
+let rec check_match cD (q : pat) (p : A.pat) =
   match q, p with
-  | PVar n, A.PVar m -> Yes (PVar m)
-  | PVar n, _ -> Yes q
+  | PVar n, A.PVar m ->
+    Debug.print (fun () -> "SPLIT: Checking PVar " ^ print_name n ^ " replacing it with " ^ print_name m);
+    let cD' = ctx_var_subst (n, m) cD in
+    Yes (cD', [n,PVar m])
+  | PVar n, _ -> Yes (cD, [])
   | PConst (n, qs), A.PConst (n', ps) when n = n' ->
-    begin
-    match check_all qs ps with
-    | Yes qs' -> Yes (PConst (n, qs'))
-    | No -> No
-    | Overlap -> Overlap
-    end
+     check_all cD qs ps
   | PConst (n, qs), A.PConst (n', ps) -> No
-  | Inacc _, _ -> Yes q
-  | PBCtx q, _ ->
-    begin match bctx_check_match q p with
-    | Yes q' -> Yes (PBCtx q')
-    | No -> No
-    | Overlap -> Overlap
-    end
-  | PTBox (cP, q), p ->
-    begin match syn_check_match cP q p with
-    | Yes q' -> Yes (PTBox (cP, q'))
-    | No -> No
-    | Overlap -> Overlap
-    end
-  | _, A.PWildcard -> Yes q
+  | Inacc _, _ -> Yes (cD, [])
+  | PBCtx q, _ -> bctx_check_match cD q p
+  | PTBox (cP, q), p -> syn_check_match cD cP q p
+  | _, A.PWildcard -> Yes (cD, [])
   | _, A.PVar n -> Overlap
   | _ -> No
-and syn_check_match cP q p =
+and syn_check_match cD cP q p =
   match q, p with
   | PLam (xs, q), A.PLam (ys, p) ->
-     begin match syn_check_match (bctx_of_lam_pars cP xs) q p with
-     | Yes q' ->
-       Yes (PLam (xs, q'))
-     | No -> No
-     | Overlap -> Overlap
-     end
-  | PPar n, A.PPar n' -> Yes (PPar n')
-  | PUnbox (n, CShift 0, cP'), A.PClos (m, s') ->
+    syn_check_match cD (bctx_of_lam_pars cP xs) q p
+  | PPar n, A.PPar n' ->
+    let cD' = ctx_var_subst (n, n') cD in
+    Yes (cD', [n, PTBox (cP, PPar n')])
+  | PUnbox (n, s, cP'), A.PClos (m, s') ->
     let cP' = shift_cp_inv_pat_subst cP s' in
-    Debug.print (fun () -> "Computed context: " ^ print_bctx cP' ^ " " ^ print_pat_subst s') ;
-    Yes (PUnbox (m, s', cP'))
-  | PUnbox (n, s, cP'), A.PClos (m, s') when s = s' ->
-    Debug.print (fun () -> "Computed context: (=) " ^ print_bctx cP' ^ " " ^ print_pat_subst s) ;
-    Yes (PUnbox (n, s, cP))
-  | PUnbox _, A.PClos _ -> assert false
+    let cD' = ctx_var_subst (n, m) cD in
+    Yes (cD', [n, PTBox(cP, PUnbox (m, s', cP'))])
   | PUnbox (n, s, cP'), A.PBVar i' ->
     begin match apply_inv_pat_subst (BVar i') s with
-    | Some _ -> Yes (PUnbox (n, s, cP'))
+    | Some _ -> Yes (cD, [])
     | None -> No
     end
-  | PUnbox (n, s, cP'), _ -> Yes (PUnbox (n, s, cP'))
-  | SInacc _, _ -> Yes q
-  | PEmpty, A.PEmpty -> Yes PEmpty
-  | PShift n, A.PShift n' when n = n' -> Yes (PShift n)
-  | PBVar i, A.PBVar i' when i = i' -> Yes (PBVar i)
-  | PSConst (n, qs), A.PConst (n', ps) when n = n' ->
-    begin match syn_check_all cP qs ps with
-    | Yes qs' -> Yes (PSConst (n, qs'))
-    | No -> No
-    | Overlap -> Overlap
-    end
+  | PUnbox (n, s, cP'), _ -> Yes (cD, [])
+  | SInacc _, _ -> Yes (cD, [])
+  | PEmpty, A.PEmpty -> Yes (cD, [])
+  | PShift n, A.PShift n' when n = n' -> Yes (cD, [])
+  | PBVar i, A.PBVar i' when i = i' -> Yes (cD, [])
+  | PSConst (n, qs), A.PConst (n', ps) when n = n' -> syn_check_all cD cP qs ps
   | PSConst (n, ps), A.PConst (n', qs) -> No
   | PDot (s, q'), A.PDot (s', p') ->
-    begin match syn_check_match cP s s', syn_check_match cP q' p' with
-    | Yes s0, Yes q0 -> Yes (PDot (s0, q0))
+    begin match syn_check_match cD cP s s' with
+    | Yes (cD', sigma) ->
+      begin match syn_check_match cD' cP (simul_syn_psubst cP sigma q') p' with
+      | Yes (cD'', sigma') -> Yes (cD'', sigma' @ sigma)
+      | _ -> No
+      end
     | _ -> No
     end
   | _, A.PVar n -> Overlap
   | _ -> No
-and bctx_check_match q p =
+and bctx_check_match cD q p =
   match q, p with
-  | PCtxVar x, A.PVar y  -> Yes (PCtxVar x)
+  | PCtxVar x, A.PVar y  -> Yes (cD, [x, PVar y])
   | PSnoc (q1, _, q2), A.PSnoc (p1, x, p2) ->
-    begin match bctx_check_match q1 p1 with (*, syn_check_match (bctx_of_pat_ctx q1) q2 p2 with *)
-    | Yes q1' -> Yes (PSnoc (q1', x, q2))
-    | _ -> No
-    end
-  | PNil, A.PNil -> Yes PNil
+    bctx_check_match cD q1 p1
+  | PNil, A.PNil -> Yes (cD, [])
   | _ -> No
-and check_all qs ps =
+and check_all cD qs ps =
   match qs, ps with
   | q :: qs, p :: ps ->
-    begin match check_match q p, check_all qs ps with
-    | Yes q', Yes qs' -> Yes (q' :: qs')
+    begin match check_match cD q p with
+    | Yes (cD', s) ->
+      begin match check_all cD' (simul_psubst_on_list s qs) ps with
+      | Yes (cD'', s') -> Yes (cD'', s' @ s)
+      | _ -> No
+      end
     | _ -> No
     end
-  | [], _ -> Yes []
+  | [], _ -> Yes (cD, [])
   | _ -> No  (* maybe we want to raise error/violation here... *)
-and syn_check_all cP qs ps =
+and syn_check_all cD cP qs ps =
   match qs, ps with
   | q :: qs, p :: ps ->
-    begin match syn_check_match cP q p, syn_check_all cP qs ps with
-    | Yes q', Yes qs' -> Yes (q' :: qs')
+    begin match syn_check_match cD cP q p with
+    | Yes (cD', s) ->
+      begin match syn_check_all cD' cP (simul_syn_psubst_on_list cP s qs) ps with
+      | Yes (cD'', s') -> Yes (cD'', s' @ s)
+      | _ -> No
+      end
     | _ -> No
     end
-  | [], _ -> Yes []
+  | [], _ -> Yes (cD, [])
   | _ -> No  (* maybe we want to raise error/violation here... *)
 
 let is_blocking = function
@@ -237,9 +222,9 @@ let split_box (sign : signature) (cD : ctx) (qs : pats)
             ^ "\nsigma = "^ print_subst sigma);
           let psigma = inac_subst sigma in
           let s = n, TermBox(cP, simul_subst_syn sigma e) in
-          let psigma' = (n, (PTBox (cP, simul_syn_psubst sign cP psigma p))) :: psigma in
+          let psigma' = (n, (PTBox (cP, simul_syn_psubst cP psigma p))) :: psigma in
           let cD''' = ctx_subst s (List.filter (fun (x, _) -> x <> n) cD'') in
-          Some (cD''', simul_psubst_on_list sign psigma' qs, s :: sigma) :: unify splits
+          Some (cD''', simul_psubst_on_list psigma' qs, s :: sigma) :: unify splits
       with Unify.Unification_failure msg ->
         Debug.print_string (Unify.print_unification_problem msg);
         None :: unify splits
@@ -275,7 +260,7 @@ let split_box (sign : signature) (cD : ctx) (qs : pats)
   | No -> unify splits
   | Yes ->
      let x = Name.gen_name "X" in
-     Some ((x, Box (cP, t)) :: cD, simul_psubst_on_list sign [n, PTBox (cP, PPar x)] qs, [n, Var x]) :: unify splits
+     Some ((x, Box (cP, t)) :: cD, simul_psubst_on_list [n, PTBox (cP, PPar x)] qs, [n, Var x]) :: unify splits
   | YesBlock  _ -> assert false
 
 let get_splits (sign : signature) (cD : ctx) (qs : pats)
@@ -294,10 +279,10 @@ let get_splits (sign : signature) (cD : ctx) (qs : pats)
             ^ "\nusing substitution " ^ print_subst sigma);
           let psigma = inac_subst sigma in
           let s = n, simul_subst sigma e in
-          let psigma' = (n, simul_psubst sign psigma p) :: psigma in
+          let psigma' = (n, simul_psubst psigma p) :: psigma in
           let cD''' = ctx_subst s (List.filter (fun (x, _) -> x <> n) cD'') in
           Debug.print (fun () -> "Final subst is " ^ print_subst (s :: sigma));
-          Some (cD''', simul_psubst_on_list sign psigma' qs, s :: sigma) :: unify splits
+          Some (cD''', simul_psubst_on_list psigma' qs, s :: sigma) :: unify splits
       with Unify.Unification_failure msg ->
         Debug.print (fun () -> "Splitting on constructor " ^ c
           ^ " resulted in unification failure\n"
@@ -314,7 +299,7 @@ let get_splits (sign : signature) (cD : ctx) (qs : pats)
    cD' |- sigma' cD
    . |- ps => cD'
  *)
-let rec split (sign : signature) (cD : ctx) (qs : pats) (over : pats matching)
+let rec split (sign : signature) (cD : ctx) (qs : pats) (over : (ctx * psubst) matching)
     (ps, rhs : A.pats * A.rhs) (t : exp) : split_tree =
   Debug.print(fun () -> "Splitting qs = " ^ print_pats qs
     ^ "\nagainst ps = " ^ AP.print_pats ps
@@ -335,7 +320,7 @@ let rec split (sign : signature) (cD : ctx) (qs : pats) (over : pats matching)
         raise (Error.Error "Overlapping patterns not implemented yet.")
       else
         let s = rename_all qs ps in
-        let qs' = simul_psubst_on_list sign (psubst_of_names s) qs in
+        let qs' = simul_psubst_on_list (psubst_of_names s) qs in
         let sigma' = subst_of_names s in
         let rec subst_name n = function
           | (n', m) :: sigma when n = n' -> m
@@ -365,11 +350,14 @@ let rec split (sign : signature) (cD : ctx) (qs : pats) (over : pats matching)
       | None -> None
       (* todo: figure out impossible branches for specific constructors *)
       | Some (cD', qs', sigma') ->
-         let over' = check_all qs' ps in
-        if is_match over' then
-          Some (split sign cD' qs' over' (ps, rhs) (simul_subst sigma' t))
-        else
+        let over' = check_all cD' qs' ps in
+        begin match over' with
+        | Yes (cD'', sigma) ->
+          Some (split sign cD'' (simul_psubst_on_list sigma qs') over' (ps, rhs)
+                      (simul_subst (subst_of_psubst sigma) (simul_subst sigma' t)))
+        | _ ->
           Some (Incomplete (cD', qs',  simul_subst sigma' t))
+        end
     in
     Debug.indent ();
     let t = try List.assoc n cD
@@ -396,26 +384,26 @@ exception Backtrack
 let rec navigate (sign : signature) (tr : split_tree) (ps, rhs : A.pats * A.rhs) : split_tree =
   match tr with
   | Incomplete (cD, qs, t) ->
-    let over = check_all qs ps in
+    let over = check_all cD qs ps in
     begin match over with
-    | Yes qs' -> split sign cD qs' over (ps, rhs) t
+    | Yes (cD', sigma) -> split sign cD' (simul_psubst_on_list sigma qs) over (ps, rhs) (simul_subst (subst_of_psubst sigma) t)
     | _ -> raise Backtrack
     end
   | Node (cD, qs, t, n, tr') ->
-    let over = check_all qs ps in
+    let over = check_all cD qs ps in
     begin match over with
-    | Yes qs' ->
+    | Yes (cD', sigma) ->
       let rec f = function
         | [] -> raise Backtrack
         | tr :: trs ->
           try navigate sign tr (ps, rhs) :: trs
           with Backtrack -> tr :: f trs
-      in Node (cD, qs', t, n, f tr')
+      in Node (cD', simul_psubst_on_list sigma qs, simul_subst (subst_of_psubst sigma) t, n, f tr')
     | _ -> raise Backtrack
     end
   | Leaf (cD, qs, _, _) ->
-    begin match check_all qs ps with
-    | Yes qs' ->
+    begin match check_all cD qs ps with
+    | Yes _ ->
       raise (Error.Error ("Branch " ^ AP.print_pats ps ^ " cannot be reached."))
     | _ ->
       raise Backtrack
