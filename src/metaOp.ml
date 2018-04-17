@@ -550,7 +550,7 @@ and syn_psubst cP (x, p') = function
     begin match p' with
     | PVar m -> PUnbox (m, pid_sub, cP)
     | Inacc e -> SInacc (e, pid_sub, cP)
-    | PTBox (cP', q) -> assert false
+    | PTBox (cP', PPar m) -> PPar m (* MMMMMMMM *)
     | _ -> assert false
     end
   | PPar n -> PPar n
