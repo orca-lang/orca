@@ -602,6 +602,7 @@ let rec rename (q : pat) (p : Apx.pat) : (name * name) list =
   | PTBox (cP, q), p -> rename_syn q p
   | Inacc (Var n), Apx.PVar m -> [n, m]
   | PVar n, Apx.Inacc (Apx.Var m) -> [n, m]
+  | PVar n, Apx.PClos (m, s) -> [n, m]
   | Inacc _, _ -> []                  (* can this be possible? *)
   | _, Apx.Inacc _ -> []                    (* Should we do that here or in a check_inacc function? *)
   (* | PVar n, Apx.PClos (m, s0) -> [n, m] (\* MMMMMMM *\) *)

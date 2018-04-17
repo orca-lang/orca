@@ -189,6 +189,11 @@ let apply_inv_subst e s =
   try Some (apply_inv e s)
   with Inv_fail -> None
 
+let rec psubst_of_pat_subst = function
+| CShift n -> Shift n
+| CEmpty -> Empty
+| CDot (s, i) -> Dot (psubst_of_pat_subst s, BVar i)
+
 (* Produces cP' such that cP |- s : cP' *)
 let rec shift_cp_inv_pat_subst cP s =
   match cP, s with

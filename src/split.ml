@@ -29,6 +29,7 @@ let rec check_match cD (q : pat) (p : A.pat) =
     Debug.print (fun () -> "SPLIT: Checking PVar " ^ print_name n ^ " replacing it with " ^ print_name m);
     let cD' = ctx_var_subst (n, m) cD in
     Yes (cD', [n,PVar m])
+  | PVar n, A.PClos (m, s) -> assert false
   | PVar n, _ -> Yes (cD, [])
   | PConst (n, qs), A.PConst (n', ps) when n = n' ->
      check_all cD qs ps
@@ -46,10 +47,21 @@ and syn_check_match cD cP q p =
   | PPar n, A.PPar n' ->
     let cD' = ctx_var_subst (n, n') cD in
     Yes (cD', [n, PTBox (cP, PPar n')])
-  | PUnbox (n, s, cP'), A.PClos (m, s') ->
+  | PUnbox (n, s, cP'), A.PClos (m, s') -> 
+    Debug.print (fun () -> "Punbox vs pclos: s = " ^ print_pat_subst s ^ ", s' = " ^ print_pat_subst s');
     let cP' = shift_cp_inv_pat_subst cP s' in
-    let cD' = ctx_var_subst (n, m) cD in
-    Yes (cD', [n, PTBox(cP, PUnbox (m, s', cP'))])
+    let rec ctx_change = function
+    | [] -> [] 
+    | (n', Box(cP1, t)) :: cD' when n = n' -> 
+      begin match apply_inv_pat_subst (psubst_of_pat_subst s) s' with
+      | None -> raise (Error.Error "Unable to apply invers substitution, go figure!")
+      | Some s'' -> (m, Box(cP', Clos(t, s'', cP1))) :: cD'
+      end
+    | (n', t) :: cD' when n = n' -> raise (Error.Violation "This shouldn't be happening. n' should have box type.")
+    | (n', t) :: cD' -> (n', t) :: ctx_change cD'
+    in 
+    let cD' = ctx_change cD in
+    Yes (cD', [n, PTBox(cP, PUnbox (m, s', cP'))]) 
   | PUnbox (n, s, cP'), A.PBVar i' ->
     begin match apply_inv_pat_subst (BVar i') s with
     | Some _ -> Yes (cD, [])
