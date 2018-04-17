@@ -139,6 +139,7 @@ let apply_inv_pat_subst e s =
     | SConst n, _ -> SConst n
     | Unbox(e, s', cP), _ -> Unbox (e, apply_inv s' s, cP)
     | Block _, _ -> assert false
+    | _ -> assert false
   in
   try Some (apply_inv e s)
   with Inv_fail -> None
