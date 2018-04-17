@@ -47,6 +47,7 @@ and syn_check_match cD cP q p =
   | PPar n, A.PPar n' ->
     let cD' = ctx_var_subst (n, n') cD in
     Yes (cD', [n, PTBox (cP, PPar n')])
+  | PPar n, A.PBVar i -> Yes (cD, [])
   | PUnbox (n, s, cP'), A.PClos (m, s') -> 
     Debug.print (fun () -> "Punbox vs pclos: s = " ^ print_pat_subst s ^ ", s' = " ^ print_pat_subst s');
     let cP' = shift_cp_inv_pat_subst cP s' in
@@ -126,7 +127,7 @@ let is_blocking = function
   | A.PClos _ -> false
   | _ -> true
 
-let rec choose_blocking_var (qs : pats) (ps : A.pats) : (name * A.pat) option =
+let rec choose_blocking_var (qs : pats) (ps : A.pats) : (name * A.pat * boolean) option =
   match qs, ps with
   | [], _ -> None
   | q :: qs', p :: ps' ->
@@ -136,7 +137,7 @@ let rec choose_blocking_var (qs : pats) (ps : A.pats) : (name * A.pat) option =
     end
   | _ -> assert false
 
-and choose_blocking_var_syn (qs : syn_pats) (ps : A.pats) : (name * A.pat) option =
+and choose_blocking_var_syn (qs : syn_pats) (ps : A.pats) : (name * A.pat * boolean) option =
   match qs, ps with
   | [], _ -> None
   | q :: qs', p :: ps' ->
@@ -146,20 +147,22 @@ and choose_blocking_var_syn (qs : syn_pats) (ps : A.pats) : (name * A.pat) optio
     end
   | _ -> assert false
 
-and choose_blocking_syn (q : syn_pat) (p : A.pat) : (name * A.pat) option =
+(* the returned boolean expresses whether we are refining based on parameter var  *)
+and choose_blocking_syn (q : syn_pat) (p : A.pat) : (name * A.pat * boolean) option =
   match q, p with
   | PLam (xs, q), A.PLam(ys, p) -> choose_blocking_syn q p
   | PSConst (c, qs), A.PConst(c', ps) -> choose_blocking_var_syn qs ps
-  | PUnbox (n, s, cP), p when is_blocking p -> Some (n, p)
+  | PUnbox (n, s, cP), p when is_blocking p -> Some (n, p, false)
+  | PPar n, A.PBVar i -> Some (n, p, true)
   | _ -> None
 
-and choose_blocking (q : pat) (p : A.pat) : (name * A.pat) option =
+(* the returned boolean expresses whether we are refining based on parameter var  *)
+and choose_blocking (q : pat) (p : A.pat) : (name * A.pat * boolean) option =
   match q, p with
-  | PVar n, p when is_blocking p -> Some (n, p)
+  | PVar n, p when is_blocking p -> Some (n, p, false)
   | PTBox(cP, q), p -> choose_blocking_syn q p
   | PConst(c, qs), A.PConst (c', ps) -> choose_blocking_var qs ps
   | _ -> None
-
 
 let rec refresh_tel = function
   | (i, n, e) :: tel ->
@@ -274,9 +277,10 @@ let split_box (sign : signature) (cD : ctx) (qs : pats)
      let x = Name.gen_name "X" in
      Some ((x, Box (cP, t)) :: cD, simul_psubst_on_list [n, PTBox (cP, PPar x)] qs, [n, Var x]) :: unify splits
   | YesBlock  _ -> assert false
-
+ 
 let get_splits (sign : signature) (cD : ctx) (qs : pats)
-    (n, p : name * A.pat) (c, sp : def_name * exp list) : (ctx * pats * subst) option list =
+               (n, p : name * A.pat) (c, sp : def_name * exp list) 
+    : (ctx * pats * subst) option list =
   let splits = split_const sign cD qs (n, p) c in
   let rec unify = function
     | [] -> []
@@ -303,6 +307,13 @@ let get_splits (sign : signature) (cD : ctx) (qs : pats)
   in
   unify splits
 
+let split_ppar (sign : signature) (cD : ctx) (qs : pats) 
+               (n , p : name * index) (t : exp)
+              : (ctx * pats * subst) option list = assert false
+(* This case will be used to split on parameter variables to produce
+   corresponding cases with bound variables (to continue uncomment 
+   the final lines in schema.kw) *)              
+              
 (* If type of pattern match function is tau, then
    tau = cG * t for some spine cG.
    cD |- sigma : cG
@@ -356,7 +367,7 @@ let rec split (sign : signature) (cD : ctx) (qs : pats) (over : (ctx * psubst) m
         in
         Debug.deindent ();
         Leaf (cD', qs', simul_subst sigma' t, rhs')
-  | Some (n, p) ->
+  | Some (n, p, refine) ->
     Debug.print (fun () -> "Found blocking variable " ^ print_name n);
     let f = function
       | None -> None
@@ -376,11 +387,15 @@ let rec split (sign : signature) (cD : ctx) (qs : pats) (over : (ctx * psubst) m
       with Not_found -> raise (Error.Violation ("Pattern " ^ print_pats qs
         ^ " has name not in context " ^ print_ctx cD))
     in
-    let splits = match Whnf.whnf sign t with
-      | Box(cP, t) -> split_box sign cD qs (n, p) (cP, t)
-      | Const c -> get_splits sign cD qs (n, p) (c, [])
-      | App (Const c, sp) -> get_splits sign cD qs (n, p) (c, sp)
-      | t -> raise (Error.Error ("Cannot match on type " ^ print_exp t))
+    let splits = 
+    if refine then 
+      split_ppar sign cD qs (n, p) t
+    else
+      match Whnf.whnf sign t with
+        | Box(cP, t) -> split_box sign cD qs (n, p) (cP, t)
+        | Const c -> get_splits sign cD qs (n, p) (c, [])
+        | App (Const c, sp) -> get_splits sign cD qs (n, p) (c, sp)
+        | t -> raise (Error.Error ("Cannot match on type " ^ print_exp t))
     in
     Debug.deindent ();
     let tr = List.fold_right (function None -> fun l -> l | (Some tr) -> fun l -> tr :: l)

@@ -63,6 +63,7 @@ let index n cP =
 (* Finds a name in the signature or the context and returns the
    appropriate internal expression *)
 let find_name (sign : sign) (cG : ctx) (cP : bctx) (n, pos : E.name * src_pos) : A.exp =
+  Debug.print(fun () -> "Fooooooo cP = " ^ (String.concat ", " (List.map (fun x -> "[" ^ (String.concat "," x) ^ "]") cP))) ;
   match index n cP with
   | Some i -> A.BVar i
   | None -> match lookup cG n with
@@ -177,6 +178,7 @@ match content e with
       raise (Error.Error_loc (loc e, "Bound variables bindings (|-) cannot be nested"))
   | E.ABox (g, e) ->
      let cP' = get_bound_var_ctx_no_annot g in
+     Debug.print (fun () -> " Fooooooo cP = " ^ (String.concat ", " (List.map (fun x -> "[" ^ (String.concat "," x) ^ "]") cP))) ;
      pproc_exp s cG cP' e
 
   | E.Fn (ns, e) ->

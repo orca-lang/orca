@@ -25,5 +25,6 @@ def copy : (g : ctx tm) -> (g |- tm) -> (g |- tm) where
 def copy' : (g : ctx tm) -> (g |- tm) -> (g |- tm) where
 | g (app M N) => app (copy' g M) (copy' g N)
 | g (lam (\x. M)) => lam (\x. copy' (g, tm) M)
-(*) | (g, x: tm) (g, x: tm :> x) => (g, x: tm :> x)
-(*) | (g, x: tm) v[^1] => (copy' g v)[^1]
+(*) | (g, x: tm) (g, x: tm :> x) => (g, (y : tm) :> y)
+(*) | (g, x: tm, y : tm) (g, x: tm , y : tm :> x) => (g, (x : tm), (y : tm) :> x)
+(*) | (g, x: tm, y : tm) v[^2] => (copy' g v)[^2]
