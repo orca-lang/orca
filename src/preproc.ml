@@ -233,24 +233,16 @@ and pproc_block (s : sign) (cG : ctx) (cP : bctx) (bs : (E.name * E.exp) Rlist.r
   let bs', _ = pproc_block' bs in
   bs'
 
-and pproc_schema (s : sign) (cG : ctx) (cP : bctx) (E.Schema (impl, expl) : E.schema) : A.schema =
-  let rec pproc_impl cG = function
-    | [] -> [], cG
-    | (x, t)::params ->
-       let cG', x' = add_name_ctx cG x in
-       let params', cG'' = pproc_impl cG' params in
-       (x', pproc_exp s cG cP t)::params', cG''
-  in
-  let rec pproc_expl cG cP = function
+and pproc_schema (s : sign) (cG : ctx) (cP : bctx) (E.Schema expl : E.schema) : A.schema =
+  let rec pproc_expl cP = function
     | [] -> []
     | (x, t)::params ->
        let cP' = [x]::cP in
-       let params' = pproc_expl cG cP' params in
+       let params' = pproc_expl cP' params in
        (x, pproc_exp s cG cP t)::params'
   in
-  let impl', cG' = pproc_impl cG impl in
-  let expl' = pproc_expl cG' cP expl in
-  A.Schema(impl', expl')
+  let expl' = pproc_expl cP expl in
+  A.Schema expl'
 
 and pproc_comma (s : sign) (cG : ctx) (cP : bctx) (g : E.exp) : bctx * A.exp =
   match content g with

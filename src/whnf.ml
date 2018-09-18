@@ -483,8 +483,8 @@ let rec normalize sign (e : exp) =
     let cP' = normalize_bctx sign cP in
     Box (cP', normalize_syn sign cP e)
 
-and normalize_schema sign (Schema (im, ex)) =
-  Schema (im, ex)               (* TODO add normalization *)
+and normalize_schema sign (Schema ex) =
+  Schema ex              (* TODO add normalization *)
 
 and normalize_stel sign cP tel =
   let f (tel, cP) (i, x, t) =

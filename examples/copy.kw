@@ -18,12 +18,13 @@ def copy : (g : ctx tm) -> (g |- tm) -> (g |- tm) where
 | g (lam (\x. M)) => lam (\x. copy (g, tm) M)
 | g (<:x) => x
 
-def copy-oft : (g : ctx {t : tp} (e : tm, d: oft e t)) (m : (g |- tm)) (t : (|- tp)) -> (g |- oft m t) -> (g |- oft m t) where
-(*) | g one unit t-unit => t-unit
+
+def copy-oft : (g : ctx [s : tp, e : tm, d: oft e s]) (m : (g |- tm)) (t : (|- tp)) -> (g |- oft m t) -> (g |- oft m t) where
+ | g one unit t-unit => t-unit
 (*) | g (app f e) t (t-app .f .e s[^] .t d1 d2) =>
 (*)   t-app f e s t (copy-oft g f (arr s t) d1) (copy-oft g e s d2)
-| g (lam m) (arr s t) (t-lam .m .s .t d) =>
-  t-lam m s t (\x. \u. (copy-oft (g, |x:tm, u: oft x s|) (g,|foo, u| :> m foo) t ?)[^1; |x , u|]) (*) (g, |x, u| :> d x u)))
+(*) | g (lam m) (arr s t) (t-lam .m .s .t d) =>
+(*)  t-lam m s t (\x. \u. (copy-oft (g, |x:tm, u: oft x s|) (g,|foo, u| :> m foo) t ?)[^1; |x , u|]) (*) (g, |x, u| :> d x u)))
 (*) | g m t (<: d) => d
 
 

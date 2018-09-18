@@ -126,29 +126,18 @@ and infer_type (sign, cG : signature * I.ctx) (s : A.exp) : I.exp * I.universe =
      Debug.print (fun () -> "Assert universe failed for " ^ IP.print_exp e ^ ".") ;
      raise (Error.Error "Not a universe.")
 
-and check_schema (sign , cG : signature * I.ctx) (A.Schema (im, ex) : A.schema) : I.schema =
-  let rec check_many_impl (sign, cG) (ps : A.schema_impl)=
-    match ps with
-    | [] -> [], cG
-    | (x, A.Box (cP, s))::ps' ->
-       let cP' = is_ctx (sign, cG) cP in
-       let s' = check_syn_type (sign, cG) cP' s in
-       let ps'', cG' = check_many_impl (sign, (x, I.Box (cP', s')) :: cG) ps' in
-       ((x, cP', s')::ps''), cG'
-    | _ -> raise (Error.Error "Schema expects implicit parameters of boxed type (they have to be meta-vars).")
-  in
-  let rec check_many_expl (sign, cG) cP (ps : A.schema_expl)=
+and check_schema (sign , cG : signature * I.ctx) (A.Schema ex : A.schema) : I.schema =
+  let rec check_many_expl cP (ps : A.schema_expl)=
     match ps with
     | [] -> [], cP
     | (x, s)::ps' ->
        let s' = check_syn_type (sign, cG) cP s in
        let cP' = (I.Snoc (cP, x, s')) in
-       let ps'', t' = check_many_expl (sign, cG) cP' ps' in
+       let ps'', t' = check_many_expl cP' ps' in
        ((x, s')::ps''), cP'
   in
-  let im', cG' = check_many_impl (sign, cG) im in
-  let ex', _ = check_many_expl (sign, cG') I.Nil ex in
-  I.Schema(im', ex')
+  let ex', _ = check_many_expl I.Nil ex in
+  I.Schema ex'
 
 and check (sign , cG : signature * I.ctx) (e : A.exp) (t : I.exp) : I.exp =
   let t' = Whnf.whnf sign t in
@@ -311,21 +300,17 @@ and is_ctx (sign, cG) g =
 
 and check_type_against_schema (sign, cG) cP e = try
     function
-    | I.Schema (im, [_, t]) ->
+    | I.Schema ([_, t]) ->
        let t' = check_syn_type (sign, cG) cP e in
-       let tel = impl_to_tel im in
-       let flex = List.map (fun (_, x, _) -> x) tel in
        let _, sigma' = try
-           Unify.unify_flex_syn (sign, cG) cP flex t t'
+           Unify.unify_flex_syn (sign, cG) cP [] t t'
          with Unify.Unification_failure problem ->
            raise (Error.Error ("Unification failed when checking a type against a schema.\n"
                                ^ Unify.print_unification_problem problem))
        in
        simul_subst_syn sigma' t'
 
-    | I.Schema (im, ex) ->
-       let tel = impl_to_tel im in
-       let flex = List.map (fun (_, x, _) -> x) tel in
+    | I.Schema ex ->
        let rec subst_in_schema i cP = function
          | [] -> []
          | (n, t) :: ex ->
@@ -338,7 +323,7 @@ and check_type_against_schema (sign, cG) cP e = try
          | (n, t)::bs', (m, t')::ex' ->
            Debug.print(fun () -> "Checking block: Trying to unify " ^ IP.print_syn_exp t ^ "\nwith " ^ IP.print_syn_exp t');
             let cG', sigma' = try
-                Unify.unify_flex_syn (sign, cG) cP flex t t'
+                Unify.unify_flex_syn (sign, cG) cP [] t t'
               with Unify.Unification_failure problem ->
                 raise (Error.Error ("Unification failed when checking a block against a schema.\n"
                                     ^ Unify.print_unification_problem problem))

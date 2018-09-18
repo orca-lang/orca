@@ -53,10 +53,7 @@ and fv_syn cG =
   | Block block -> List.concat (Rlist.mapl (fun (_, t) -> fvs t) block)
 
 and fv_schema cG = function
-  | Schema (impl, expl) -> snd (List.fold_left (fun (cG, names) (n, cP, t) -> (n,Box(cP, t)) :: cG,
-                                                                                 fv cG (Box(cP, t)) @ names)
-                                                  (cG, []) impl)
-                           @ List.concat (List.map (fun (_, t) -> fv_syn cG t) expl)
+  | Schema expl -> List.concat (List.map (fun (_, t) -> fv_syn cG t) expl)
 
 and fv_ctx cG = function
   | Nil -> []
@@ -153,13 +150,9 @@ and refresh_syn_exp rep =
   | SBCtx cP -> SBCtx (refresh_bctx rep cP)
   | Block bs -> Block (Rlist.map (fun (n, t) -> (n, f t)) bs)
 
-and refresh_schema rep (Schema (im, ex)) =
+and refresh_schema rep (Schema ex) =
   let f (n, t) = (n, refresh_syn_exp rep t) in
-  Schema (List.fold_left
-               (fun (acc, rep) (n, cP, t) ->
-                 let n' = refresh_name n in
-                 (n', refresh_bctx rep cP, refresh_syn_exp rep t) :: acc, (n,n')::rep)
-               ([], rep) im |> fst, List.map f ex)
+  Schema (List.map f ex)
 
 and refresh_bctx (rep : (name * name) list) : bctx -> bctx =
   function
@@ -232,14 +225,9 @@ and refresh_free_var_syn (x, y) e =
   | SBCtx cP -> SBCtx (refresh_free_var_bctx (x, y) cP)
   | Block cs -> Block (Rlist.map (fun (z, e) -> (z, f e)) cs) (* z has to be free *)
 
-and refresh_free_var_schema (x, y as rep) (Schema (im, ex)) =
-  let f (n, cP, t) =
-    if n <> x then
-      (n, refresh_free_var_bctx rep cP, refresh_free_var_syn rep t)
-    else
-      raise (Error.Violation "Duplicate name in refresh_free_var_schema") in
+and refresh_free_var_schema (x, y as rep) (Schema ex) =
   let g (n, t) = (n, refresh_free_var_syn rep t) in
-  Schema (List.map f im, List.map g ex)
+  Schema (List.map g ex)
 
 and refresh_free_var_bctx (x, y) cP =
   match cP with
@@ -298,10 +286,9 @@ let rec subst (x, es : single_subst) (e : exp) :  exp =
   | Annot (e1, e2) -> Annot(f e1, f e2)
   | Hole s -> Hole s
 
-and sub_schema s (Schema (im, ex)) =
-  let f (n, cP, e) = (n, subst_bctx s cP, subst_syn s e) in
+and sub_schema s (Schema ex) =
   let g (n, e) = (n, subst_syn s e) in
-  Schema (List.map f im, List.map g ex)
+  Schema (List.map g ex)
 
 and subst_syn (x, es) e =
   let f e = subst_syn (x, es) e in

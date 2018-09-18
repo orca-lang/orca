@@ -48,21 +48,21 @@ and syn_check_match cD cP q p =
     let cD' = ctx_var_subst (n, n') cD in
     Yes (cD', [n, PTBox (cP, PPar n')])
   | PPar n, A.PBVar i -> Yes (cD, [])
-  | PUnbox (n, s, cP'), A.PClos (m, s') -> 
+  | PUnbox (n, s, cP'), A.PClos (m, s') ->
     Debug.print (fun () -> "Punbox vs pclos: s = " ^ print_pat_subst s ^ ", s' = " ^ print_pat_subst s');
     let cP' = shift_cp_inv_pat_subst cP s' in
     let rec ctx_change = function
-    | [] -> [] 
-    | (n', Box(cP1, t)) :: cD' when n = n' -> 
+    | [] -> []
+    | (n', Box(cP1, t)) :: cD' when n = n' ->
       begin match apply_inv_pat_subst (psubst_of_pat_subst s) s' with
       | None -> raise (Error.Error "Unable to apply invers substitution, go figure!")
       | Some s'' -> (m, Box(cP', Clos(t, s'', cP1))) :: cD'
       end
     | (n', t) :: cD' when n = n' -> raise (Error.Violation "This shouldn't be happening. n' should have box type.")
     | (n', t) :: cD' -> (n', t) :: ctx_change cD'
-    in 
+    in
     let cD' = ctx_change cD in
-    Yes (cD', [n, PTBox(cP, PUnbox (m, s', cP'))]) 
+    Yes (cD', [n, PTBox(cP, PUnbox (m, s', cP'))])
   | PUnbox (n, s, cP'), A.PBVar i' ->
     begin match apply_inv_pat_subst (BVar i') s with
     | Some _ -> Yes (cD, [])
@@ -127,7 +127,7 @@ let is_blocking = function
   | A.PClos _ -> false
   | _ -> true
 
-let rec choose_blocking_var (qs : pats) (ps : A.pats) : (name * A.pat * boolean) option =
+let rec choose_blocking_var (qs : pats) (ps : A.pats) : (name * A.pat * bool) option =
   match qs, ps with
   | [], _ -> None
   | q :: qs', p :: ps' ->
@@ -137,7 +137,7 @@ let rec choose_blocking_var (qs : pats) (ps : A.pats) : (name * A.pat * boolean)
     end
   | _ -> assert false
 
-and choose_blocking_var_syn (qs : syn_pats) (ps : A.pats) : (name * A.pat * boolean) option =
+and choose_blocking_var_syn (qs : syn_pats) (ps : A.pats) : (name * A.pat * bool) option =
   match qs, ps with
   | [], _ -> None
   | q :: qs', p :: ps' ->
@@ -148,7 +148,7 @@ and choose_blocking_var_syn (qs : syn_pats) (ps : A.pats) : (name * A.pat * bool
   | _ -> assert false
 
 (* the returned boolean expresses whether we are refining based on parameter var  *)
-and choose_blocking_syn (q : syn_pat) (p : A.pat) : (name * A.pat * boolean) option =
+and choose_blocking_syn (q : syn_pat) (p : A.pat) : (name * A.pat * bool) option =
   match q, p with
   | PLam (xs, q), A.PLam(ys, p) -> choose_blocking_syn q p
   | PSConst (c, qs), A.PConst(c', ps) -> choose_blocking_var_syn qs ps
@@ -157,7 +157,7 @@ and choose_blocking_syn (q : syn_pat) (p : A.pat) : (name * A.pat * boolean) opt
   | _ -> None
 
 (* the returned boolean expresses whether we are refining based on parameter var  *)
-and choose_blocking (q : pat) (p : A.pat) : (name * A.pat * boolean) option =
+and choose_blocking (q : pat) (p : A.pat) : (name * A.pat * bool) option =
   match q, p with
   | PVar n, p when is_blocking p -> Some (n, p, false)
   | PTBox(cP, q), p -> choose_blocking_syn q p
@@ -248,20 +248,18 @@ let split_box (sign : signature) (cD : ctx) (qs : pats)
     | Nil -> No
     | CtxVar g ->
       begin match lookup_ctx_fail cD g with
-        | Ctx (Schema (im, [_,t'])) -> (* Schema has a 1-tuple, no projections needed *)
+        | Ctx (Schema ([_,t'])) -> (* Schema has a 1-tuple, no projections needed *)
           (* let _tel = impl_to_tel im in *)
           begin try let _ = Unify.unify_syn (sign, cD) cP t (Clos (t', Shift (n+1), CtxVar g))
                     in Yes
                 with Unify.Unification_failure _ -> No
           end
-        | Ctx (Schema (im, ex)) ->
-                      let tel = impl_to_tel im in
-                      let flex = List.map (fun (_, x, _) -> x) tel in
+        | Ctx (Schema ex) ->
                       let rec find n = function
                         | [] -> No
                         | (_, t')::ex' ->
                            try
-                             let _, sigma = Unify.unify_flex_syn (sign, cD) cP flex t t' in
+                             let _, sigma = Unify.unify_flex_syn (sign, cD) cP [] t t' in
                              YesBlock (n, Block(simul_subst_in_expl sigma ex |> Rlist.from_list)) (* possible wrong order *)
                            with Unify.Unification_failure _ -> find (n+1) ex'
                       in find 0 ex
@@ -277,9 +275,9 @@ let split_box (sign : signature) (cD : ctx) (qs : pats)
      let x = Name.gen_name "X" in
      Some ((x, Box (cP, t)) :: cD, simul_psubst_on_list [n, PTBox (cP, PPar x)] qs, [n, Var x]) :: unify splits
   | YesBlock  _ -> assert false
- 
+
 let get_splits (sign : signature) (cD : ctx) (qs : pats)
-               (n, p : name * A.pat) (c, sp : def_name * exp list) 
+               (n, p : name * A.pat) (c, sp : def_name * exp list)
     : (ctx * pats * subst) option list =
   let splits = split_const sign cD qs (n, p) c in
   let rec unify = function
@@ -307,13 +305,13 @@ let get_splits (sign : signature) (cD : ctx) (qs : pats)
   in
   unify splits
 
-let split_ppar (sign : signature) (cD : ctx) (qs : pats) 
+let split_ppar (sign : signature) (cD : ctx) (qs : pats)
                (n , p : name * index) (t : exp)
               : (ctx * pats * subst) option list = assert false
 (* This case will be used to split on parameter variables to produce
-   corresponding cases with bound variables (to continue uncomment 
-   the final lines in schema.kw) *)              
-              
+   corresponding cases with bound variables (to continue uncomment
+   the final lines in schema.kw) *)
+
 (* If type of pattern match function is tau, then
    tau = cG * t for some spine cG.
    cD |- sigma : cG
@@ -387,9 +385,10 @@ let rec split (sign : signature) (cD : ctx) (qs : pats) (over : (ctx * psubst) m
       with Not_found -> raise (Error.Violation ("Pattern " ^ print_pats qs
         ^ " has name not in context " ^ print_ctx cD))
     in
-    let splits = 
-    if refine then 
-      split_ppar sign cD qs (n, p) t
+    let splits =
+    if refine then
+      let A.PBVar i = p in
+      split_ppar sign cD qs (n, i) t
     else
       match Whnf.whnf sign t with
         | Box(cP, t) -> split_box sign cD qs (n, p) (cP, t)

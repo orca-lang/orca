@@ -13,7 +13,6 @@ let shift_idx (n, p) m = (n + m , p)
 
 let zidx = (0, None)
 
-
 type pat_subst
   = CShift of int
   | CEmpty
@@ -52,7 +51,7 @@ module Ext = struct
     | Block of (name * exp) rlist
 
   and schema
-    = Schema of (name * exp) list * (name * exp) list
+    = Schema of (name * exp) list
 
   type pat =
     | PIdent of name
@@ -116,10 +115,9 @@ module Apx = struct
     | Block of (string * exp) rlist
     | TBlock of exp rlist
 
-  and schema_impl = (name * exp) list
   and schema_expl = (string * exp) list
   and schema
-    = Schema of schema_impl * schema_expl
+    = Schema of schema_expl
 
   and tel_entry = icit * name * exp
   and tel = tel_entry list
@@ -207,10 +205,9 @@ module Int = struct
     | SCtx of schema
     | Unbox of exp * syn_exp * bctx
 
-  and schema_impl = (name * bctx * syn_exp) list
   and schema_expl = (string * syn_exp) list
   and schema
-    = Schema of schema_impl * schema_expl
+    = Schema of schema_expl
 
   and bctx
     = Nil

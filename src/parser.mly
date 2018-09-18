@@ -152,13 +152,9 @@ raw_simple_exp:
 | NIL {Nil}
 
 schema:
-| e = simple_exp {Schema ([], ["_", e])}
+| e = simple_exp {Schema (["_", e])}
 (* | LCURLY impl=separated_nonempty_list(COMMA, schema_ex) RCURLY e = simple_exp {Schema (impl, ["_", e])} *)
-| LCURLY impl=separated_nonempty_list(COMMA, schema_ex_impl) RCURLY LPAREN expl=separated_nonempty_list(COMMA, schema_ex) RPAREN
-   {Schema (impl, expl)}
-
-schema_ex_impl:
-| x=IDENT COLON e=exp_level6 {x,e}
+| LSQUARE expl=separated_nonempty_list(COMMA, schema_ex) RSQUARE {Schema expl}
 
 schema_ex:
 | x=IDENT COLON e=exp_level6 {x,e}

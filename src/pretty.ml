@@ -339,17 +339,9 @@ and fmt_block cG cP parens pps =
   | RCons (RNil, (x, t)) -> Fmt.pf pps "%s : %a" x (fmt_syn_exp cG cP parens) t
   | RCons (bs, (x, t)) -> Fmt.pf pps "%s : %a, %a" x (fmt_syn_exp cG cP parens) t (fmt_block cG cP parens) bs
 
-and fmt_schema cG parens pps = function
-  |  (Schema ([], ex)) ->
-       Fmt.pf pps "%a"
+and fmt_schema cG parens pps (Schema ex) = 
+       Fmt.pf pps "%a"  
               (fmt_schema_expl cG Nil parens) ex
-
-  |  (Schema (im, ex)) ->
-      let cG' = MetaOp.impl_to_ctx im in
-       Fmt.pf pps "{%a} %a"
-              (fmt_schema_impl cG parens) im
-              (fmt_schema_expl cG' Nil parens) ex
-
 
 and fmt_schema_impl cG parens pps = function
   | [] -> ()

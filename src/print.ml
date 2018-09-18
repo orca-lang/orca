@@ -43,9 +43,9 @@ module Ext = struct
     | Ctx sch -> "ctx " ^ print_schema sch
     | Block bs -> "|" ^ Rlist.to_string (fun (n, t) -> n  ^ " : " ^ print_exp t ) bs ^ "|"
 
-  and print_schema (Schema (impl, expl)) =
+  and print_schema (Schema expl) =
     let f ps = String.concat ", " (List.map (fun (x, t) -> x ^ " : " ^ print_exp t) ps) in
-    "{" ^ f impl ^ "}(" ^ f expl ^ ")"
+    "[" ^ f expl ^ "]"
 
   let rec print_pat (p : pat) : string = match p with
     | PIdent n -> n
@@ -123,10 +123,9 @@ module Apx = struct
     | Block bs -> "|" ^ Rlist.to_string (fun (n, t) -> n  ^ " : " ^ print_exp t ) bs ^ "|"
     | TBlock bs -> "|t " ^ Rlist.to_string print_exp bs ^ "|"
 
-  and print_schema (Schema (impl, expl)) =
-    let f ps = String.concat ", " (List.map (fun (x, t) -> print_name x ^ " : " ^ print_exp t) ps) in
+  and print_schema (Schema expl) =
     let g ps = String.concat ", " (List.map (fun (x, t) -> x ^ " : " ^ print_exp t) ps) in
-    "{" ^ f impl ^ "}(" ^ g expl ^ ")"
+    "[" ^ g expl ^ "]"
 
   and print_pi tel t = match tel with
     | [] -> print_exp t
@@ -264,7 +263,7 @@ module Int = struct
     | TBlock bs -> "|" ^ Rlist.to_string print_syn_exp bs ^ "|"
 
   and print_schema = function
-    | Schema (impl, expl) -> "{" ^ print_block_entries_impl impl ^ "} (" ^ print_block_entries_expl expl ^ ")"
+    | Schema expl -> "[" ^ print_block_entries_expl expl ^ "]"
 
   and print_block_entry_impl (n, cP, t) = print_name n ^ " : " ^ print_bctx cP ^ " |- " ^ print_syn_exp t
   and print_block_entry_expl (n, t) = n ^ " : " ^ print_syn_exp t

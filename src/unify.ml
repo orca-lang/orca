@@ -13,8 +13,7 @@ type unification_problem
   | Expressions_dont_unify of name list * exp * exp
   | Expressions_dont_unify_syn of name list * syn_exp * syn_exp
   | Schemata_dont_unify of name list * schema * schema
-  | Schema_impl_dont_unify of name list * schema_impl * schema_impl
-  | Schema_expl_dont_unify of name list * schema_expl * schema_expl
+  | Schema_expl_dont_unify of name list * schema_expl * schema_expl (* this may not be necessary until we have implicit schema block members *)
   | Universes_dont_match of int * int
   | Unequal_number_params of exp list * exp list
   | Unequal_number_params_syn of syn_exp list * syn_exp list
@@ -39,7 +38,6 @@ let print_unification_problem =
      "Occurs check failed for " ^ print_name n ^ " in expression " ^ print_syn_exp e ^ "."
   | Schemata_dont_unify (flex, sch1, sch2) ->
      "Schemata do not unify"
-  | Schema_impl_dont_unify (flex, _, _)
   | Schema_expl_dont_unify (flex, _, _) ->
      "Schema parts do not unify"
   | Expressions_dont_unify (flex, e1, e2) ->
@@ -191,24 +189,8 @@ let rec unify_flex (sign, cG) flex e1 e2 =
   | _, _ ->
      raise (Unification_failure(Expressions_dont_unify (flex, e1', e2')))
 
-and unify_flex_schemata (sign, cG) flex (Schema (im1, ex1)) (Schema (im2, ex2)) =
-  let cG', sigma = unify_flex_schema_impl (sign, cG) flex im1 im2 in
-  let ex1' = simul_subst_in_expl sigma ex1 in
-  let ex2' = simul_subst_in_expl sigma ex2 in
-  unify_flex_schema_expl (sign, cG') Nil flex ex1' ex2'
-
-and unify_flex_schema_impl (sign, cG: signature * ctx) (flex : name list) (ps1: schema_impl)  (ps2 : schema_impl) =
-  match ps1, ps2 with
-  | [], [] ->  cG, []
-  | _, []
-  | [], _ -> raise (Unification_failure (Schema_impl_dont_unify (flex, ps1, ps2)))
-  | (n1, cP1, e1)::ps1, (n2, cP2, e2)::ps2 ->
-     let sigma0 = [n1, Var n2] in
-     let cD, sigma' = unify_flex (sign, cG) flex (Box (cP1, e1)) (Box (cP2, e2)) in
-     let ps1' = simul_subst_in_impl (sigma0 @ sigma') ps1 in
-     let ps2' = simul_subst_in_impl sigma' ps2 in
-     let cD', sigma'' = (unify_flex_schema_impl (sign, cD) flex ps1' ps2') in
-     cD', sigma0 @ sigma' @ sigma''
+and unify_flex_schemata (sign, cG) flex (Schema ex1) (Schema ex2) =
+  unify_flex_schema_expl (sign, cG) Nil flex ex1 ex2
 
 and unify_flex_schema_expl (sign, cG: signature * ctx) cP (flex : name list) (ps1: schema_expl)  (ps2 : schema_expl) =
   let simul_subst_in_part sigma ps =
