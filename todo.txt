@@ -1,3 +1,19 @@
+
+Big todos:
+
+- merge back to main
+- remove the old pattern matching code
+- improve unification
+- add coverage checking
+- add termination checking (or think about it)
+- improve pretty printing (i.e.: always print parseable code)
+- add a strict mode for fully explicit boxes
+- add a vscode mode
+- implement the LSP (language server protocol)
+- add a version with markdown comments for documentation (lightweight literate programming)
+
+
+Old todos:
 * Add syntax for (x: A) (y: B) (z: C) -> D
 * Add syntax for (x y: A)-> B
 * Try the implicit parameters with unification thing
