@@ -57,7 +57,7 @@ module Ext = struct
     | PIdent of name
     | Inacc of exp
     | PLam of string list * pat
-    | PPar of name
+    | PPar of name * int option
     | PConst of name * pat list
     | PClos of name * exp
     | PEmpty
@@ -138,7 +138,7 @@ module Apx = struct
     | PDot of pat * pat
     | PNil
     | PSnoc of pat * string * pat
-    | PPar of name
+    | PPar of name * int option
     | PUnder
     | PWildcard
 
@@ -203,7 +203,8 @@ module Int = struct
     | TBlock of syn_exp rlist
     | SBCtx of bctx
     | SCtx of schema
-    | Unbox of exp * syn_exp * bctx
+    | Unbox of exp * syn_exp * bctx (* TODO remove the context from Unbox *)
+    | UnboxParam of name * int * syn_exp
 
   and schema_expl = (string * syn_exp) list
   and schema
@@ -234,7 +235,7 @@ module Int = struct
 
   and syn_pat =
     | PBVar of index
-    | PPar of name
+    | PPar of name * int option
     | PLam of (string * syn_exp) list * syn_pat
     | PSConst of def_name * syn_pat list
     | PUnbox of name * pat_subst * bctx
@@ -311,8 +312,8 @@ module Int = struct
   and syn_exp_of_pat =
     function
     | PBVar i -> BVar i
-    | PPar n -> Unbox(Var n, id_sub, Nil) (* MMMM *)
-
+    | PPar (n, None) -> Unbox(Var n, id_sub, Nil) (* MMMM *)
+    | PPar (n, Some pr) -> UnboxParam(n, pr, id_sub) (* MMMM *)
     | PLam (fs, p) -> Lam (fs, syn_exp_of_pat p)
     | PSConst (n, ps) ->
        AppL (SConst n, List.map (syn_exp_of_pat) ps)

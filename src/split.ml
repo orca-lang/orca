@@ -44,10 +44,10 @@ and syn_check_match cD cP q p =
   match q, p with
   | PLam (xs, q), A.PLam (ys, p) ->
     syn_check_match cD (bctx_of_lam_pars cP xs) q p
-  | PPar n, A.PPar n' ->
+  | PPar (n, pr), A.PPar (n', pr') when pr = pr'->
     let cD' = ctx_var_subst (n, n') cD in
-    Yes (cD', [n, PTBox (cP, PPar n')])
-  | PPar n, A.PBVar i -> Yes (cD, [])
+    Yes (cD', [n, PTBox (cP, PPar (n', pr))])
+  | PPar (n, pr), A.PBVar (i, pr') when pr = pr' -> Yes (cD, [])
   | PUnbox (n, s, cP'), A.PClos (m, s') ->
     Debug.print (fun () -> "Punbox vs pclos: s = " ^ print_pat_subst s ^ ", s' = " ^ print_pat_subst s');
     let cP' = shift_cp_inv_pat_subst cP s' in
@@ -153,7 +153,7 @@ and choose_blocking_syn (q : syn_pat) (p : A.pat) : (name * A.pat * bool) option
   | PLam (xs, q), A.PLam(ys, p) -> choose_blocking_syn q p
   | PSConst (c, qs), A.PConst(c', ps) -> choose_blocking_var_syn qs ps
   | PUnbox (n, s, cP), p when is_blocking p -> Some (n, p, false)
-  | PPar n, A.PBVar i -> Some (n, p, true)
+  | PPar (n, _), A.PBVar i -> Some (n, p, true)
   | _ -> None
 
 (* the returned boolean expresses whether we are refining based on parameter var  *)
@@ -197,7 +197,11 @@ let split_sconst (sign : signature) (cD : ctx) (cP : bctx) (qs : pats)
     | (c, tel, ts) :: cs' ->
       let sigma0, tel = refresh_tel tel in
       let ts = simul_subst_syn_on_list sigma0 ts in
-      let cD' = cD @ (ctx_of_tel tel) in
+      Debug.print (fun () -> "split_sconst cD = " ^ Pretty.print_ctx cD);
+
+      let cD' = (ctx_of_tel tel) @ cD in
+      Debug.print (fun () -> "split_sconst cD' = " ^ Pretty.print_ctx cD');
+
       let flex = List.map fst cD' in
       (ts, cD', flex, (if tel == [] then SConst c else AppL (SConst c, unbox_list_of_tel cP tel)),
        PSConst (c, punbox_list_of_tel cP tel)) :: process cs'
@@ -217,10 +221,11 @@ let split_lam (sign : signature) (cD : ctx) (cP : bctx) (qs : pats)
 type scheme_in_var
   = No
   | Yes
-  | YesBlock of int * syn_exp
+  | YesBlock of int * syn_exp (* which projection should the generated variable correspond to *)
 
 let split_box (sign : signature) (cD : ctx) (qs : pats)
     (n, p : name * A.pat) (cP, t : bctx * syn_exp) =
+    Debug.print (fun () -> "split_box cD = " ^ Pretty.print_ctx cD);
   let splits, sp = match Whnf.rewrite sign cP t with
     | SConst c -> split_sconst sign cD cP qs (n, p) c, []
     | AppL (SConst c, sp) -> split_sconst sign cD cP qs (n, p) c, sp
@@ -233,12 +238,13 @@ let split_box (sign : signature) (cD : ctx) (qs : pats)
     | [] -> []
     | (ts, cD', flex, e, p) :: splits ->
       try let cD'', sigma = Unify.unify_flex_many_syn (sign, cD') cP flex ts sp in
-          Debug.print(fun () -> "Unification: cD' = " ^ print_ctx cD' ^ "\ncD'' = "^ print_ctx cD''
+          Debug.print(fun () -> "Unification: cD' = " ^ Pretty.print_ctx cD' ^ "\ncD'' = "^ Pretty.print_ctx cD''
             ^ "\nsigma = "^ print_subst sigma);
           let psigma = inac_subst sigma in
           let s = n, TermBox(cP, simul_subst_syn sigma e) in
           let psigma' = (n, (PTBox (cP, simul_syn_psubst cP psigma p))) :: psigma in
           let cD''' = ctx_subst s (List.filter (fun (x, _) -> x <> n) cD'') in
+          Debug.print (fun () -> "split_box1 cD''' = " ^ Pretty.print_ctx cD''');
           Some (cD''', simul_psubst_on_list psigma' qs, s :: sigma) :: unify splits
       with Unify.Unification_failure msg ->
         Debug.print_string (Unify.print_unification_problem msg);
@@ -260,6 +266,8 @@ let split_box (sign : signature) (cD : ctx) (qs : pats)
                         | (_, t')::ex' ->
                            try
                              let _, sigma = Unify.unify_flex_syn (sign, cD) cP [] t t' in
+                             (* consider that YesBlock may only take a list of terms instead of a block *)
+                             (* aka: we don't want projections on arbitrary terms *)
                              YesBlock (n, Block(simul_subst_in_expl sigma ex |> Rlist.from_list)) (* possible wrong order *)
                            with Unify.Unification_failure _ -> find (n+1) ex'
                       in find 0 ex
@@ -273,8 +281,10 @@ let split_box (sign : signature) (cD : ctx) (qs : pats)
   | No -> unify splits
   | Yes ->
      let x = Name.gen_name "X" in
-     Some ((x, Box (cP, t)) :: cD, simul_psubst_on_list [n, PTBox (cP, PPar x)] qs, [n, Var x]) :: unify splits
-  | YesBlock  _ -> assert false
+     Some ((x, Box (cP, t)) :: cD, simul_psubst_on_list [n, PTBox (cP, PPar (x, None))] qs, [n, Var x]) :: unify splits
+  | YesBlock  (pr, Block ex) -> 
+     let x = Name.gen_name "X" in
+     Some ((x, Box (cP, t)) :: cD, simul_psubst_on_list [n, PTBox (cP, PPar (x, Some pr))] qs, [n, Var x]) :: unify splits
 
 let get_splits (sign : signature) (cD : ctx) (qs : pats)
                (n, p : name * A.pat) (c, sp : def_name * exp list)
@@ -322,9 +332,9 @@ let split_ppar (sign : signature) (cD : ctx) (qs : pats)
  *)
 let rec split (sign : signature) (cD : ctx) (qs : pats) (over : (ctx * psubst) matching)
     (ps, rhs : A.pats * A.rhs) (t : exp) : split_tree =
-  Debug.print(fun () -> "Splitting qs = " ^ print_pats qs
+  Debug.print(fun () -> "Splitting qs = " ^ Pretty.print_pats cD qs
     ^ "\nagainst ps = " ^ AP.print_pats ps
-    ^ "\ncontext is " ^ print_ctx cD);
+    ^ "\ncontext is " ^ Pretty.print_ctx cD);
   match choose_blocking_var qs ps with
   | None ->
     (* Checking if we are done with patterns or if we could introduce
@@ -371,9 +381,11 @@ let rec split (sign : signature) (cD : ctx) (qs : pats) (over : (ctx * psubst) m
       | None -> None
       (* todo: figure out impossible branches for specific constructors *)
       | Some (cD', qs', sigma') ->
+        Debug.print (fun () -> "split1 cD' = " ^ Pretty.print_ctx cD');
         let over' = check_all cD' qs' ps in
         begin match over' with
         | Yes (cD'', sigma) ->
+          Debug.print (fun () -> "split1 cD'' = " ^ Pretty.print_ctx cD'');
           Some (split sign cD'' (simul_psubst_on_list sigma qs') over' (ps, rhs)
                       (simul_subst (subst_of_psubst sigma) (simul_subst sigma' t)))
         | _ ->
@@ -397,6 +409,7 @@ let rec split (sign : signature) (cD : ctx) (qs : pats) (over : (ctx * psubst) m
         | t -> raise (Error.Error ("Cannot match on type " ^ print_exp t))
     in
     Debug.deindent ();
+    Debug.print (fun () -> "split1 cD = " ^ Pretty.print_ctx cD ^ "\n qs = "^ Pretty.print_pats cD qs);
     let tr = List.fold_right (function None -> fun l -> l | (Some tr) -> fun l -> tr :: l)
                              (List.map f splits) []
     in
@@ -410,15 +423,20 @@ exception Backtrack
 let rec navigate (sign : signature) (tr : split_tree) (ps, rhs : A.pats * A.rhs) : split_tree =
   match tr with
   | Incomplete (cD, qs, t) ->
+    Debug.print (fun () -> "nav1 cD = " ^ Pretty.print_ctx cD);
     let over = check_all cD qs ps in
     begin match over with
-    | Yes (cD', sigma) -> split sign cD' (simul_psubst_on_list sigma qs) over (ps, rhs) (simul_subst (subst_of_psubst sigma) t)
+    | Yes (cD', sigma) -> 
+      Debug.print (fun () -> "nav1 cD' = " ^ Pretty.print_ctx cD');
+      split sign cD' (simul_psubst_on_list sigma qs) over (ps, rhs) (simul_subst (subst_of_psubst sigma) t)
     | _ -> raise Backtrack
     end
   | Node (cD, qs, t, n, tr') ->
+    Debug.print (fun () -> "nav2 cD = " ^ Pretty.print_ctx cD);
     let over = check_all cD qs ps in
     begin match over with
     | Yes (cD', sigma) ->
+      Debug.print (fun () -> "nav2 cD' = " ^ Pretty.print_ctx cD');
       let rec f = function
         | [] -> raise Backtrack
         | tr :: trs ->

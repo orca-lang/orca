@@ -3,6 +3,7 @@
 
 type 'a rlist = RNil | RCons of 'a rlist * 'a
 val from_list : 'a list -> 'a rlist
+val rev : 'a rlist -> 'a rlist
 val to_list : 'a rlist -> 'a list
 val to_string : ?sep:string -> ('a -> string) -> 'a rlist -> string
 val nth: 'a rlist -> int -> 'a

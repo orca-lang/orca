@@ -128,7 +128,7 @@ let apply_inv_pat_subst e s =
     | Clos (e, s', cP), _ -> Clos(e, apply_inv s' s, cP)
     | Empty, _ -> Empty
     | Shift n, CShift m when n >= m -> Shift (n - m)
-    | Shift n, CShift _ -> raise (Error.Error "Shift too long")
+    | Shift n, CShift _ -> raise Inv_fail
     | Shift n, CEmpty -> Empty
     | Shift n, CDot(_,_) -> assert false
 
@@ -173,7 +173,7 @@ let apply_inv_subst e s =
     | Clos (e, s', cP), _ -> Clos(e, apply_inv s' s, cP)
     | Empty, _ -> Empty
     | Shift n, Shift m when n >= m -> Shift (n - m)
-    | Shift n, Shift _ -> raise (Error.Error "Shift too long")
+    | Shift n, Shift _ -> raise Inv_fail
     | Shift n, Empty -> Empty
     | Shift n, Dot(_,_) -> assert false
     | Shift 0, ShiftS (n, Empty) -> Shift 0

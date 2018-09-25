@@ -64,7 +64,7 @@ and match_syn_pat sign cP p e =
      | None -> raise (Matching_syn_failure (p, e))
      | Some e' -> [n, TermBox (cP', e')]
      end
-  | PPar n, BVar i -> [n, TermBox (cP, BVar i)]
+  | PPar (n, pr), BVar (i, pr') when pr = pr' -> [n, TermBox (cP, BVar (i, pr'))]
   | _ -> raise (Matching_syn_failure (p, e))
 
 (* | PAnnot (p, e) -> *)

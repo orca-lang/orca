@@ -431,7 +431,7 @@ let rec collect_pat_vars (s : sign) cG cP p =
   | E.PBox (g, p) ->
       let cP' = get_bound_var_ctx_in_pat g in
       collect_pat_vars s cG cP' p
-  | E.PPar n ->collect_pat_ctx s cG cP n
+  | E.PPar (n, _) -> collect_pat_ctx s cG cP n
   | E.PUnder -> cG
   | E.PWildcard -> cG
 
@@ -441,9 +441,9 @@ let rec pproc_pat (s : sign) cG cP p =
   Debug.print (fun () -> "Procesing pattern : " ^ EP.print_pat p ^ " with current context " ^ print_ctx cG);
   match p with
   | E.PIdent n -> find_name_pat s cG cP n
-  | E.PPar n ->
+  | E.PPar (n, pr) ->
      begin match find_name_pat s cG cP n with
-     | A.PVar n -> A.PPar n
+     | A.PVar n -> A.PPar (n, pr)
      | _ -> raise (Error.Error "Expected parameter variable, got something else")
      end
   | E.PClos (x, e) ->

@@ -33,8 +33,10 @@ let add_line pos length =
     ; Lexing.pos_bol = pos.Lexing.pos_cnum
 }
 
+(* TODO remove magic numbers from this *)
 let remove_set_ s = String.sub s 4 (String.length s - 4)
 let remove_set s = String.sub s 3 (String.length s - 3)
+let remove_proj s = String.sub s 1 (String.length s - 1)
 
 let remove_leading_char ch s =
   try
@@ -102,6 +104,8 @@ let rec main_scanner pos = lexer
   | "set" numeral -> add_word pos (Ulexing.lexeme_length lexbuf)
                    , SET (int_of_string (remove_set (Ulexing.utf8_lexeme lexbuf)))
   | "set" -> add_word pos (Ulexing.lexeme_length lexbuf), SET 0
+  | "#" numeral -> add_word pos (Ulexing.lexeme_length lexbuf)
+                   , PROJ (int_of_string (remove_proj (Ulexing.utf8_lexeme lexbuf)))
   | "._" -> add_word pos (Ulexing.lexeme_length lexbuf), PATTERNWILD
   | hole -> add_word pos (Ulexing.lexeme_length lexbuf)
           , HOLE (Some (remove_leading_char '?' (Ulexing.utf8_lexeme lexbuf)))

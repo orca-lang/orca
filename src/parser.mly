@@ -17,6 +17,7 @@ open Rlist
 %token COMMA EMPTYS DOT NIL
 %token <int>INDEX
 %token <int>SHIFT
+%token <int>PROJ
 
 %nonassoc DOT
 %left COMMA SEMICOLON
@@ -179,7 +180,7 @@ pattern:
 | s = pattern COMMA e = pattern {PComma (s, None, e)}
 | s = pattern COMMA x = IDENT COLON e = pattern {PComma (s, Some x, e)}
 | p1 = pattern TTS p2 = pattern {PBox (p1, p2)}
-| STT x = IDENT {PPar x}
+| STT x = IDENT pr = PROJ? {PPar (x, pr)}
 | p = simple_pattern {p}
 
 schema_pat:

@@ -148,7 +148,7 @@ and fmt_stel cG cP pps (tel, e) =
     | (Explicit, "_", t) :: tel ->
       Fmt.pf pps (if floating then "%a ->> %a" else "->> %a ->> %a")
         (fmt_syn_exp cG cP 5) t
-        (fmt_stel' cG (Snoc(cP, "_", dst)) true) (tel, e)
+        (fmt_stel' cG (Snoc(cP, "_p", dst)) true) (tel, e)
     | (_, n, t) as se :: tel ->
       Fmt.pf pps "%a %a"
         (fmt_stel_entry cG cP) se
@@ -254,7 +254,7 @@ and fmt_syn_exp cG cP parens pps e =
   match e with
   | Star -> string pps "*"
   | SCtx sch ->
-     Fmt.pf pps "ctx %a"
+     Fmt.pf pps "ctx [%a]"
             (fmt_schema cG 1) sch
 
   | SBCtx cP -> fmt_bctx cG pps cP
@@ -340,7 +340,7 @@ and fmt_block cG cP parens pps =
   | RCons (bs, (x, t)) -> Fmt.pf pps "%s : %a, %a" x (fmt_syn_exp cG cP parens) t (fmt_block cG cP parens) bs
 
 and fmt_schema cG parens pps (Schema ex) = 
-       Fmt.pf pps "%a"  
+       Fmt.pf pps "[%a]"  
               (fmt_schema_expl cG Nil parens) ex
 
 and fmt_schema_impl cG parens pps = function
@@ -431,9 +431,14 @@ and fmt_syn_pat cG cP pps = function
       bound_var i
     | Some n -> bound_name pps n
     end
-  | PPar n ->
+  | PPar (n, None) ->
     Fmt.pf pps "<:%a"
       (comp_var cG) n
+
+  | PPar (n, Some pr) ->
+    Fmt.pf pps "<:%a#%d"
+      (comp_var cG) n
+      pr
 
   | PLam (xs, p) ->
      let xs' = List.map fst xs in
@@ -744,6 +749,7 @@ let produce_string f e =
 let print_program p = produce_string fmt_program p
 let print_programs p = produce_string fmt_programs p
 let print_exp cG e = produce_string (fmt_exp cG never_paren) e
+let print_pats cG pats = produce_string (fmt_pats cG) pats
 let print_bctx cG cP = produce_string (fmt_bctx cG) cP
 let print_ctx cP = produce_string fmt_ctx cP
 let print_syn_exp cG cP e = produce_string (fmt_syn_exp cG cP never_paren) e

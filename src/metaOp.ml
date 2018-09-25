@@ -81,7 +81,7 @@ let rec fv_pat =
 and fv_syn_pat =
   function
   | PBVar i -> []
-  | PPar n -> [n]
+  | PPar (n, _) -> [n]
   | PLam (f, p) -> fv_syn_pat p
   | PSConst (n, ps) -> fv_syn_pats ps
   | PUnbox (n, _, _) -> [n]
@@ -548,7 +548,7 @@ and syn_psubst cP (x, p') = function
                in
                comp s n
             | PDot (sigma, p) -> PDot (push_unbox (s, cP') sigma, push_unbox (s, cP') p)
-            | PPar n -> PPar n
+            | PPar (n, pr) -> PPar (n, pr)
 
           in
           push_unbox (s, cP') q
@@ -559,14 +559,15 @@ and syn_psubst cP (x, p') = function
   | PEmpty -> PEmpty
   | PShift n -> PShift n
   | PDot (s, p) -> PDot (syn_psubst cP (x, p') s, syn_psubst cP (x, p') p)
-  | PPar n when n = x ->
+  | PPar (n, None) when n = x ->
     begin match p' with
     | PVar m -> PUnbox (m, pid_sub, cP)
     | Inacc e -> SInacc (e, pid_sub, cP)
-    | PTBox (cP', PPar m) -> PPar m (* MMMMMMMM *)
+    | PTBox (cP', PPar (m, pr)) -> PPar (m, pr) (* MMMMMMMM *)
     | _ -> assert false
     end
-  | PPar n -> PPar n
+  | PPar (n, Some _) when n = x -> assert false
+  | PPar (n , pr) -> PPar (n, pr)
 
 
 and bctx_psubst (x, p') = function
@@ -625,7 +626,7 @@ let rec rename (q : pat) (p : Apx.pat) : (name * name) list =
 and rename_syn (q : syn_pat) (p : Apx.pat) : (name * name) list =
   match q, p with
   | PBVar _, Apx.PBVar _ -> []
-  | PPar n, Apx.PPar m -> [n, m]
+  | PPar (n, _), Apx.PPar (m, _) -> [n, m] (* MMMM might want to compare the projections *)
   | PLam (es, q), Apx.PLam (sl, p) -> rename_syn q p
   | PSConst (_, qs), Apx.PConst (_, ps) -> rename_all_syn qs ps
   | PUnbox (n, _, _), Apx.PVar m -> [n, m]

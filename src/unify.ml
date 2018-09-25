@@ -345,13 +345,13 @@ and unify_flex_many (sign, cG) flex es1 es2 =
   else raise (Unification_failure (Unequal_number_params (es1, es2)))
 
 and unify_flex_many_syn (sign, cG) cP flex es1 es2 =
-  let unify_each (cD, sigma1) e1 e2 =
+  let unify_each e1 e2 (cD, sigma1) =
     let cD', sigma' = unify_flex_syn (sign, cD) cP flex (simul_subst_syn sigma1 e1) (simul_subst_syn sigma1 e2) in
     cD', sigma' @ sigma1
   in
   if List.length es1 = List.length es2
   then
-    List.fold_left2 unify_each (cG, []) es1 es2
+    List.fold_right2 unify_each es1 es2 (cG, [])
   else raise (Unification_failure (Unequal_number_params_syn (es1, es2)))
 
 and unify_flex_pi (sign, cG as ctxs: signature * ctx) (flex : name list) (tel1 : tel) (t1 : exp) (tel2 : tel) (t2 : exp) =

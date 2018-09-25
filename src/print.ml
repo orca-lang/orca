@@ -61,7 +61,8 @@ module Ext = struct
     | PComma (p1, None, p2) -> "(, " ^ print_pat p1 ^ " " ^ print_pat p2 ^ ")"
     | PComma (p1, Some x, p2) -> "(, " ^ print_pat p1 ^ " " ^ x ^ " : " ^ print_pat p2 ^ ")"
     | PCommaBlock (p, ns) -> "(, " ^ print_pat p ^ " |" ^ String.concat ", " ns ^ "|)"
-    | PPar x -> "(<:" ^ x ^ ")"
+    | PPar (x, None) -> "(<:" ^ x ^ ")"
+    | PPar (x, Some pr) -> "(<:" ^ x ^ "#" ^ string_of_int pr ^ ")" 
     | PUnder -> "_"
     | PWildcard -> "._"
 
@@ -145,7 +146,8 @@ module Apx = struct
 
   let rec print_pat (p : pat) : string = match p with
     | PVar n -> print_name n
-    | PPar n -> "(<: " ^ print_name n ^ ")"
+    | PPar (n, None) -> "(<: " ^ print_name n ^ ")"
+    | PPar (n, Some pr) -> "(<: " ^ print_name n ^ "#" ^ string_of_int pr ^ ")"
     | PBVar (i, None) -> "i" ^ string_of_int i
     | PBVar (i, Some j) -> "i" ^ string_of_int i ^ "." ^ string_of_int j
     | Inacc e -> "." ^ print_exp e
@@ -305,8 +307,8 @@ module Int = struct
 
   and print_syn_pat = function
     | PBVar i -> "i" ^ print_index i
-    | PPar n -> "(<: " ^ print_name n ^ ")"
-
+    | PPar (n, None) -> "(<: " ^ print_name n ^ ")"
+    | PPar (n, Some pr) -> "(<: " ^ print_name n ^ "#" ^ string_of_int pr ^ ")"
     | PLam (fs, p) -> "(\ " ^ String.concat " " (List.map (fun (x, t) -> "("^ x ^ " : " ^ print_syn_exp t ^ ")") fs) ^ " " ^ print_syn_pat p ^ ")"
     | PSConst (n, ps) -> "(" ^ n ^ " " ^ (String.concat " " (List.map (fun p -> "(" ^ print_syn_pat p ^ ")") ps)) ^ ")"
     | PUnbox (n, s, cP) -> "(u " ^ print_name n ^ "[" ^ print_pat_subst s ^ " : " ^ print_bctx cP ^ "])"

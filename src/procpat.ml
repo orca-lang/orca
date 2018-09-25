@@ -50,14 +50,14 @@ let rec psubst sign (x, p') = function
                        I.PTBox (cP', syn_psubst sign cP' (x, p') p)
 and syn_psubst sign cP (x, p') = function
   | I.PBVar i -> I.PBVar i
-  | I.PPar n when n = x ->
+  | I.PPar (n, _) when n = x -> (* MMMM *)
     begin match p' with
     | I.PVar m -> I.PUnbox (m, pid_sub, cP)
     | I.Inacc e -> I.SInacc (e, pid_sub, cP)
     | I.PTBox (cP', q) -> assert false
     | _ -> assert false
     end
-  | I.PPar n -> I.PPar n
+  | I.PPar (n, pr) -> I.PPar (n, pr)
 
   | I.PLam (xs, p) -> I.PLam (xs, syn_psubst sign (bctx_of_lam_pars cP xs) (x, p') p) (* What about shifts in p'? *)
   | I.PSConst (n, ps) -> I.PSConst (n, List.map (syn_psubst sign cP (x, p')) ps)
@@ -92,7 +92,7 @@ and syn_psubst sign cP (x, p') = function
                in
                comp s n
             | I.PDot (sigma, p) -> I.PDot (push_unbox (s, cP') sigma, push_unbox (s, cP') p)
-            | I.PPar n -> I.PPar n
+            | I.PPar (n, pr) -> I.PPar (n, pr)
           in
           push_unbox (s, cP') q
        | _ -> assert false

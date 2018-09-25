@@ -2,6 +2,11 @@
 
 type 'a rlist = RNil | RCons of 'a rlist * 'a
 
+let rev l =
+  let rec rev acc = function 
+  | RNil -> acc
+  | RCons (l, e) -> rev (RCons (acc, e)) l
+in rev RNil l 
 
 let rec fold f acc = function
   | RNil -> acc
