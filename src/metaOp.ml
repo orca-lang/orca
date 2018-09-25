@@ -396,9 +396,35 @@ let punbox_list_of_ctx cP : ctx -> syn_pat list = List.map (fun (x, _) -> PUnbox
 let unbox_list_of_tel cP : tel -> syn_exp list = List.map (fun (_, x, _) -> Unbox(Var x, id_sub, cP))
 let punbox_list_of_tel cP : tel -> syn_pat list = List.map (fun (_, x, _) -> PUnbox(x, pid_sub, cP))
 
+(* Re-orders variables to satisfy dependencies *)
+(* TODO have a nicer algorithm *)
+let topologic_ctx (cG0 : ctx) : ctx =
+let rec topo cG cD acc =
+  match cG with
+  | [] -> cD, acc
+  | (x, t) :: cG -> 
+    if fv cD t = [] then
+      topo cG ((x, t) :: cD) acc
+    else
+      topo cG cD ((x, t) :: acc)  
+in
+let rec tries cD cG = 
+  let cD', cG' = topo cG cD [] in
+  if cG' = [] then
+    cD'
+  else if List.length cD < List.length cD' then
+    tries cD' cG'
+  else 
+    raise (Error.Error ("No topological order found for context" ^ print_ctx cG0))
+in tries [] cG0
+
+let ctx_subst s cG =
 let rec ctx_subst s = function
   | (x, t) :: cG -> (x, subst s t) :: (ctx_subst s cG)
   | [] -> []
+in
+let cG' = ctx_subst s cG in
+topologic_ctx cG'    
 
 let ctx_var_subst (x, y) cG =
   let rec replace_var_in_subst (x, y) = function

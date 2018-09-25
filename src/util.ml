@@ -22,6 +22,9 @@ let split_first n l =
        let l1, l2 = split (n-1) xs in
        x::l1, l2
     | _ -> raise (Error.Violation ("split_first called with " ^ string_of_int n
-                                   ^ " and a list of only length " ^ string_of_int (List.length l)))
+                                   ^ " and a list of only length " ^ string_of_int (List.length l))) 
   in
   split n l
+
+(* Removes from l1 every element of l2 *)
+let diff l1 l2 = List.filter (fun x -> not (List.mem x l2)) l1
