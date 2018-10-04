@@ -142,7 +142,9 @@ let apply_inv_pat_subst e s =
     | _ -> assert false
   in
   try Some (apply_inv e s)
-  with Inv_fail -> None
+  with Inv_fail ->
+    Debug.print (fun () -> "Cannot find an inverse for " ^ Print.print_pat_subst s ^ " to apply to " ^ print_syn_exp e); 
+    None
 
 let apply_inv_subst e s =
   let rec add_id_cdot n s =
@@ -173,7 +175,7 @@ let apply_inv_subst e s =
     | Clos (e, s', cP), _ -> Clos(e, apply_inv s' s, cP)
     | Empty, _ -> Empty
     | Shift n, Shift m when n >= m -> Shift (n - m)
-    | Shift n, Shift _ -> raise Inv_fail
+    | Shift n, Shift m -> Debug.print (fun () -> "Incompatible shifts " ^ string_of_int n ^ " " ^ string_of_int m)  ; raise Inv_fail
     | Shift n, Empty -> Empty
     | Shift n, Dot(_,_) -> assert false
     | Shift 0, ShiftS (n, Empty) -> Shift 0
@@ -188,7 +190,9 @@ let apply_inv_subst e s =
                                    ^ " because it was not a substitution."))
   in
   try Some (apply_inv e s)
-  with Inv_fail -> None
+  with Inv_fail -> 
+    Debug.print (fun () -> "Cannot find an inverse for " ^ print_syn_exp s ^ " to apply to " ^ print_syn_exp e);
+    None
 
 let rec psubst_of_pat_subst = function
 | CShift n -> Shift n

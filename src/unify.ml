@@ -31,15 +31,15 @@ let print_unification_problem =
 
   function
   | Different_constuctors (n, n') ->
-     "Constructor " ^ n ^ " and " ^ n' ^ " do not unify."
+     "Constructor " ^ n ^ " and " ^ n' ^ " do not unify.\n"
   | Occur_check (n, e) ->
-     "Occurs check failed for " ^ print_name n ^ " in expression " ^ print_exp e ^ "."
+     "Occurs check failed for " ^ print_name n ^ " in expression " ^ print_exp e ^ ".\n"
   | Occur_check_syn (n, e) ->
-     "Occurs check failed for " ^ print_name n ^ " in expression " ^ print_syn_exp e ^ "."
+     "Occurs check failed for " ^ print_name n ^ " in expression " ^ print_syn_exp e ^ ".\n"
   | Schemata_dont_unify (flex, sch1, sch2) ->
-     "Schemata do not unify"
+     "Schemata do not unify.\n"
   | Schema_expl_dont_unify (flex, _, _) ->
-     "Schema parts do not unify"
+     "Schema parts do not unify.\n"
   | Expressions_dont_unify (flex, e1, e2) ->
      "Expressions\ne1 = " ^ print_exp e1
      ^ "\ne2 = " ^ print_exp e2
@@ -55,13 +55,13 @@ let print_unification_problem =
      ^ " do not match."
   | Unequal_number_params (es1, es2) ->
      "Unequal number of params " ^ string_of_int(List.length es1)
-     ^ " <> " ^ string_of_int(List.length es1)
-     ^ "For expressions\n" ^ print_exps es1
+     ^ " <> " ^ string_of_int(List.length es2)
+     ^ "\nFor expressions\n" ^ print_exps es1
      ^ "\nand\n" ^ print_exps es2
   | Unequal_number_params_syn (es1, es2) ->
      "Unequal number of params " ^ string_of_int(List.length es1)
-     ^ " <> " ^ string_of_int(List.length es1)
-     ^ "For expressions\n" ^ print_syn_exps es1
+     ^ " <> " ^ string_of_int(List.length es2)
+     ^ "\nFor syntactic expressions\n" ^ print_syn_exps es1
      ^ "\nand\n" ^ print_syn_exps es2
   | Unification_didnt_solve_all_problems (e1, e2, cG, remaining_vars, cG') ->
      "Unification of " ^ print_exp e1 ^ " and " ^ print_exp e2
@@ -272,6 +272,7 @@ and unify_flex_syn (sign, cG) cP flex e1 e2 =
   | Unbox(Var n, s, cP'), _ when is_flex n ->
      if not (occur_check_syn sign cP n e2') then
        try
+        Debug.print (fun () -> "Inverse substitution is computed in ctx " ^ print_bctx cP);
          match apply_inv_subst e2' s with
          | None -> raise (Unification_failure (Expressions_dont_unify_syn(flex, e1', e2')))
          | Some e ->
@@ -284,6 +285,7 @@ and unify_flex_syn (sign, cG) cP flex e1 e2 =
   | _, Unbox(Var n, s, cP') when is_flex n ->
      if not (occur_check_syn sign cP n e1') then
        try
+        Debug.print (fun () -> "Inverse substitution is computed in ctx " ^ print_bctx cP);
          match apply_inv_subst e1' s with
          | None -> raise (Unification_failure (Expressions_dont_unify_syn(flex, e1', e2')))
          | Some e ->

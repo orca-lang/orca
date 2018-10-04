@@ -528,7 +528,7 @@ let fmt_rhs cG pps = function
      Fmt.pf pps "impossible %a" (comp_var cG) n
 
 let fmt_pat_decl cG pps (pats, rhs) =
-  let cG' = (List.map (fun x -> x, dt) (MetaOp.fv_pats pats)) @ cG in
+  let cG' = (List.map (fun x -> x, dt) (Free.fv_pats pats)) @ cG in
   Fmt.pf pps "| %a => %a"
          (list ~sep:nbsp (fmt_pat cG')) pats
          (fmt_rhs cG') rhs

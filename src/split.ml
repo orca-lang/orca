@@ -27,7 +27,11 @@ let rec check_match cD (q : pat) (p : A.pat) =
   match q, p with
   | PVar n, A.PVar m ->
     Debug.print (fun () -> "SPLIT: Checking PVar " ^ print_name n ^ " replacing it with " ^ print_name m);
+          Debug.print(fun () -> "(check_match) Sanitizing cD");
+          let cD_sane = topologic_ctx cD in
     let cD' = ctx_var_subst (n, m) cD in
+          Debug.print(fun () -> "(check_match) Sanitizing cD'");
+          let cD'_sane = topologic_ctx cD' in
     Yes (cD', [n,PVar m])
   | PVar n, A.PClos (m, s) -> assert false
   | PVar n, _ -> Yes (cD, [])
@@ -45,23 +49,34 @@ and syn_check_match cD cP q p =
   | PLam (xs, q), A.PLam (ys, p) ->
     syn_check_match cD (bctx_of_lam_pars cP xs) q p
   | PPar (n, pr), A.PPar (n', pr') when pr = pr'->
+      Debug.print(fun () -> "(syn_check_match) Sanitizing cD");
+          let cD_sane = topologic_ctx cD in
     let cD' = ctx_var_subst (n, n') cD in
+      Debug.print(fun () -> "(syn_check_match) Sanitizing cD'");
+          let cD'_sane = topologic_ctx cD' in
     Yes (cD', [n, PTBox (cP, PPar (n', pr))])
   | PPar (n, pr), A.PBVar (i, pr') when pr = pr' -> Yes (cD, [])
   | PUnbox (n, s, cP'), A.PClos (m, s') ->
     Debug.print (fun () -> "Punbox vs pclos: s = " ^ print_pat_subst s ^ ", s' = " ^ print_pat_subst s');
     let cP' = shift_cp_inv_pat_subst cP s' in
     let rec ctx_change = function
-    | [] -> []
+    | [] -> None, []
     | (n', Box(cP1, t)) :: cD' when n = n' ->
       begin match apply_inv_pat_subst (psubst_of_pat_subst s) s' with
       | None -> raise (Error.Error "Unable to apply invers substitution, go figure!")
-      | Some s'' -> (m, Box(cP', Clos(t, s'', cP1))) :: cD'
+      | Some s'' -> Some (n, m), (m, Box(cP', Clos(t, s'', cP1))) :: cD'
       end
     | (n', t) :: cD' when n = n' -> raise (Error.Violation "This shouldn't be happening. n' should have box type.")
-    | (n', t) :: cD' -> (n', t) :: ctx_change cD'
+    | (n', t) :: cD' -> let b, cD'' = ctx_change cD' in b, (n', t) :: cD''
     in
-    let cD' = ctx_change cD in
+          Debug.print(fun () -> "(syn_check_match - ctx_change) Sanitizing cD");
+          let cD_sane = topologic_ctx cD in
+    let cD' = match ctx_change cD with
+     | None, cD' -> cD'
+     | Some b, cD' -> ctx_var_subst b cD'
+    in
+          Debug.print(fun () -> "(syn_check_match - ctx_change) Sanitizing cD'");
+          let cD'_sane = topologic_ctx cD' in
     Yes (cD', [n, PTBox(cP, PUnbox (m, s', cP'))])
   | PUnbox (n, s, cP'), A.PBVar i' ->
     begin match apply_inv_pat_subst (BVar i') s with
@@ -226,6 +241,8 @@ type scheme_in_var
 let split_box (sign : signature) (cD : ctx) (qs : pats)
     (n, p : name * A.pat) (cP, t : bctx * syn_exp) =
     Debug.print (fun () -> "split_box cD = " ^ Pretty.print_ctx cD);
+    Debug.print(fun () -> "Sanitizing cD");
+    let cD_sane = topologic_ctx cD in
   let splits, sp = match Whnf.rewrite sign cP t with
     | SConst c -> split_sconst sign cD cP qs (n, p) c, []
     | AppL (SConst c, sp) -> split_sconst sign cD cP qs (n, p) c, sp
@@ -237,9 +254,15 @@ let split_box (sign : signature) (cD : ctx) (qs : pats)
   let rec unify = function
     | [] -> []
     | (ts, cD', flex, e, p) :: splits ->
-      try let cD'', sigma = Unify.unify_flex_many_syn (sign, cD') cP flex ts sp in
-          Debug.print(fun () -> "Unification: cD' = " ^ Pretty.print_ctx cD' ^ "\ncD'' = "^ Pretty.print_ctx cD''
+      Debug.print(fun () -> "Sanitizing cD'");
+      let cD'_sane = topologic_ctx cD' in
+      try
+        Debug.print (fun () -> "splitbox preuni"); 
+        let cD'', sigma = Unify.unify_flex_many_syn (sign, cD') cP flex ts sp in
+          Debug.print (fun () -> "Unification: cD' = " ^ Pretty.print_ctx cD' ^ "\ncD'' = "^ Pretty.print_ctx cD''
             ^ "\nsigma = "^ print_subst sigma);
+          Debug.print(fun () -> "Sanitizing cD''");
+          let cD''_sane = topologic_ctx cD'' in
           let psigma = inac_subst sigma in
           let s = n, TermBox(cP, simul_subst_syn sigma e) in
           let psigma' = (n, (PTBox (cP, simul_syn_psubst cP psigma p))) :: psigma in
@@ -424,9 +447,13 @@ let rec navigate (sign : signature) (tr : split_tree) (ps, rhs : A.pats * A.rhs)
   match tr with
   | Incomplete (cD, qs, t) ->
     Debug.print (fun () -> "nav1 cD = " ^ Pretty.print_ctx cD);
+    Debug.print(fun () -> "(nav) Sanitizing cD");
+          let cD_sane = topologic_ctx cD in
     let over = check_all cD qs ps in
     begin match over with
     | Yes (cD', sigma) -> 
+      Debug.print(fun () -> "(nav) Sanitizing cD'");
+          let cD'_sane = topologic_ctx cD' in
       Debug.print (fun () -> "nav1 cD' = " ^ Pretty.print_ctx cD');
       split sign cD' (simul_psubst_on_list sigma qs) over (ps, rhs) (simul_subst (subst_of_psubst sigma) t)
     | _ -> raise Backtrack

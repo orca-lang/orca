@@ -25,9 +25,9 @@ let print_names_no_comma ns = "(" ^ (String.concat " " (List.map print_name ns))
 let is_name_floating (_, _, x) = x
 
 let fmt_name pps (s, n, b) =
-  if b
+  (*if b
   then Format.fprintf pps "_%s%d_" s n
-  else Format.fprintf pps "%s!!%d" s n
+  else *)Format.fprintf pps "%s!!%d" s n
 
 let disable_beautify, do_beautify =
   let beau = ref true in
