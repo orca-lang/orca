@@ -20,7 +20,7 @@ let abstract sign (cP : bctx) (tel : stel) : tel * syn_exp * bctx =
        let xn = Name.gen_name x in
        let sl' = (x, s, Unbox(Var xn, Shift 0, cP')) :: sl in
        let tel'', sl'' = abstract tel' sl'  in
-       (i, xn, Whnf.normalize sign (Box(cP, Clos (s, sigma, cP'))))::tel'', sl''
+       (i, xn, Box(cP, Whnf.rewrite sign cP (Clos (s, sigma, cP'))))::tel'', sl''
   in
   let tel', sl = abstract tel [] in
   Debug.print (fun () -> "Abstracted version is " ^ print_tel tel');
