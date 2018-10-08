@@ -1,8 +1,8 @@
 open Syntax
-open Sign
+
 
 val check_clauses :
-  signature ->
+  Int.signature ->
   def_name ->
   Int.exp ->
-  Apx.pat_decls -> signature_entry * Int.split_tree
+  Apx.pat_decls -> Int.signature_entry * Int.split_tree

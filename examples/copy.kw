@@ -18,16 +18,18 @@ def copy : (g : ctx tm) -> (g |- tm) -> (g |- tm) where
 | g (lam (\x. M)) => lam (\x. copy (g, tm) M)
 | g (<:x) => x
 
+
+
 def copy-oft : (g : ctx [s : tp, e : tm, d: oft e s]) (m : (g |- tm)) (t : (|- tp)) -> (g |- oft m t) -> (g |- oft m t) where
 | g .one .unit t-unit => t-unit
 
 | g .(app f e) t (t-app f e s[^] .t d1 d2) => 
-  t-app f e s t (copy-oft g f (arr s t) d1) (copy-oft g e s d2)
+  t-app f e s[^] t (copy-oft g f (arr s[^] t) d1) (copy-oft g e s[^] d2)
 (*) in the next case s and t should have empty substs inferred (the only possible ones) instead of ids
 (*) that they would get without our manual annotation 
 
 (* the problem may come from trying to split on lambda. *)
-| g .(lam m) .(arr s t) (t-lam m s[^0] t[^] (\z.\u.d)) => ?
+| g .(lam m) .(arr s t) (t-lam m s[^0] t[^] (\z.\u.d)) => ?toto
 (*)   t-lam m s t (\x. \u. (copy-oft (g, |s':tp, x:tm, u: oft x s'|) (g,|s, foo, u| :> m foo) t t)[^1; |s, x, u|]) 
 
 (*) | g m t (<: d) => d
@@ -40,3 +42,13 @@ def copy-oft : (g : ctx [s : tp, e : tm, d: oft e s]) (m : (g |- tm)) (t : (|- t
 (*) | g (lam m) (arr s t) (t-lam .m .s .t d) =>
 (*)   t-lam (\x.copy (g,x:tm) (m x)) s t (\x. \u. (oft-copy (g,x:tm,oft x s) (m x) t (d x u)))
 (*) | g m t (<: d) => d
+
+
+(*) Idea for after
+(*
+data bool where tt : bool | ff : bool
+
+def is-closed : (g : ctx tm) (m : (g |- tm)) -> bool where
+| g m[^] => tt
+| g m => ff
+*)

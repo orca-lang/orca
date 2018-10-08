@@ -2,7 +2,6 @@
 
 open Util
 open Name
-open Sign
 open Print
 open Print.Int
 open Syntax

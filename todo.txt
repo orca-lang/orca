@@ -2,6 +2,8 @@
 Big todos:
 
 - merge back to main
+- remove newsplit (or fill it with something)
+- is-open in copy.kw should work
 - remove the bctx in Unbox
 - join metaOp and metaSub
 - remove the old pattern matching code

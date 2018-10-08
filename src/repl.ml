@@ -1,3 +1,4 @@
+open Syntax.Int
 open Sign
 
 let prompt_str = ref "🐋 > "

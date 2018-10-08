@@ -1,4 +1,3 @@
-open Sign
 open Syntax
 open Syntax.Int
 

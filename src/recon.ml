@@ -68,7 +68,7 @@ let compute_wkn (sign, cG) e cP cP' =
     raise (Error.Error ("Cannot infer the substitution unifying contexts\ncP = " ^ IP.print_bctx cP ^ "\ncP' = " ^ IP.print_bctx cP'))
 
 (* infers the type and returns the internal term and its type *)
-let rec infer (sign, cG : signature * I.ctx) (e : A.exp) : I.exp * I.exp =
+let rec infer (sign, cG : I.signature * I.ctx) (e : A.exp) : I.exp * I.exp =
   Debug.print (fun () -> "Infer called with: " ^ AP.print_exp e ^ " in context: " ^ PP.print_ctx (Whnf.whnf_ctx sign cG));
   Debug.indent() ;
   let res_e, res_t  =
@@ -119,14 +119,14 @@ let rec infer (sign, cG : signature * I.ctx) (e : A.exp) : I.exp * I.exp =
   Debug.print(fun() -> "Result of infer for " ^ AP.print_exp e ^ " was " ^ IP.print_exp res_t) ;
   res_e, res_t
 
-and infer_type (sign, cG : signature * I.ctx) (s : A.exp) : I.exp * I.universe =
+and infer_type (sign, cG : I.signature * I.ctx) (s : A.exp) : I.exp * I.universe =
   match infer (sign, cG) s with
   | t, I.Set n -> t, n
   | t, e ->
      Debug.print (fun () -> "Assert universe failed for " ^ IP.print_exp e ^ ".") ;
      raise (Error.Error "Not a universe.")
 
-and check_schema (sign , cG : signature * I.ctx) (A.Schema ex : A.schema) : I.schema =
+and check_schema (sign , cG : I.signature * I.ctx) (A.Schema ex : A.schema) : I.schema =
   let rec check_many_expl cP (ps : A.schema_expl)=
     match ps with
     | [] -> [], cP
@@ -139,7 +139,7 @@ and check_schema (sign , cG : signature * I.ctx) (A.Schema ex : A.schema) : I.sc
   let ex', _ = check_many_expl I.Nil ex in
   I.Schema ex'
 
-and check (sign , cG : signature * I.ctx) (e : A.exp) (t : I.exp) : I.exp =
+and check (sign , cG : I.signature * I.ctx) (e : A.exp) (t : I.exp) : I.exp =
   let t' = Whnf.whnf sign t in
   Debug.print (fun () ->
       "Checking " ^ AP.print_exp e ^ "\nagainst "
@@ -250,10 +250,10 @@ and check_syn_type (sign, cG) cP (e : A.exp) : I.syn_exp =
       in
       let tel', cP' = check_stel_type cP tel in
       I.SPi (tel', check_syn_type (sign, cG) cP' e')
-    | A.Const n -> if lookup_syn_def sign n = [] then I.SConst n
+    | A.Const n -> if I.lookup_syn_def sign n = [] then I.SConst n
       else raise (Error.Error ("Type " ^ n ^ " is not fully applied."))
     | A.App (A.Const n, es) ->
-      let tel = lookup_syn_def sign n in
+      let tel = I.lookup_syn_def sign n in
       begin try
           I.AppL (I.SConst n, List.map2 (fun e (_, x, t) -> check_syn (sign, cG) cP e t) es tel)
         with Invalid_argument _ -> raise (Error.Error ("Type " ^ n ^ " is not fully applied."))
@@ -426,7 +426,7 @@ and infer_syn (sign, cG) cP (e : A.exp) =
     | A.SPi (tel, t) ->
        let tel', t' = check_spi (sign, cG) cP tel t in
        I.SPi (tel', t'), I.Star
-    | A.App (A.Const n, es) when not (is_syn_con sign n) ->
+    | A.App (A.Const n, es) when not (I.is_syn_con sign n) ->
        let e, t = infer (sign, cG) e in
        begin match t with
        | I.Box (cP', t') ->
@@ -474,7 +474,7 @@ and infer_syn (sign, cG) cP (e : A.exp) =
           I.Unbox(I.Var x, sigma, cP'), I.Clos(t', sigma, cP')
        | t -> raise (Error.Error ("Expected a box type, got " ^ IP.print_exp t))
        end
-    | A.Const n when is_syn_con sign n ->
+    | A.Const n when I.is_syn_con sign n ->
        I.SConst n, lookup_syn_sign sign n
 
     | A.Const n ->

@@ -23,8 +23,8 @@ let parse_pm_option = function
   | "new" -> current_pm := New
   | _ -> raise (Error.Violation "Unknown pattern matching processor specified")
 
-let tc_constructor (sign , cG : signature * I.ctx) (u : I.universe) (tel : I.tel)
-                   (n , tel', (n', es) : def_name * tel * dsig) : signature_entry * I.decl =
+let tc_constructor (sign , cG : I.signature * I.ctx) (u : I.universe) (tel : I.tel)
+                   (n , tel', (n', es) : def_name * tel * dsig) : I.signature_entry * I.decl =
   Debug.print_string ("Typechecking constructor: " ^ n) ;
   let tel'', uc = check_tel (sign, cG) u tel' in
   let cG' = (ctx_of_tel tel'') @ cG in
@@ -50,8 +50,8 @@ let tc_constructor (sign , cG : signature * I.ctx) (u : I.universe) (tel : I.tel
                         ^ " which does not fit in " ^ print_universe u
                         ^ ", the universe of the data type " ^ n'))
 
-let rec tc_constructors (sign , cG : signature * I.ctx) (u : I.universe) (tel : I.tel)
-                    (ds : decls) : signature * I.decls =
+let rec tc_constructors (sign , cG : I.signature * I.ctx) (u : I.universe) (tel : I.tel)
+                    (ds : decls) : I.signature * I.decls =
   match ds with
   | [] -> sign, []
   | d::ds ->
@@ -59,8 +59,8 @@ let rec tc_constructors (sign , cG : signature * I.ctx) (u : I.universe) (tel : 
      let sign', ds' = tc_constructors (sign, cG) u tel ds in
      se::sign', d'::ds'
 
-let tc_observation (sign , cG : signature * I.ctx) (u : I.universe) (tel : I.tel)
-                   (n , tel', (m, n', es), e : def_name * tel * codsig * exp) : signature_entry * I.codecl =
+let tc_observation (sign , cG : I.signature * I.ctx) (u : I.universe) (tel : I.tel)
+                   (n , tel', (m, n', es), e : def_name * tel * codsig * exp) : I.signature_entry * I.codecl =
   Debug.print_string ("Typechecking constructor: " ^ n) ;
   let tel'', uc = check_tel (sign, cG) u tel' in
   let cG' = (ctx_of_tel tel'') @ cG in
@@ -86,8 +86,8 @@ let tc_observation (sign , cG : signature * I.ctx) (u : I.universe) (tel : I.tel
                         ^ " which does not fit in " ^ print_universe u
                         ^ ", the universe of the data type " ^ n'))
 
-let rec tc_observations (sign , cG : signature * I.ctx) (u : I.universe) (tel : I.tel)
-           (ds : codecls) : signature * I.codecls =
+let rec tc_observations (sign , cG : I.signature * I.ctx) (u : I.universe) (tel : I.tel)
+           (ds : codecls) : I.signature * I.codecls =
   match ds with
   | [] -> sign, []
   | d::ds ->
@@ -95,8 +95,8 @@ let rec tc_observations (sign , cG : signature * I.ctx) (u : I.universe) (tel : 
      let sign', ds' = tc_observations (sign, cG) u tel ds in
      se::sign', d'::ds'
 
-let tc_syn_constructor (sign , cG : signature * I.ctx) (tel : I.stel)
-                       (n , tel', (n', es) : def_name * stel * dsig) : signature_entry * I.sdecl =
+let tc_syn_constructor (sign , cG : I.signature * I.ctx) (tel : I.stel)
+                       (n , tel', (n', es) : def_name * stel * dsig) : I.signature_entry * I.sdecl =
   Debug.print_string ("Typechecking syntax constructor: " ^ n) ;
   let tel'' = check_stel (sign, cG) I.Nil tel' in
   let cP = bctx_of_stel I.Nil tel'' in
@@ -114,8 +114,8 @@ let tc_syn_constructor (sign , cG : signature * I.ctx) (tel : I.stel)
   let es' = check_indices es tel cP I.id_sub in
   SConstructor (n, tel'', (n', es')), (n, tel'', (n', es'))
 
-let rec tc_syn_constructors (sign , cG : signature * I.ctx) (tel : I.stel)
-                        (ds : sdecls) : signature * I.sdecls =
+let rec tc_syn_constructors (sign , cG : I.signature * I.ctx) (tel : I.stel)
+                        (ds : sdecls) : I.signature * I.sdecls =
   match ds with
   | [] -> sign, []
   | d::ds ->
@@ -123,7 +123,7 @@ let rec tc_syn_constructors (sign , cG : signature * I.ctx) (tel : I.stel)
      let sign', ds' = tc_syn_constructors (sign, cG) tel ds in
      se::sign', d'::ds'
 
-let tc_program (sign : signature) : program -> signature * I.program =
+let tc_program (sign : I.signature) : program -> I.signature * I.program =
   function
   | Data (n, ps, is, u, ds) ->
     Debug.print_string ("Typechecking data declaration: " ^ n ^ "\nps = "
@@ -131,7 +131,7 @@ let tc_program (sign : signature) : program -> signature * I.program =
      let ps', u' = check_tel (sign, []) u ps in
      let cG = ctx_of_tel ps' in
      let is', u'' = check_tel (sign, cG) u' is in
-     let sign' = DataDef (n, ps', is', u'') :: sign in
+     let sign' = I.DataDef (n, ps', is', u'') :: sign in
      let sign'', ds' = tc_constructors (sign', cG) u (ps' @ is') ds in
      sign'', I.Data(n, ps', is', u'', List.rev ds')
      (* TODO Add positivity checking *)
@@ -142,13 +142,13 @@ let tc_program (sign : signature) : program -> signature * I.program =
     let ps', u' = check_tel (sign, []) u ps in
     let cG = ctx_of_tel ps' in
     let is', u'' = check_tel (sign, cG) u' is in
-    let sign' = CodataDef (n, ps', is', u'') :: sign in
+    let sign' = I.CodataDef (n, ps', is', u'') :: sign in
     let sign'', ds' = tc_observations (sign', cG) u (ps' @ is') ds in
     sign'', I.Codata(n, ps', is', u'', List.rev ds')
 
   | Spec spec ->
     let spec' = List.map (fun (n, tel, ds) -> n, check_stel (sign, []) I.Nil tel, ds) spec in
-    let sign' = List.map (fun (n, tel, ds) -> SpecDef (n, tel)) spec' @ sign in
+    let sign' = List.map (fun (n, tel, ds) -> I.SpecDef (n, tel)) spec' @ sign in
     let rec process sign = function
       | (n, tel, ds) :: spec ->
         Debug.print_string ("Typechecking syn declaration: " ^ n);
@@ -172,7 +172,7 @@ let tc_program (sign : signature) : program -> signature * I.program =
       (n, tel', t0, ds)
     in
     let def' = List.map process_type def in
-    let sign_temp = List.map (fun (n, tel, t, ds) -> Program (n, tel, t, [], Stuck)) def' @ sign in
+    let sign_temp = List.map (fun (n, tel, t, ds) -> I.Program (n, tel, t, [], I.Stuck)) def' @ sign in
     begin match !current_pm with
     | Split ->
       let rec process = function

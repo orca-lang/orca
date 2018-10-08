@@ -221,7 +221,14 @@ let split_sconst (sign : signature) (cD : ctx) (cP : bctx) (qs : pats)
       (ts, cD', flex, (if tel == [] then SConst c else AppL (SConst c, unbox_list_of_tel cP tel)),
        PSConst (c, punbox_list_of_tel cP tel)) :: process cs'
   in
-  process cs
+  let cs' = process cs in
+  let rec print_processed = function
+  | [] -> ""
+  | (ts, cD, flex, e, e') :: cs ->
+    print_syn_exp e ^ ",\n" ^
+    print_processed cs
+  in 
+  Debug.print (fun () -> "Print processing: " ^ print_processed cs'); cs'
 
 let split_lam (sign : signature) (cD : ctx) (cP : bctx) (qs : pats)
     (n, p : name * A.pat) (tel, t : stel * syn_exp) =

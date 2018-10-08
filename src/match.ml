@@ -13,6 +13,7 @@ open MetaOp
 open MetaSub
 
 type ctx_map = pats
+type signature = I.signature
 
 type comp_or_syn
   = Syn of I.syn_exp list
@@ -28,7 +29,7 @@ let ctx_of_tel_nr : I.tel -> I.ctx = List.map (fun (_, x, s) -> x, s)
 (* Given the name of a type and a spine, return the parameter, the indices *)
 let split_idx_param (sign : signature) (cG : I.ctx) (n : def_name) (es1 : comp_or_syn)
     (es2 : comp_or_syn) : I.ctx * I.subst * comp_or_syn * comp_or_syn * comp_or_syn =
-  match lookup_sign_entry sign n with
+  match I.lookup_sign_entry sign n with
   | DataDef (_, ps, is, _) ->
      (* Debug.print (fun () -> "Splitting parameters " ^ IP.print_exps es1 ^ " against " ^ IP.print_tel ps); *)
      let rec split = function
@@ -284,11 +285,11 @@ let split_const (sign : signature) (p1 : pats) (c, ps : def_name * pats)
     | Some cP -> cP
     | None -> raise (Error.Error "Syntactic constructor was used in pattern that was not of boxed type")
   in
-  let thetatel, (n', sp') = if is_syn_con sign c then
+  let thetatel, (n', sp') = if I.is_syn_con sign c then
                               let thetatel, (n', sp') = lookup_syn_cons_entry sign c (get_cP maybe_g) in
                               thetatel, (n', Syn sp')
                             else
-                              let thetatel, (n', sp') = lookup_cons_entry sign c in
+                              let thetatel, (n', sp') = I.lookup_cons_entry sign c in
                               thetatel, (n', Comp sp')
   in
 
@@ -298,12 +299,12 @@ let split_const (sign : signature) (p1 : pats) (c, ps : def_name * pats)
     let cD1, sigma, us, vs, ws = split_idx_param sign cD1 n sp sp' in
     Debug.print (fun () -> "wtf? : " ^ IP.print_ctx cD1);
     let cD', cT, delta, pdelta, td = split_flex_unify sign sigma maybe_g p1 thetatel ps cD1 vs ws in
-    let ss = if is_syn_con sign c then
+    let ss = if I.is_syn_con sign c then
                let cP = get_cP maybe_g in
                x, I.TermBox(cP, I.AppL (I.SConst c, unbox_list_of_ctx cP td))
              else
                x, I.App (I.Const c, var_list_of_ctx td) in
-    let pss = if is_syn_con sign c then
+    let pss = if I.is_syn_con sign c then
                let cP = get_cP maybe_g in
                x, I.PTBox(cP, I.PSConst (c, simul_syn_psubst_on_list cP pdelta (punbox_list_of_ctx cP cT)))
              else
@@ -578,7 +579,7 @@ and check_inac (sign, cD : signature * I.ctx) (p : A.pat) (q : I.pat) (t : I.exp
      I.Inacc (simul_subst sigma ep')
   | A.PVar x, I.PVar y when x = y -> I.PVar x
   | A.PConst (n, sp), I.PConst (n', sq) when n = n' ->
-     begin match lookup_sign_entry sign n with
+     begin match I.lookup_sign_entry sign n with
      | Constructor (_, tel, _) -> I.PConst (n, check_inacs (sign, cD) sp sq (ctx_of_tel_nr tel))
      | SConstructor (_, stel, _) -> (* raise (Error.Violation ("Syntactic constructor used with PConst")) *)
         let cP = match t with
@@ -620,7 +621,7 @@ and check_inac_syn (sign, cD : signature * I.ctx) (cP : I.bctx) (p : A.pat) (q :
      Debug.deindent ();
      I.SInacc (simul_subst sigma eq, s, simul_subst_on_bctx sigma cP')
   | A.PConst (n, sp), I.PSConst (n', sq) when n = n' ->
-     begin match lookup_sign_entry sign n with
+     begin match I.lookup_sign_entry sign n with
      | Constructor (_, tel, _) -> raise (Error.Error ("Used a data type constructor inside a syntactic pattern"))
      | SConstructor (_, tel, _) ->
         I.PSConst (n, check_inacs_syn (sign, cD) cP sp sq tel)
@@ -687,7 +688,7 @@ let check_clause (sign : signature) (f : def_name) (p : A.pats) (telG : I.tel) (
                         ^ "\nwith unification problem:\n"
                         ^ Unify.print_unification_problem prob))
 
-let check_clauses (sign : signature) (f : def_name) (telG : I.tel) (t : I.exp) (ds : A.pat_decls) : signature_entry * I.pat_decls =
+let check_clauses (sign : signature) (f : def_name) (telG : I.tel) (t : I.exp) (ds : A.pat_decls) : I.signature_entry * I.pat_decls =
   (* we add a non-reducing version of f to the signature *)
   let ds'= List.map (fun (ps, rhs) -> check_clause sign f ps telG t rhs) ds  in
   (Program (f, telG, t, ds', Reduces)), ds'

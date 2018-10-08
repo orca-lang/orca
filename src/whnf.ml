@@ -3,7 +3,6 @@ open Syntax.Int
 open Print.Int
 open MetaOp
 open MetaSub
-open Sign
 open Util
 
 exception Matching_failure of pat * exp

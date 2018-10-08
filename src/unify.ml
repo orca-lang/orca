@@ -240,7 +240,7 @@ and unify_flex_syn (sign, cG) cP flex e1 e2 =
   | SCtx sch, SCtx sch' -> unify_flex_schemata (sign, cG) flex sch sch'
   | SBCtx cP, SBCtx cP' -> unify_flex_bctx (sign, cG) flex cP cP'
   | Star, Star -> cG, []
-  (* (\* This is comparing eta long and eta short versions *\) *)
+  (* This is comparing eta long and eta short versions *)
   | Unbox(Var n, s, _), Lam (xs, (AppL (Unbox (Var m, s', _), es))) when n = m ->
     Debug.print (fun () -> "Hello!");
     let n = List.length xs in
@@ -268,6 +268,8 @@ and unify_flex_syn (sign, cG) cP flex e1 e2 =
     else
       raise (Unification_failure(Expressions_dont_unify_syn (flex, e1', e2')))
 
+  | Unbox(Var n, Empty, _), Unbox (Var m, Shift 0, _) (* when n = m -> cG, [] *)
+  | Unbox(Var n, Shift 0, _), Unbox (Var m, Empty, _) when n = m -> cG, []
   | Unbox(Var n, s, _), Unbox (Var m, s', _) when n = m ->  unify_flex_syn (sign, cG) cP flex s s'
   | Unbox(Var n, s, cP'), _ when is_flex n ->
      if not (occur_check_syn sign cP n e2') then
