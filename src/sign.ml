@@ -23,7 +23,7 @@ let abstract sign (cP : bctx) (tel : stel) : tel * syn_exp * bctx =
        (i, xn, Box(cP, Whnf.rewrite sign cP (Clos (s, sigma, cP'))))::tel'', sl''
   in
   let tel', sl = abstract tel [] in
-  Debug.print (fun () -> "Abstracted version is " ^ print_tel tel');
+  Debug.print (fun () -> "Abstracted version is " ^ print_tel (List.map (fun (i, x, t) -> (i, x, Whnf.normalize sign t)) tel'));
   tel', extract_sigma sl, extend_cP sl
 
 let lookup_syn_cons_entry (sign : signature) (c : def_name) (cP : bctx) : tel * spec_dsig =
@@ -90,7 +90,7 @@ let lookup_syn_sign sign n =
      in
      Debug.print (fun () -> "Looked up constructor " ^ n ^ " which has type " ^ print_syn_exp t');
      t'
-  | _ -> raise (Error.Error ("Name " ^ n ^ " is not syntactic"))
+  | _ -> raise (Error.Error ("Name " ^ n ^ " is not syntactic")) 
 
 (* returns all the constructors of type n *)
 let rec lookup_constructors sign n =

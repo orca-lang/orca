@@ -26,7 +26,7 @@ module Ext = struct
     | ABox (e1, e2) -> "(" ^ print_exp e1 ^ " :> " ^ print_exp e2 ^ ")"
     | Fn (fs, e) ->
        "(fn " ^ (String.concat " " fs) ^ " " ^ print_exp e ^ ")"
-    | Lam (f, e) -> "(\ " ^ String.concat " " f ^ " " ^ print_exp e ^ ")"
+    | Lam (f, e) -> "(\\ " ^ String.concat " " f ^ ". " ^ print_exp e ^ ")"
     | App (e1, e2) -> "(" ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
     | AppL (e1, e2) -> "(' " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
     | Ident n -> n
@@ -50,7 +50,7 @@ module Ext = struct
   let rec print_pat (p : pat) : string = match p with
     | PIdent n -> n
     | Inacc e -> "(. " ^ print_exp e ^ ")"
-    | PLam (f, p) -> "(\ " ^ String.concat " " f ^ " " ^ print_pat p ^ ")"
+    | PLam (f, p) -> "(\\ " ^ String.concat " " f ^ ". " ^ print_pat p ^ ")"
     | PConst (n, ps) -> "(" ^ n ^ " " ^ (String.concat " " (List.map (fun p -> "(" ^ print_pat p ^ ")") ps)) ^ ")"
     | PClos (n, e) -> "([] " ^ n ^ " " ^ print_exp e ^ ")"
     | PBox (p1, p2) -> "(:> " ^ print_pat p1 ^ " " ^ print_pat p2 ^ ")"
@@ -106,7 +106,7 @@ module Apx = struct
     | SPi (tel, t) -> print_spi tel t
     | Box (ctx, e) -> "(" ^ print_exp ctx ^ " |- " ^ print_exp e ^ ")"
     | Fn (fs, e) -> "(fn " ^ (String.concat " " (List.map print_name fs)) ^ " " ^ print_exp e ^ ")"
-    | Lam (fs, e) -> "(\\ " ^ String.concat " " fs ^ " " ^ print_exp e ^ ")"
+    | Lam (fs, e) -> "(\\ " ^ String.concat " " fs ^ ". " ^ print_exp e ^ ")"
     | App (e, es) -> "(" ^ print_exp e ^ " " ^ String.concat " " (List.map print_exp es) ^ ")"
     | AppL (e1, es) -> "(" ^ print_exp e1 ^ " ' " ^ String.concat " ' " (List.map print_exp es) ^ ")"
     | Const n -> n
@@ -151,7 +151,7 @@ module Apx = struct
     | PBVar (i, None) -> "i" ^ string_of_int i
     | PBVar (i, Some j) -> "i" ^ string_of_int i ^ "." ^ string_of_int j
     | Inacc e -> "." ^ print_exp e
-    | PLam (fs, p) -> "(\ " ^ String.concat " " fs ^ " " ^ print_pat p ^ ")"
+    | PLam (fs, p) -> "(\\ " ^ String.concat " " fs ^ ". " ^ print_pat p ^ ")"
     | PConst (n, ps) -> "(" ^ n ^ " " ^ (String.concat " " (List.map (fun p -> "(" ^ print_pat p ^ ")") ps)) ^ ")"
     | PClos (n, s) -> print_name n ^ "[" ^ print_pat_subst s ^ "]"
     | SInacc (e, s) -> "." ^ print_exp e ^ "[" ^ print_pat_subst s ^ "]"
@@ -309,7 +309,7 @@ module Int = struct
     | PBVar i -> "i" ^ print_index i
     | PPar (n, None) -> "(<: " ^ print_name n ^ ")"
     | PPar (n, Some pr) -> "(<: " ^ print_name n ^ "#" ^ string_of_int pr ^ ")"
-    | PLam (fs, p) -> "(\ " ^ String.concat " " (List.map (fun (x, t) -> "("^ x ^ " : " ^ print_syn_exp t ^ ")") fs) ^ " " ^ print_syn_pat p ^ ")"
+    | PLam (fs, p) -> "(\\ " ^ String.concat " " (List.map (fun (x, t) -> "("^ x ^ " : " ^ print_syn_exp t ^ ")") fs) ^ ". " ^ print_syn_pat p ^ ")"
     | PSConst (n, ps) -> "(" ^ n ^ " " ^ (String.concat " " (List.map (fun p -> "(" ^ print_syn_pat p ^ ")") ps)) ^ ")"
     | PUnbox (n, s, cP) -> "(u " ^ print_name n ^ "[" ^ print_pat_subst s ^ " : " ^ print_bctx cP ^ "])"
     | SInacc (e, s, cP) -> "(s. " ^ print_exp e ^ "[" ^ print_pat_subst s ^ " : " ^ print_bctx cP ^ "])"

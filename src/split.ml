@@ -165,7 +165,15 @@ and choose_blocking_var_syn (qs : syn_pats) (ps : A.pats) : (name * A.pat * bool
 (* the returned boolean expresses whether we are refining based on parameter var  *)
 and choose_blocking_syn (q : syn_pat) (p : A.pat) : (name * A.pat * bool) option =
   match q, p with
-  | PLam (xs, q), A.PLam(ys, p) -> choose_blocking_syn q p
+  | PLam (xs, q), A.PLam(ys, p) -> 
+    let rec consume_vars xs' ys' = 
+    begin match xs', ys' with
+    | [], [] -> choose_blocking_syn q p
+    | x::xs, y::ys -> consume_vars xs ys
+    | xs, [] -> choose_blocking_syn (PLam (xs, q)) p
+    | _, _ -> raise (Error.Error ("Pattern has lambda abstraction " ^ AP.print_pat (A.PLam (ys, p)) ^ " with a left-hand side longer than expected."))
+    end 
+    in consume_vars xs ys
   | PSConst (c, qs), A.PConst(c', ps) -> choose_blocking_var_syn qs ps
   | PUnbox (n, s, cP), p when is_blocking p -> Some (n, p, false)
   | PPar (n, _), A.PBVar i -> Some (n, p, true)
@@ -253,7 +261,8 @@ let split_box (sign : signature) (cD : ctx) (qs : pats)
   let splits, sp = match Whnf.rewrite sign cP t with
     | SConst c -> split_sconst sign cD cP qs (n, p) c, []
     | AppL (SConst c, sp) -> split_sconst sign cD cP qs (n, p) c, sp
-    | SPi (tel, t) -> split_lam sign cD cP qs (n, p) (tel, t), []
+    | SPi (tel, t) -> Debug.print (fun () -> "split_box splitting on SPi");
+      split_lam sign cD cP qs (n, p) (tel, t), []
     | SBCtx cP' -> raise Error.NotImplemented
     | SCtx _ -> raise (Error.Error "Contexts are irrelevant")
     | _ -> raise (Error.Error "Cannot split on this constructor")
@@ -407,6 +416,7 @@ let rec split (sign : signature) (cD : ctx) (qs : pats) (over : (ctx * psubst) m
         Leaf (cD', qs', simul_subst sigma' t, rhs')
   | Some (n, p, refine) ->
     Debug.print (fun () -> "Found blocking variable " ^ print_name n);
+    Debug.indent ();  
     let f = function
       | None -> None
       (* todo: figure out impossible branches for specific constructors *)
@@ -415,14 +425,13 @@ let rec split (sign : signature) (cD : ctx) (qs : pats) (over : (ctx * psubst) m
         let over' = check_all cD' qs' ps in
         begin match over' with
         | Yes (cD'', sigma) ->
-          Debug.print (fun () -> "split1 cD'' = " ^ Pretty.print_ctx cD'');
+          Debug.print (fun () -> "split1 cD'' = " ^ Pretty.print_ctx cD'' ^ "\nqs' = " ^ Pretty.print_pats cD'' (simul_psubst_on_list sigma qs'));
           Some (split sign cD'' (simul_psubst_on_list sigma qs') over' (ps, rhs)
                       (simul_subst (subst_of_psubst sigma) (simul_subst sigma' t)))
         | _ ->
           Some (Incomplete (cD', qs',  simul_subst sigma' t))
         end
     in
-    Debug.indent ();
     let t = try List.assoc n cD
       with Not_found -> raise (Error.Violation ("Pattern " ^ print_pats qs
         ^ " has name not in context " ^ print_ctx cD))

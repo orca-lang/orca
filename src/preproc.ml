@@ -185,7 +185,15 @@ match content e with
      let cG', n' = add_names_ctx cG ns in
      A.Fn(n', pproc_exp s cG' cP e)
   | E.Lam (ns, e) ->
-     A.Lam(ns, pproc_exp s cG (add_name_bvars cP ns) e)
+    let rec accumulate_lams e = match content e with
+    | E.Lam (ns, e) -> 
+      let ns', e' = accumulate_lams e in
+      ns @ ns', e'
+    | _ -> [], e
+    in 
+    let ns', e' = accumulate_lams e in
+    let ns'' = ns @ ns' in
+     A.Lam(ns'', pproc_exp s cG (add_name_bvars cP ns'') e')
   | E.App (e1, e2) ->
      let h, sp = pproc_app s cG cP e in
      A.App(h, sp)
@@ -466,7 +474,15 @@ let rec pproc_pat (s : sign) cG cP p =
      Debug.print (fun () -> "Preprocessing inaccessible pattern " ^ EP.print_exp e ^ " in context " ^ print_ctx cG);
      A.Inacc (pproc_exp s cG [] e)
   | E.PLam (xs, p) ->
-    A.PLam (xs, pproc_pat s cG ((List.map (fun x -> [x]) xs)@cP) p)
+    let rec accumulate_plams = function
+    | E.PLam (xs, p) -> 
+      let xs', p' = accumulate_plams p in
+      xs @ xs', p'
+    | p -> [], p
+    in 
+    let xs', p' = accumulate_plams p in
+    let xs'' = xs @ xs' in
+    A.PLam (xs, pproc_pat s cG ((List.map (fun x -> [x]) xs'')@cP) p')
   | E.PConst (c, ps) ->
     let ps' = List.map (pproc_pat s cG cP) ps in
     A.PConst (c, ps')

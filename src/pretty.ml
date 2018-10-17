@@ -316,7 +316,7 @@ and fmt_syn_exp cG cP parens pps e =
      let cP' = bctx_of_names xs' cP in
      Fmt.pf pps "%s\\%a. %a%s"
        (open_paren 5)
-       (list bound_name) (beautify_bound_names xs' cP')
+       (list ~sep:nbsp bound_name) (beautify_bound_names xs' cP')
        (fmt_syn_exp cG cP' 5) e
        (close_paren 5)
 
@@ -444,7 +444,7 @@ and fmt_syn_pat cG cP pps = function
      let xs' = List.map fst xs in
      let cP' = bctx_of_names xs' cP in
      Fmt.pf pps "(\\%a. %a)"
-            (list bound_name) (beautify_bound_names xs' cP)
+            (list ~sep:nbsp bound_name) (beautify_bound_names xs' cP)
             (fmt_syn_pat cG cP') p
 
   | PUnbox (n, CShift 0, _) ->
