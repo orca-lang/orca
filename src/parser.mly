@@ -151,6 +151,7 @@ raw_simple_exp:
 | n = SHIFT {Shift n}
 | n = INDEX {BVar n}
 | NIL {Nil}
+| e = raw_simple_exp pr = PROJ? {Proj (e, pr)}
 
 schema:
 | e = simple_exp {Schema (["_", e])}

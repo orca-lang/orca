@@ -49,6 +49,7 @@ module Ext = struct
     | Annot of exp * exp
     | Ctx of schema
     | Block of (name * exp) rlist
+    | Proj of int * exp
 
   and schema
     = Schema of (name * exp) list

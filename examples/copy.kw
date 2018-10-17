@@ -29,8 +29,8 @@ def copy-oft : (g : ctx [s : tp, e : tm, d: oft e s]) (m : (g |- tm)) (t : (|- t
 (*) that they would get without our manual annotation 
 
 (* the problem may come from trying to split on lambda. *)
-| g .(lam m) .(arr s t) (t-lam m s[^0] t[^] (\z.\u.d)) => ?toto
-  (*) t-lam m s t (\x. \u. (copy-oft (g, |s':tp, x:tm, u: oft x s'|) (g,|s, foo, u| :> m foo) t d[])[^2; |s, x, u|]) 
+| g .(lam m) .(arr s t) (t-lam m s[^0] t[^] (\z.\u.d)) => 
+  t-lam m s t (\x. \u. (copy-oft (g, |s':tp, x:tm, u: oft x s'|) (g,|s, foo, u| :> m foo) t d[])[^2; |s, x, u|]) 
 
 (*) | g m t (<: d) => d
 
