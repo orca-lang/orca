@@ -337,13 +337,14 @@ and fmt_block cG cP parens pps =
   let open Rlist in function
   | RNil -> ()
   | RCons (RNil, (x, t)) -> Fmt.pf pps "%s : %a" x (fmt_syn_exp cG cP parens) t
-  | RCons (bs, (x, t)) -> Fmt.pf pps "%s : %a, %a" x (fmt_syn_exp cG cP parens) t (fmt_block cG cP parens) bs
+  | RCons (bs, (x, t)) -> Fmt.pf pps "%a, %s : %a" (fmt_block cG cP parens) bs x (fmt_syn_exp cG cP parens) t 
 
-and fmt_schema cG parens pps (Schema ex) = 
-       Fmt.pf pps "[%a]"  
-              (fmt_schema_expl cG Nil parens) ex
+and fmt_schema cG parens pps (Schema (quant,block)) = 
+       Fmt.pf pps "<%a>[%a]"
+        (fmt_schema_part cG Nil parens) quant
+        (fmt_schema_part cG Nil parens) block
 
-and fmt_schema_impl cG parens pps = function
+(* and fmt_schema_impl cG parens pps = function
   | [] -> ()
   | [(n, cP, t)] ->
      Fmt.pf pps "%a : %a"
@@ -355,8 +356,9 @@ and fmt_schema_impl cG parens pps = function
             fmt_name n
             (fmt_exp cG parens) (Box (cP, t))
             (fmt_schema_impl ((n, Box(cP, t))::cG) parens) ps'
+*)
 
-and fmt_schema_expl cG cP parens pps = function
+and fmt_schema_part cG cP parens pps = function
   | [] -> ()
   | [(n, t)] ->
      Fmt.pf pps "%s : %a"
@@ -367,7 +369,7 @@ and fmt_schema_expl cG cP parens pps = function
      Fmt.pf pps "%s : %a, %a"
             n
             (fmt_syn_exp cG cP parens) t
-            (fmt_schema_expl cG (Snoc (cP, n, t)) parens) ps'
+            (fmt_schema_part cG (Snoc (cP, n, t)) parens) ps'
 
 and fmt_bctx cG pps = function
   | Nil -> string pps "0"

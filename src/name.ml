@@ -9,6 +9,8 @@ let gen_sym =
 
 let gen_name s = (s, gen_sym (), false)
 
+let gen_string s = s ^ "_" ^ string_of_int (gen_sym ())
+
 (* A floating name is one that is not used in a term *)
 let gen_floating_name () = ("@", gen_sym(), true)
 

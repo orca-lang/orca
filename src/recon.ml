@@ -126,20 +126,24 @@ and infer_type (sign, cG : I.signature * I.ctx) (s : A.exp) : I.exp * I.universe
      Debug.print (fun () -> "Assert universe failed for " ^ IP.print_exp e ^ ".") ;
      raise (Error.Error "Not a universe.")
 
-and check_schema (sign , cG : I.signature * I.ctx) (A.Schema ex : A.schema) : I.schema =
-  let rec check_many_expl cP (ps : A.schema_expl)=
+and check_schema (sign , cG : I.signature * I.ctx) (A.Schema (quant, block) : A.schema) : I.schema =
+  let rec check_many cP (ps : A.schema_part)=
     match ps with
     | [] -> [], cP
     | (x, s)::ps' ->
        let s' = check_syn_type (sign, cG) cP s in
        let cP' = (I.Snoc (cP, x, s')) in
-       let ps'', t' = check_many_expl cP' ps' in
+       let ps'', t' = check_many cP' ps' in
        ((x, s')::ps''), cP'
   in
-  let ex', _ = check_many_expl I.Nil ex in
-  I.Schema ex'
+  let quant', cP = check_many I.Nil quant in
+  let block', _ = check_many cP block in
+  I.Schema (quant', block')
 
 and check (sign , cG : I.signature * I.ctx) (e : A.exp) (t : I.exp) : I.exp =
+  Debug.print (fun () ->
+      "(BEFORE) Checking " ^ AP.print_exp e ^ "\nagainst "
+      ^ Pretty.print_exp cG t ^ "\nin context: " ^ Pretty.print_ctx (Whnf.whnf_ctx sign cG));
   let t' = Whnf.whnf sign t in
   Debug.print (fun () ->
       "Checking " ^ AP.print_exp e ^ "\nagainst "
@@ -204,6 +208,7 @@ and check (sign , cG : I.signature * I.ctx) (e : A.exp) (t : I.exp) : I.exp =
 and check_spine (sign, cG) sp tel t =
   match sp, tel with
   | e::sp', (_, x, s)::tel ->
+    Debug.print (fun () -> "Checking spine at term " ^ AP.print_exp e ^ " against type " ^ IP.print_exp s);
      let e' = check (sign, cG) e s in
      let tel', t' = subst_pi (x, e') tel t in
      let sp', spA, t'' = check_spine (sign, cG) sp' tel' t' in
@@ -300,7 +305,7 @@ and is_ctx (sign, cG) g =
 
 and check_type_against_schema (sign, cG) cP e = try
     function
-    | I.Schema ([_, t]) ->
+    | I.Schema ([], [_, t]) ->
        let t' = check_syn_type (sign, cG) cP e in
        let _, sigma' = try
            Unify.unify_flex_syn (sign, cG) cP [] t t'
@@ -310,20 +315,22 @@ and check_type_against_schema (sign, cG) cP e = try
        in
        simul_subst_syn sigma' t'
 
-    | I.Schema ex ->
-       let rec subst_in_schema i cP = function
+    | I.Schema (quant, block) ->
+      (* we create unif vars for the quants, so unification can later instantiate them, maybe *)
+      let block', flex = mk_quant_subst cP quant block in
+       (*let rec subst_in_schema i cP = function
          | [] -> []
          | (n, t) :: ex ->
             let t' = if i > 0 then I.Clos(t, I.ShiftS (i, I.id_sub), cP) else t in
             (n, t') :: subst_in_schema (i+1) (I.Snoc(cP, n, t')) ex
        in
-       let ex' = subst_in_schema 0 cP ex in
+       let ex' = subst_in_schema 0 cP' block in *)
        let rec unify_explicit cG cP sigma = function
          | [], [] -> cG, sigma
          | (n, t)::bs', (m, t')::ex' ->
            Debug.print(fun () -> "Checking block: Trying to unify " ^ IP.print_syn_exp t ^ "\nwith " ^ IP.print_syn_exp t');
             let cG', sigma' = try
-                Unify.unify_flex_syn (sign, cG) cP [] t t'
+                Unify.unify_flex_syn (sign, cG) cP flex t t'
               with Unify.Unification_failure problem ->
                 raise (Error.Error ("Unification failed when checking a block against a schema.\n"
                                     ^ Unify.print_unification_problem problem))
@@ -336,7 +343,7 @@ and check_type_against_schema (sign, cG) cP e = try
          | A.Block bs -> check_block (sign, cG) cP bs
          | _ -> raise (Error. Error "Expected a block")
        in
-       let cG', sigma = unify_explicit cG I.Nil [] (Rlist.to_list bs, List.rev ex') in (* Trying to rev here because suspect shema are in non context order... *)
+       let cG', sigma = unify_explicit cG I.Nil [] (Rlist.to_list bs, List.rev block') in (* Trying to rev here because suspect shema are in non context order... *)
        simul_subst_syn sigma (I.Block bs)
   with Unify.Unification_failure problem -> raise (Error.Error (Unify.print_unification_problem problem))
 

@@ -12,7 +12,7 @@ let regexp lower = ['a'-'z']
 let regexp upper = ['A'-'Z']
 
 (* Old regexp: (lower | upper) (lower | upper | digit)* *)
-let regexp identifier = [^ '\x09'-'\x0a' '\x20' '\x0d' '(' ')' ':' ',' '\\' '.' '[' ']' ';' '{' '}' '|']+
+let regexp identifier = [^ '\x09'-'\x0a' '\x20' '\x0d' '(' ')' ':' ',' '\\' '.' '[' ']' ';' '{' '}' '|' '>' '<']+
 
 let regexp hole = "?" identifier
 
@@ -96,6 +96,8 @@ let rec main_scanner pos = lexer
   | ")" -> add_word pos (Ulexing.lexeme_length lexbuf), RPAREN
   | "{" -> add_word pos (Ulexing.lexeme_length lexbuf), LCURLY
   | "}" -> add_word pos (Ulexing.lexeme_length lexbuf), RCURLY
+  | "<" -> add_word pos (Ulexing.lexeme_length lexbuf), LTRIANG
+  | ">" -> add_word pos (Ulexing.lexeme_length lexbuf), RTRIANG
   | "_" -> add_word pos (Ulexing.lexeme_length lexbuf), UNDERSCORE
   | "where" -> add_word pos (Ulexing.lexeme_length lexbuf), WHERE
   | "=" -> add_word pos (Ulexing.lexeme_length lexbuf), EQ

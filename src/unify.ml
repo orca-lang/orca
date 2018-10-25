@@ -13,7 +13,7 @@ type unification_problem
   | Expressions_dont_unify of name list * exp * exp
   | Expressions_dont_unify_syn of name list * syn_exp * syn_exp
   | Schemata_dont_unify of name list * schema * schema
-  | Schema_expl_dont_unify of name list * schema_expl * schema_expl (* this may not be necessary until we have implicit schema block members *)
+  | Schema_expl_dont_unify of name list * schema_part * schema_part (* this may not be necessary until we have implicit schema block members *)
   | Universes_dont_match of int * int
   | Unequal_number_params of exp list * exp list
   | Unequal_number_params_syn of syn_exp list * syn_exp list
@@ -189,10 +189,12 @@ let rec unify_flex (sign, cG) flex e1 e2 =
   | _, _ ->
      raise (Unification_failure(Expressions_dont_unify (flex, e1', e2')))
 
-and unify_flex_schemata (sign, cG) flex (Schema ex1) (Schema ex2) =
-  unify_flex_schema_expl (sign, cG) Nil flex ex1 ex2
+and unify_flex_schemata (sign, cG) flex (Schema (quant1, block1)) (Schema (quant2, block2)) =
+  let cD, sigma = unify_flex_schema_expl (sign, cG) Nil flex quant1 quant2 in 
+  let cP' = bctx_of_quant Nil (simul_subst_in_part sigma quant1) in 
+  unify_flex_schema_expl (sign, cG) cP' flex block1 block2
 
-and unify_flex_schema_expl (sign, cG: signature * ctx) cP (flex : name list) (ps1: schema_expl)  (ps2 : schema_expl) =
+and unify_flex_schema_expl (sign, cG: signature * ctx) cP (flex : name list) (ps1: schema_part)  (ps2 : schema_part) =
   let simul_subst_in_part sigma ps =
     List.map (fun (n, e) -> n, simul_subst_syn sigma e) ps
   in
@@ -272,6 +274,7 @@ and unify_flex_syn (sign, cG) cP flex e1 e2 =
   | Unbox(Var n, Shift 0, _), Unbox (Var m, Empty, _) when n = m -> cG, []
   | Unbox(Var n, s, _), Unbox (Var m, s', _) when n = m ->  unify_flex_syn (sign, cG) cP flex s s'
   | Unbox(Var n, s, cP'), _ when is_flex n ->
+    Debug.print (fun () -> "Unifying variable " ^ print_name n ^ " which is flexible");
      if not (occur_check_syn sign cP n e2') then
        try
         Debug.print (fun () -> "Inverse substitution is computed in ctx " ^ print_bctx cP);
@@ -285,6 +288,7 @@ and unify_flex_syn (sign, cG) cP flex e1 e2 =
      else
        raise (Unification_failure(Occur_check_syn (n, e2)))
   | _, Unbox(Var n, s, cP') when is_flex n ->
+  Debug.print (fun () -> "Unifying variable " ^ print_name n ^ " which is flexible");
      if not (occur_check_syn sign cP n e1') then
        try
         Debug.print (fun () -> "Inverse substitution is computed in ctx " ^ print_bctx cP);

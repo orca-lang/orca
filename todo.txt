@@ -1,3 +1,6 @@
+Small todo for next week:
+  - fix names of bound variables in pretty
+
 
 Big todos:
 
@@ -15,7 +18,11 @@ Big todos:
 - add a vscode mode
 - implement the LSP (language server protocol)
 - add a version with markdown comments for documentation (lightweight literate programming)
-
+- instead of creating closures to apply syntactic substitutions it would be
+  better to have a meta-operation that applies these (for both performance and
+  simplicity reasons)
+- pretty uses print if we set a flag
+- pretty should print paresable code
 
 Old todos:
 * Add syntax for (x: A) (y: B) (z: C) -> D

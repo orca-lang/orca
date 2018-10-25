@@ -51,7 +51,7 @@ module Ext = struct
     | Block of (name * exp) rlist
 
   and schema
-    = Schema of (name * exp) list
+    = Schema of (name * exp) list * (name * exp) list (* quant, block *)
 
   type pat =
     | PIdent of name
@@ -115,9 +115,9 @@ module Apx = struct
     | Block of (string * exp) rlist
     | TBlock of exp rlist
 
-  and schema_expl = (string * exp) list
+  and schema_part = (string * exp) list 
   and schema
-    = Schema of schema_expl
+    = Schema of schema_part * schema_part (* quant, block *)
 
   and tel_entry = icit * name * exp
   and tel = tel_entry list
@@ -206,9 +206,9 @@ module Int = struct
     | Unbox of exp * syn_exp * bctx (* TODO remove the context from Unbox *)
     | UnboxParam of name * int * syn_exp
 
-  and schema_expl = (string * syn_exp) list
+  and schema_part = (string * syn_exp) list
   and schema
-    = Schema of schema_expl
+    = Schema of schema_part * schema_part
 
   and bctx
     = Nil

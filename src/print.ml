@@ -43,9 +43,9 @@ module Ext = struct
     | Ctx sch -> "ctx " ^ print_schema sch
     | Block bs -> "|" ^ Rlist.to_string (fun (n, t) -> n  ^ " : " ^ print_exp t ) bs ^ "|"
 
-  and print_schema (Schema expl) =
+  and print_schema (Schema (quant, block)) =
     let f ps = String.concat ", " (List.map (fun (x, t) -> x ^ " : " ^ print_exp t) ps) in
-    "[" ^ f expl ^ "]"
+    "<" ^ f quant ^">[" ^ f block ^ "]"
 
   let rec print_pat (p : pat) : string = match p with
     | PIdent n -> n
@@ -124,9 +124,9 @@ module Apx = struct
     | Block bs -> "|" ^ Rlist.to_string (fun (n, t) -> n  ^ " : " ^ print_exp t ) bs ^ "|"
     | TBlock bs -> "|t " ^ Rlist.to_string print_exp bs ^ "|"
 
-  and print_schema (Schema expl) =
+  and print_schema (Schema (quant, block)) =
     let g ps = String.concat ", " (List.map (fun (x, t) -> x ^ " : " ^ print_exp t) ps) in
-    "[" ^ g expl ^ "]"
+    "<" ^ g quant ^ ">[" ^ g block ^ "]"
 
   and print_pi tel t = match tel with
     | [] -> print_exp t
@@ -261,16 +261,16 @@ module Int = struct
     | Unbox (e, se, cP) -> "(ub " ^ print_exp e ^ "[" ^ print_syn_exp se ^ " : " ^ print_bctx cP  ^ "])"
     | SCtx sch -> "ctx " ^ print_schema sch
     | SBCtx cP -> print_bctx cP
-    | Block bs -> "|" ^ Rlist.to_string (fun (n, t) -> n ^ " : " ^ print_syn_exp t) bs ^ "|"
-    | TBlock bs -> "|" ^ Rlist.to_string print_syn_exp bs ^ "|"
+    | Block bs -> "|aa" ^ Rlist.to_string (fun (n, t) -> n ^ " : " ^ print_syn_exp t) bs ^ "|"
+    | TBlock bs -> "|bbb" ^ Rlist.to_string print_syn_exp bs ^ "|"
 
   and print_schema = function
-    | Schema expl -> "[" ^ print_block_entries_expl expl ^ "]"
+    | Schema (quant, block) -> "<" ^ print_block_entries_expl quant ^ ">[" ^ print_block_entries_expl block ^ "]"
 
-  and print_block_entry_impl (n, cP, t) = print_name n ^ " : " ^ print_bctx cP ^ " |- " ^ print_syn_exp t
+  (*and print_block_entry_impl (n, cP, t) = print_name n ^ " : " ^ print_bctx cP ^ " |- " ^ print_syn_exp t*)
   and print_block_entry_expl (n, t) = n ^ " : " ^ print_syn_exp t
 
-  and print_block_entries_impl ns = String.concat ", " (List.map print_block_entry_impl ns)
+  (*and print_block_entries_impl ns = String.concat ", " (List.map print_block_entry_impl ns)*)
   and print_block_entries_expl ns = String.concat ", " (List.map print_block_entry_expl ns)
 
   and print_bctx cP =
@@ -279,7 +279,7 @@ module Int = struct
     | Nil -> "0"
     | CtxVar n -> print_name n
     in
-    "{" ^ print cP ^ "}"
+    "{bb" ^ print cP ^ "}"
 
   and print_pi tel t = match tel with
     | [] -> "(Pi[] " ^ print_exp t ^ ")"

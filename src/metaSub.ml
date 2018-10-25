@@ -21,26 +21,31 @@ let lookup_bound_name cP x =
   lookup cP 0
 
 let lookup_bound cP (x, j) =
-  let proj = function
-    | Block bs, Some j' -> snd (Rlist.nth bs j')
-    | t, None -> t
+  let proj x = function
+    | Block bs, Some j' -> 
+      let rec mk_subst = function
+      | n when n = j' -> Shift (x+1)
+      | n -> Dot(mk_subst (n+1), BVar (x, Some n)) 
+      in
+      Clos(snd (Rlist.nth bs j'), mk_subst 0, cP)
+    | t, None -> Clos(t, Shift (x+1), cP)
     | _ -> raise (Error.Error "Projection of something that is not a block.")
   in
   let rec lookup cP0 i =
     match cP0 with
-    | Snoc (_, _, t) when i = 0 -> Clos(proj (t, j), Shift (x+1), cP)
+    | Snoc (_, _, t) when i = 0 -> proj x (t, j)
     | Snoc (cP', _, _) -> lookup cP' (i-1)
     | _ -> raise (Error.Error ("Bound variable had index larger than bound context"))
   in
   lookup cP x
 
 let rec bctx_of_lam_stel (fs : string list) (tel : stel) (cP : bctx) : bctx * stel=
-    match fs, tel with
-    | [], tel' -> cP, tel'
-    | f::fs', (_, _, t)::tel' ->
-       let cP, tel'' = bctx_of_lam_stel fs' tel' cP in
-       Snoc (cP , f, t), tel''
-    | _, [] -> raise (Error.Error ("Too many variables declared in lambda"))
+  match fs, tel with
+  | [], tel' -> cP, tel'
+  | f::fs', (_, _, t)::tel' ->
+    let cP, tel'' = bctx_of_lam_stel fs' tel' cP in
+    Snoc (cP , f, t), tel''
+  | _, [] -> raise (Error.Error ("Too many variables declared in lambda"))
 
 let bctx_of_stel cP tel =
   let rec make = function
@@ -49,27 +54,34 @@ let bctx_of_stel cP tel =
   in
   make (List.rev tel)
 
+let rec bctx_of_quant cP quant =  
+  let rec make = function
+    | [] -> cP
+    | (x, s)::quant' -> Snoc (make quant', x, s)
+  in
+  make quant
+
 let rec bctx_of_ctx_exp = function
   | Snoc(g, x, e) -> Snoc(bctx_of_ctx_exp g, x, e)
   | _ -> Nil
 
 let drop_suffix cP n =
-    let rec drop cP' n' =
-      match cP', n' with
-      | _, 0 -> cP'
-      | Snoc(cP', _, _), n' -> drop cP' (n'-1)
-      | _ -> raise (Error.Error ("Tried to drop " ^ string_of_int n ^ " terms out of " ^ print_bctx cP ^ " which is too short."))
-    in
-    drop cP n
+  let rec drop cP' n' =
+    match cP', n' with
+    | _, 0 -> cP'
+    | Snoc(cP', _, _), n' -> drop cP' (n'-1)
+    | _ -> raise (Error.Error ("Tried to drop " ^ string_of_int n ^ " terms out of " ^ print_bctx cP ^ " which is too short."))
+  in
+  drop cP n
 
- let keep_suffix cP n =
-    let rec keep cP' n' =
-      match cP', n' with
-      | _, 0 -> Nil
-      | Snoc(cP', x, t), n' -> Snoc(keep cP' (n'-1), x, t)
-      | _ -> raise (Error.Error ("Tried to keep " ^ string_of_int n ^ " terms out from " ^ print_bctx cP ^ " which is too short."))
-    in
-    keep cP n
+let keep_suffix cP n =
+  let rec keep cP' n' =
+    match cP', n' with
+    | _, 0 -> Nil
+    | Snoc(cP', x, t), n' -> Snoc(keep cP' (n'-1), x, t)
+    | _ -> raise (Error.Error ("Tried to keep " ^ string_of_int n ^ " terms out from " ^ print_bctx cP ^ " which is too short."))
+  in
+  keep cP n
 
 (* Substitution utilities *)
 
@@ -91,14 +103,14 @@ let drop_suffix cP n =
 
 
 (* let rec comp_pat_subst err s s' = *)
-  (* match s, s' with *)
-  (* | CShift n, CShift n' -> CShift (n + n') *)
-  (* | _, CEmpty -> CEmpty *)
-  (* | CEmpty, CShift _ -> raise (Error.Error err) *)
-  (* | CEmpty, CDot _ -> raise (Error.Error err) *)
-  (* | s, CDot(s', x) -> *)
-  (*    CDot(comp_pat_subst err s s', lookup_pat_subst err x s) *)
-  (* | CDot (s', x), CShift n -> comp_pat_subst err s' (CShift (n-1)) *)
+(* match s, s' with *)
+(* | CShift n, CShift n' -> CShift (n + n') *)
+(* | _, CEmpty -> CEmpty *)
+(* | CEmpty, CShift _ -> raise (Error.Error err) *)
+(* | CEmpty, CDot _ -> raise (Error.Error err) *)
+(* | s, CDot(s', x) -> *)
+(*    CDot(comp_pat_subst err s s', lookup_pat_subst err x s) *)
+(* | CDot (s', x), CShift n -> comp_pat_subst err s' (CShift (n-1)) *)
 
 exception Inv_fail
 
@@ -195,9 +207,9 @@ let apply_inv_subst e s =
     None
 
 let rec psubst_of_pat_subst = function
-| CShift n -> Shift n
-| CEmpty -> Empty
-| CDot (s, i) -> Dot (psubst_of_pat_subst s, BVar i)
+  | CShift n -> Shift n
+  | CEmpty -> Empty
+  | CDot (s, i) -> Dot (psubst_of_pat_subst s, BVar i)
 
 (* Produces cP' such that cP |- s : cP' *)
 let rec shift_cp_inv_pat_subst cP s =

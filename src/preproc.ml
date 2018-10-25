@@ -241,16 +241,17 @@ and pproc_block (s : sign) (cG : ctx) (cP : bctx) (bs : (E.name * E.exp) Rlist.r
   let bs', _ = pproc_block' bs in
   bs'
 
-and pproc_schema (s : sign) (cG : ctx) (cP : bctx) (E.Schema expl : E.schema) : A.schema =
-  let rec pproc_expl cP = function
-    | [] -> []
+and pproc_schema (s : sign) (cG : ctx) (cP : bctx) (E.Schema (quant, block) : E.schema) : A.schema =
+  let rec pproc_part cP = function
+    | [] -> [], cP
     | (x, t)::params ->
        let cP' = [x]::cP in
-       let params' = pproc_expl cP' params in
-       (x, pproc_exp s cG cP t)::params'
+       let params', cP'' = pproc_part cP' params in
+       (x, pproc_exp s cG cP t)::params',  cP''   
   in
-  let expl' = pproc_expl cP expl in
-  A.Schema expl'
+  let quant', cP' = pproc_part cP quant in 
+  let block', _ = pproc_part cP' block in
+  A.Schema (quant', block')
 
 and pproc_comma (s : sign) (cG : ctx) (cP : bctx) (g : E.exp) : bctx * A.exp =
   match content g with
@@ -268,7 +269,7 @@ and pproc_comma (s : sign) (cG : ctx) (cP : bctx) (g : E.exp) : bctx * A.exp =
     | E.Annot (P(_, E.Ident n), e) ->
        [n]::cP', A.Snoc(e1', n, pproc_exp s cG cP' e)
     | _ ->
-       cP', A.Snoc(e1', "_", pproc_exp s cG cP' e2)
+       cP', A.Snoc(e1', Name.gen_string "_", pproc_exp s cG cP' e2)
     end
   | _ -> raise (Error.Error_loc (loc g, "Left hand side of comma should be a context. Instead found: " ^ EP.print_exp g))
 
@@ -352,8 +353,8 @@ and pproc_stel (s : sign) (cG : ctx) (cP : bctx) (e : E.exp) : A.stel * A.exp =
     tel @ tel', t
   | E.Arr (t0, t1)
   | E.SArr (t0, t1) ->
-     let tel, t = pproc_stel s cG (["_"]::cP) t1 in
-     (Syntax.Explicit, "_", pproc_exp s cG cP t0) :: tel , t
+     let tel, t = pproc_stel s cG (["_3223"]::cP) t1 in
+     (Syntax.Explicit, "_asgwq", pproc_exp s cG cP t0) :: tel , t
   | t -> [], pproc_exp s cG cP (ghost t)
 
 and pproc_app (s : sign) (cG : ctx) (cP : bctx) (e : E.exp) : A.exp * A.exp list =
@@ -493,7 +494,7 @@ let rec pproc_pat (s : sign) cG cP p =
   | E.PNil -> A.PNil
   | E.PComma (p1, x, p2) ->
      let x = match x with
-       | None -> "_"
+       | None -> "_2vf23"
        | Some x -> x
      in
      Debug.print(fun () -> "Preprocessing comma\np1 = " ^ EP.print_pat p1 ^ "\np2 = " ^ EP.print_pat p2);

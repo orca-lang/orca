@@ -48,11 +48,11 @@ let args = [("-ext", Arg.Unit set_print_external, "Print external syntax before 
 let execute_code (sign : Syntax.Int.signature) (program : Syntax.Ext.program list) : Syntax.Int.signature =
     Debug.print_string "* The external tree is:";
     Debug.print (fun () -> String.concat "\n"
-        (List.rev (List.map Print.Ext.print_program program)));
+        (List.map Print.Ext.print_program program));
 
     begin if get_print_external() then
       let ext_pp = String.concat "\n"
-        (List.rev (List.map Print.Ext.print_program program))
+        (List.map Print.Ext.print_program program)
       in
       print_string ("The external tree is:\n" ^ ext_pp ^ "\n")
     end;

@@ -7,7 +7,7 @@ open Rlist
 %}
 
 %token DATA CODATA SPEC AND DEF MID AMP RARR COLON SEMICOLON WHERE EQ UNDERSCORE PATTERNWILD CTX
-%token LPAREN RPAREN LCURLY RCURLY LSQUARE RSQUARE
+%token LPAREN RPAREN LCURLY RCURLY LSQUARE RSQUARE LTRIANG RTRIANG
 %token FN LAM APPL
 %token STAR ARR SARR TURNSTILE TTS (* term turnstile *) STT
 %token <int>SET
@@ -153,13 +153,14 @@ raw_simple_exp:
 | NIL {Nil}
 
 schema:
-| e = simple_exp {Schema (["_", e])}
-(* | LCURLY impl=separated_nonempty_list(COMMA, schema_ex) RCURLY e = simple_exp {Schema (impl, ["_", e])} *)
-| LSQUARE expl=separated_nonempty_list(COMMA, schema_ex) RSQUARE {Schema expl}
+| e = simple_exp {Schema ([], ["_anon", e])}
+| LTRIANG quant=separated_nonempty_list(COMMA, schema_ex) RTRIANG e = simple_exp {Schema (quant, ["_anon", e])}
+| LTRIANG quant=separated_nonempty_list(COMMA, schema_ex) RTRIANG LSQUARE block=separated_nonempty_list(COMMA, schema_ex) RSQUARE {Schema (quant,block)}
+| LSQUARE block=separated_nonempty_list(COMMA, schema_ex) RSQUARE {Schema ([],block)}
 
 schema_ex:
-| x=IDENT COLON e=exp_level6 {x,e}
-| e = exp_level6 {"_", e}
+| x=IDENT COLON e=exp_level6 {x,e} 
+| e = exp_level6 {"_anon", e}
 
 simple_pattern:
 | x = IDENT {PIdent x}

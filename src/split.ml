@@ -27,16 +27,16 @@ let rec check_match cD (q : pat) (p : A.pat) =
   match q, p with
   | PVar n, A.PVar m ->
     Debug.print (fun () -> "SPLIT: Checking PVar " ^ print_name n ^ " replacing it with " ^ print_name m);
-          Debug.print(fun () -> "(check_match) Sanitizing cD");
-          let cD_sane = topologic_ctx cD in
+    Debug.print(fun () -> "(check_match) Sanitizing cD");
+    let cD_sane = topologic_ctx cD in
     let cD' = ctx_var_subst (n, m) cD in
-          Debug.print(fun () -> "(check_match) Sanitizing cD'");
-          let cD'_sane = topologic_ctx cD' in
+    Debug.print(fun () -> "(check_match) Sanitizing cD'");
+    let cD'_sane = topologic_ctx cD' in
     Yes (cD', [n,PVar m])
   | PVar n, A.PClos (m, s) -> assert false
   | PVar n, _ -> Yes (cD, [])
   | PConst (n, qs), A.PConst (n', ps) when n = n' ->
-     check_all cD qs ps
+    check_all cD qs ps
   | PConst (n, qs), A.PConst (n', ps) -> No
   | Inacc _, _ -> Yes (cD, [])
   | PBCtx q, _ -> bctx_check_match cD q p
@@ -49,39 +49,39 @@ and syn_check_match cD cP q p =
   | PLam (xs, q), A.PLam (ys, p) ->
     syn_check_match cD (bctx_of_lam_pars cP xs) q p
   | PPar (n, pr), A.PPar (n', pr') when pr = pr'->
-      Debug.print(fun () -> "(syn_check_match) Sanitizing cD");
-          let cD_sane = topologic_ctx cD in
+    Debug.print(fun () -> "(syn_check_match) Sanitizing cD");
+    let cD_sane = topologic_ctx cD in
     let cD' = ctx_var_subst (n, n') cD in
-      Debug.print(fun () -> "(syn_check_match) Sanitizing cD'");
-          let cD'_sane = topologic_ctx cD' in
+    Debug.print(fun () -> "(syn_check_match) Sanitizing cD'");
+    let cD'_sane = topologic_ctx cD' in
     Yes (cD', [n, PTBox (cP, PPar (n', pr))])
   | PPar (n, pr), A.PBVar (i, pr') when pr = pr' -> Yes (cD, [])
   | PUnbox (n, s, cP'), A.PClos (m, s') ->
     Debug.print (fun () -> "Punbox vs pclos: s = " ^ print_pat_subst s ^ ", s' = " ^ print_pat_subst s');
     let cP' = shift_cp_inv_pat_subst cP s' in
     let rec ctx_change = function
-    | [] -> None, []
-    | (n', Box(cP1, t)) :: cD' when n = n' ->
-      begin match apply_inv_pat_subst (psubst_of_pat_subst s) s' with
-      | None -> raise (Error.Error "Unable to apply invers substitution, go figure!")
-      | Some s'' -> Some (n, m), (m, Box(cP', Clos(t, s'', cP1))) :: cD'
-      end
-    | (n', t) :: cD' when n = n' -> raise (Error.Violation "This shouldn't be happening. n' should have box type.")
-    | (n', t) :: cD' -> let b, cD'' = ctx_change cD' in b, (n', t) :: cD''
+      | [] -> None, []
+      | (n', Box(cP1, t)) :: cD' when n = n' ->
+        begin match apply_inv_pat_subst (psubst_of_pat_subst s) s' with
+          | None -> raise (Error.Error "Unable to apply invers substitution, go figure!")
+          | Some s'' -> Some (n, m), (m, Box(cP', Clos(t, s'', cP1))) :: cD'
+        end
+      | (n', t) :: cD' when n = n' -> raise (Error.Violation "This shouldn't be happening. n' should have box type.")
+      | (n', t) :: cD' -> let b, cD'' = ctx_change cD' in b, (n', t) :: cD''
     in
-          Debug.print(fun () -> "(syn_check_match - ctx_change) Sanitizing cD");
-          let cD_sane = topologic_ctx cD in
+    Debug.print(fun () -> "(syn_check_match - ctx_change) Sanitizing cD");
+    let cD_sane = topologic_ctx cD in
     let cD' = match ctx_change cD with
-     | None, cD' -> cD'
-     | Some b, cD' -> ctx_var_subst b cD'
+      | None, cD' -> cD'
+      | Some b, cD' -> ctx_var_subst b cD'
     in
-          Debug.print(fun () -> "(syn_check_match - ctx_change) Sanitizing cD'");
-          let cD'_sane = topologic_ctx cD' in
+    Debug.print(fun () -> "(syn_check_match - ctx_change) Sanitizing cD'");
+    let cD'_sane = topologic_ctx cD' in
     Yes (cD', [n, PTBox(cP, PUnbox (m, s', cP'))])
   | PUnbox (n, s, cP'), A.PBVar i' ->
     begin match apply_inv_pat_subst (BVar i') s with
-    | Some _ -> Yes (cD, [])
-    | None -> No
+      | Some _ -> Yes (cD, [])
+      | None -> No
     end
   | PUnbox (n, s, cP'), _ -> Yes (cD, [])
   | SInacc _, _ -> Yes (cD, [])
@@ -92,12 +92,12 @@ and syn_check_match cD cP q p =
   | PSConst (n, ps), A.PConst (n', qs) -> No
   | PDot (s, q'), A.PDot (s', p') ->
     begin match syn_check_match cD cP s s' with
-    | Yes (cD', sigma) ->
-      begin match syn_check_match cD' cP (simul_syn_psubst cP sigma q') p' with
-      | Yes (cD'', sigma') -> Yes (cD'', sigma' @ sigma)
+      | Yes (cD', sigma) ->
+        begin match syn_check_match cD' cP (simul_syn_psubst cP sigma q') p' with
+          | Yes (cD'', sigma') -> Yes (cD'', sigma' @ sigma)
+          | _ -> No
+        end
       | _ -> No
-      end
-    | _ -> No
     end
   | _, A.PVar n -> Overlap
   | _ -> No
@@ -112,12 +112,12 @@ and check_all cD qs ps =
   match qs, ps with
   | q :: qs, p :: ps ->
     begin match check_match cD q p with
-    | Yes (cD', s) ->
-      begin match check_all cD' (simul_psubst_on_list s qs) ps with
-      | Yes (cD'', s') -> Yes (cD'', s' @ s)
+      | Yes (cD', s) ->
+        begin match check_all cD' (simul_psubst_on_list s qs) ps with
+          | Yes (cD'', s') -> Yes (cD'', s' @ s)
+          | _ -> No
+        end
       | _ -> No
-      end
-    | _ -> No
     end
   | [], _ -> Yes (cD, [])
   | _ -> No  (* maybe we want to raise error/violation here... *)
@@ -125,12 +125,12 @@ and syn_check_all cD cP qs ps =
   match qs, ps with
   | q :: qs, p :: ps ->
     begin match syn_check_match cD cP q p with
-    | Yes (cD', s) ->
-      begin match syn_check_all cD' cP (simul_syn_psubst_on_list cP s qs) ps with
-      | Yes (cD'', s') -> Yes (cD'', s' @ s)
+      | Yes (cD', s) ->
+        begin match syn_check_all cD' cP (simul_syn_psubst_on_list cP s qs) ps with
+          | Yes (cD'', s') -> Yes (cD'', s' @ s)
+          | _ -> No
+        end
       | _ -> No
-      end
-    | _ -> No
     end
   | [], _ -> Yes (cD, [])
   | _ -> No  (* maybe we want to raise error/violation here... *)
@@ -147,8 +147,8 @@ let rec choose_blocking_var (qs : pats) (ps : A.pats) : (name * A.pat * bool) op
   | [], _ -> None
   | q :: qs', p :: ps' ->
     begin match choose_blocking q p with
-    | Some w -> Some w
-    | None -> choose_blocking_var qs' ps'
+      | Some w -> Some w
+      | None -> choose_blocking_var qs' ps'
     end
   | _ -> assert false
 
@@ -157,8 +157,8 @@ and choose_blocking_var_syn (qs : syn_pats) (ps : A.pats) : (name * A.pat * bool
   | [], _ -> None
   | q :: qs', p :: ps' ->
     begin match choose_blocking_syn q p with
-    | Some w -> Some w
-    | None -> choose_blocking_var_syn qs' ps'
+      | Some w -> Some w
+      | None -> choose_blocking_var_syn qs' ps'
     end
   | _ -> assert false
 
@@ -167,12 +167,12 @@ and choose_blocking_syn (q : syn_pat) (p : A.pat) : (name * A.pat * bool) option
   match q, p with
   | PLam (xs, q), A.PLam(ys, p) -> 
     let rec consume_vars xs' ys' = 
-    begin match xs', ys' with
-    | [], [] -> choose_blocking_syn q p
-    | x::xs, y::ys -> consume_vars xs ys
-    | xs, [] -> choose_blocking_syn (PLam (xs, q)) p
-    | _, _ -> raise (Error.Error ("Pattern has lambda abstraction " ^ AP.print_pat (A.PLam (ys, p)) ^ " with a left-hand side longer than expected."))
-    end 
+      begin match xs', ys' with
+        | [], [] -> choose_blocking_syn q p
+        | x::xs, y::ys -> consume_vars xs ys
+        | xs, [] -> choose_blocking_syn (PLam (xs, q)) p
+        | _, _ -> raise (Error.Error ("Pattern has lambda abstraction " ^ AP.print_pat (A.PLam (ys, p)) ^ " with a left-hand side longer than expected."))
+      end 
     in consume_vars xs ys
   | PSConst (c, qs), A.PConst(c', ps) -> choose_blocking_var_syn qs ps
   | PUnbox (n, s, cP), p when is_blocking p -> Some (n, p, false)
@@ -231,10 +231,10 @@ let split_sconst (sign : signature) (cD : ctx) (cP : bctx) (qs : pats)
   in
   let cs' = process cs in
   let rec print_processed = function
-  | [] -> ""
-  | (ts, cD, flex, e, e') :: cs ->
-    print_syn_exp e ^ ",\n" ^
-    print_processed cs
+    | [] -> ""
+    | (ts, cD, flex, e, e') :: cs ->
+      print_syn_exp e ^ ",\n" ^
+      print_processed cs
   in 
   Debug.print (fun () -> "Print processing: " ^ print_processed cs'); cs'
 
@@ -255,9 +255,9 @@ type scheme_in_var
 
 let split_box (sign : signature) (cD : ctx) (qs : pats)
     (n, p : name * A.pat) (cP, t : bctx * syn_exp) =
-    Debug.print (fun () -> "split_box cD = " ^ Pretty.print_ctx cD);
-    Debug.print(fun () -> "Sanitizing cD");
-    let cD_sane = topologic_ctx cD in
+  Debug.print (fun () -> "split_box cD = " ^ Pretty.print_ctx cD);
+  Debug.print(fun () -> "Sanitizing cD");
+  let cD_sane = topologic_ctx cD in
   let splits, sp = match Whnf.rewrite sign cP t with
     | SConst c -> split_sconst sign cD cP qs (n, p) c, []
     | AppL (SConst c, sp) -> split_sconst sign cD cP qs (n, p) c, sp
@@ -275,16 +275,16 @@ let split_box (sign : signature) (cD : ctx) (qs : pats)
       try
         Debug.print (fun () -> "splitbox preuni"); 
         let cD'', sigma = Unify.unify_flex_many_syn (sign, cD') cP flex ts sp in
-          Debug.print (fun () -> "Unification: cD' = " ^ Pretty.print_ctx cD' ^ "\ncD'' = "^ Pretty.print_ctx cD''
-            ^ "\nsigma = "^ print_subst sigma);
-          Debug.print(fun () -> "Sanitizing cD''");
-          let cD''_sane = topologic_ctx cD'' in
-          let psigma = inac_subst sigma in
-          let s = n, TermBox(cP, simul_subst_syn sigma e) in
-          let psigma' = (n, (PTBox (cP, simul_syn_psubst cP psigma p))) :: psigma in
-          let cD''' = ctx_subst s (List.filter (fun (x, _) -> x <> n) cD'') in
-          Debug.print (fun () -> "split_box1 cD''' = " ^ Pretty.print_ctx cD''');
-          Some (cD''', simul_psubst_on_list psigma' qs, s :: sigma) :: unify splits
+        Debug.print (fun () -> "Unification: cD' = " ^ Pretty.print_ctx cD' ^ "\ncD'' = "^ Pretty.print_ctx cD''
+                               ^ "\nsigma = "^ print_subst sigma);
+        Debug.print(fun () -> "Sanitizing cD''");
+        let cD''_sane = topologic_ctx cD'' in
+        let psigma = inac_subst sigma in
+        let s = n, TermBox(cP, simul_subst_syn sigma e) in
+        let psigma' = (n, (PTBox (cP, simul_syn_psubst cP psigma p))) :: psigma in
+        let cD''' = ctx_subst s (List.filter (fun (x, _) -> x <> n) cD'') in
+        Debug.print (fun () -> "split_box1 cD''' = " ^ Pretty.print_ctx cD''');
+        Some (cD''', simul_psubst_on_list psigma' qs, s :: sigma) :: unify splits
       with Unify.Unification_failure msg ->
         Debug.print_string (Unify.print_unification_problem msg);
         None :: unify splits
@@ -293,70 +293,71 @@ let split_box (sign : signature) (cD : ctx) (qs : pats)
     | Nil -> No
     | CtxVar g ->
       begin match lookup_ctx_fail cD g with
-        | Ctx (Schema ([_,t'])) -> (* Schema has a 1-tuple, no projections needed *)
+        | Ctx (Schema ([], [_,t'])) -> (* Schema has a 1-tuple, no projections needed *)
           (* let _tel = impl_to_tel im in *)
           begin try let _ = Unify.unify_syn (sign, cD) cP t (Clos (t', Shift (n+1), CtxVar g))
-                    in Yes
-                with Unify.Unification_failure _ -> No
+              in Yes
+            with Unify.Unification_failure _ -> No
           end
-        | Ctx (Schema ex) ->
-                      let rec find n = function
-                        | [] -> No
-                        | (_, t')::ex' ->
-                           try
-                             let _, sigma = Unify.unify_flex_syn (sign, cD) cP [] t t' in
-                             (* consider that YesBlock may only take a list of terms instead of a block *)
-                             (* aka: we don't want projections on arbitrary terms *)
-                             YesBlock (n, Block(simul_subst_in_expl sigma ex |> Rlist.from_list)) (* possible wrong order *)
-                           with Unify.Unification_failure _ -> find (n+1) ex'
-                      in find 0 ex
+        | Ctx (Schema (quant, block)) ->
+          let block', flex = mk_quant_subst cP quant block in
+          let rec find n = function
+            | [] -> No
+            | (_, t')::block' ->
+              try
+                let _, sigma = Unify.unify_flex_syn (sign, cD) cP flex t t' in
+                (* consider that YesBlock may only take a list of terms instead of a block *)
+                (* aka: we don't want projections on arbitrary terms *)
+                YesBlock (n, Block(simul_subst_in_part sigma block |> Rlist.from_list)) (* possible wrong order *)
+              with Unify.Unification_failure _ -> find (n+1) block'
+          in find 0 block'
 
-                   | _ -> raise (Error.Violation "Admits variable has bctx which is not a context")
-       end
+        | _ -> raise (Error.Violation "Admits variable has bctx which is not a context")
+      end
     | Snoc (cP', _, s) -> try let _ = Unify.unify_syn (sign, cD) cP t (Clos (s, Shift (n+1), cP')) in Yes
-                          with Unify.Unification_failure _ -> admits_variables (n+1) cP'
+      with Unify.Unification_failure _ -> admits_variables (n+1) cP'
   in
   match admits_variables 0 cP with
   | No -> unify splits
   | Yes ->
-     let x = Name.gen_name "X" in
-     Some ((x, Box (cP, t)) :: cD, simul_psubst_on_list [n, PTBox (cP, PPar (x, None))] qs, [n, Var x]) :: unify splits
+    let x = Name.gen_name "X" in
+    Some ((x, Box (cP, t)) :: cD, simul_psubst_on_list [n, PTBox (cP, PPar (x, None))] qs, [n, Var x]) :: unify splits
   | YesBlock  (pr, Block ex) -> 
-     let x = Name.gen_name "X" in
-     Some ((x, Box (cP, t)) :: cD, simul_psubst_on_list [n, PTBox (cP, PPar (x, Some pr))] qs, [n, Var x]) :: unify splits
+    let x = Name.gen_name "X" in
+    Some ((x, Box (cP, t)) :: cD, simul_psubst_on_list [n, PTBox (cP, PPar (x, Some pr))] qs, [n, Var x]) :: unify splits
 
 let get_splits (sign : signature) (cD : ctx) (qs : pats)
-               (n, p : name * A.pat) (c, sp : def_name * exp list)
-    : (ctx * pats * subst) option list =
+    (n, p : name * A.pat) (c, sp : def_name * exp list)
+  : (ctx * pats * subst) option list =
   let splits = split_const sign cD qs (n, p) c in
   let rec unify = function
     | [] -> []
     | (c, ts, cD', flex, e, p) :: splits ->
       Debug.print (fun () -> "Unification of ts = " ^ print_exps ts
-            ^ "\nwith sp = " ^ print_exps sp
-            ^ "\nusing flex = " ^ print_names flex);
+                             ^ "\nwith sp = " ^ print_exps sp
+                             ^ "\nusing flex = " ^ print_names flex);
       try let cD'', sigma = Unify.unify_flex_many (sign, cD') flex ts sp in
-          Debug.print (fun () -> "Resulting Unification "
-            ^ "moves context cD' = " ^ print_ctx cD'
-            ^ "\nto context " ^ print_ctx cD''
-            ^ "\nusing substitution " ^ print_subst sigma);
-          let psigma = inac_subst sigma in
-          let s = n, simul_subst sigma e in
-          let psigma' = (n, simul_psubst psigma p) :: psigma in
-          let cD''' = ctx_subst s (List.filter (fun (x, _) -> x <> n) cD'') in
-          Debug.print (fun () -> "Final subst is " ^ print_subst (s :: sigma));
-          Some (cD''', simul_psubst_on_list psigma' qs, s :: sigma) :: unify splits
+        Debug.print (fun () -> "Resulting Unification "
+                               ^ "moves context cD' = " ^ print_ctx cD'
+                               ^ "\nto context " ^ print_ctx cD''
+                               ^ "\nusing substitution " ^ print_subst sigma);
+        let psigma = inac_subst sigma in
+        let s = n, simul_subst sigma e in
+        let psigma' = (n, simul_psubst psigma p) :: psigma in
+        let cD''' = ctx_subst s (List.filter (fun (x, _) -> x <> n) cD'') in
+        Debug.print (fun () -> "Final subst is " ^ print_subst (s :: sigma));
+        Some (cD''', simul_psubst_on_list psigma' qs, s :: sigma) :: unify splits
       with Unify.Unification_failure msg ->
         Debug.print (fun () -> "Splitting on constructor " ^ c
-          ^ " resulted in unification failure\n"
-          ^ Unify.print_unification_problem msg);
+                               ^ " resulted in unification failure\n"
+                               ^ Unify.print_unification_problem msg);
         None :: unify splits
   in
   unify splits
 
 let split_ppar (sign : signature) (cD : ctx) (qs : pats)
-               (n , p : name * index) (t : exp)
-              : (ctx * pats * subst) option list = assert false
+    (n , p : name * index) (t : exp)
+  : (ctx * pats * subst) option list = assert false
 (* This case will be used to split on parameter variables to produce
    corresponding cases with bound variables (to continue uncomment
    the final lines in schema.kw) *)
@@ -368,12 +369,12 @@ let split_ppar (sign : signature) (cD : ctx) (qs : pats)
 
    cD' |- sigma' cD
    . |- ps => cD'
- *)
+*)
 let rec split (sign : signature) (cD : ctx) (qs : pats) (over : (ctx * psubst) matching)
     (ps, rhs : A.pats * A.rhs) (t : exp) : split_tree =
   Debug.print(fun () -> "Splitting qs = " ^ Pretty.print_pats cD qs
-    ^ "\nagainst ps = " ^ AP.print_pats ps
-    ^ "\ncontext is " ^ Pretty.print_ctx cD);
+                        ^ "\nagainst ps = " ^ AP.print_pats ps
+                        ^ "\ncontext is " ^ Pretty.print_ctx cD);
   match choose_blocking_var qs ps with
   | None ->
     (* Checking if we are done with patterns or if we could introduce
@@ -409,7 +410,7 @@ let rec split (sign : signature) (cD : ctx) (qs : pats) (over : (ctx * psubst) m
         Debug.indent ();
         let rhs' = match rhs with
           | A.Just e ->
-             Just (Recon.check (sign, cD') e (simul_subst sigma' t))
+            Just (Recon.check (sign, cD') e (simul_subst sigma' t))
           | A.Impossible n -> Impossible n (* Need to check if actually impossible *)
         in
         Debug.deindent ();
@@ -424,24 +425,24 @@ let rec split (sign : signature) (cD : ctx) (qs : pats) (over : (ctx * psubst) m
         Debug.print (fun () -> "split1 cD' = " ^ Pretty.print_ctx cD');
         let over' = check_all cD' qs' ps in
         begin match over' with
-        | Yes (cD'', sigma) ->
-          Debug.print (fun () -> "split1 cD'' = " ^ Pretty.print_ctx cD'' ^ "\nqs' = " ^ Pretty.print_pats cD'' (simul_psubst_on_list sigma qs'));
-          Some (split sign cD'' (simul_psubst_on_list sigma qs') over' (ps, rhs)
-                      (simul_subst (subst_of_psubst sigma) (simul_subst sigma' t)))
-        | _ ->
-          Some (Incomplete (cD', qs',  simul_subst sigma' t))
+          | Yes (cD'', sigma) ->
+            Debug.print (fun () -> "split1 cD'' = " ^ Pretty.print_ctx cD'' ^ "\nqs' = " ^ Pretty.print_pats cD'' (simul_psubst_on_list sigma qs'));
+            Some (split sign cD'' (simul_psubst_on_list sigma qs') over' (ps, rhs)
+                    (simul_subst (subst_of_psubst sigma) (simul_subst sigma' t)))
+          | _ ->
+            Some (Incomplete (cD', qs',  simul_subst sigma' t))
         end
     in
     let t = try List.assoc n cD
       with Not_found -> raise (Error.Violation ("Pattern " ^ print_pats qs
-        ^ " has name not in context " ^ print_ctx cD))
+                                                ^ " has name not in context " ^ print_ctx cD))
     in
     let splits =
-    if refine then
-      let A.PBVar i = p in
-      split_ppar sign cD qs (n, i) t
-    else
-      match Whnf.whnf sign t with
+      if refine then
+        let A.PBVar i = p in
+        split_ppar sign cD qs (n, i) t
+      else
+        match Whnf.whnf sign t with
         | Box(cP, t) -> split_box sign cD qs (n, p) (cP, t)
         | Const c -> get_splits sign cD qs (n, p) (c, [])
         | App (Const c, sp) -> get_splits sign cD qs (n, p) (c, sp)
@@ -450,7 +451,7 @@ let rec split (sign : signature) (cD : ctx) (qs : pats) (over : (ctx * psubst) m
     Debug.deindent ();
     Debug.print (fun () -> "split1 cD = " ^ Pretty.print_ctx cD ^ "\n qs = "^ Pretty.print_pats cD qs);
     let tr = List.fold_right (function None -> fun l -> l | (Some tr) -> fun l -> tr :: l)
-                             (List.map f splits) []
+        (List.map f splits) []
     in
     if tr = [] then
       raise (Error.Error ("Split on variable " ^ print_name n ^ " resulted in no branches from " ^ print_pats qs))
@@ -464,36 +465,36 @@ let rec navigate (sign : signature) (tr : split_tree) (ps, rhs : A.pats * A.rhs)
   | Incomplete (cD, qs, t) ->
     Debug.print (fun () -> "nav1 cD = " ^ Pretty.print_ctx cD);
     Debug.print(fun () -> "(nav) Sanitizing cD");
-          let cD_sane = topologic_ctx cD in
+    let cD_sane = topologic_ctx cD in
     let over = check_all cD qs ps in
     begin match over with
-    | Yes (cD', sigma) -> 
-      Debug.print(fun () -> "(nav) Sanitizing cD'");
-          let cD'_sane = topologic_ctx cD' in
-      Debug.print (fun () -> "nav1 cD' = " ^ Pretty.print_ctx cD');
-      split sign cD' (simul_psubst_on_list sigma qs) over (ps, rhs) (simul_subst (subst_of_psubst sigma) t)
-    | _ -> raise Backtrack
+      | Yes (cD', sigma) -> 
+        Debug.print(fun () -> "(nav) Sanitizing cD'");
+        let cD'_sane = topologic_ctx cD' in
+        Debug.print (fun () -> "nav1 cD' = " ^ Pretty.print_ctx cD');
+        split sign cD' (simul_psubst_on_list sigma qs) over (ps, rhs) (simul_subst (subst_of_psubst sigma) t)
+      | _ -> raise Backtrack
     end
   | Node (cD, qs, t, n, tr') ->
     Debug.print (fun () -> "nav2 cD = " ^ Pretty.print_ctx cD);
     let over = check_all cD qs ps in
     begin match over with
-    | Yes (cD', sigma) ->
-      Debug.print (fun () -> "nav2 cD' = " ^ Pretty.print_ctx cD');
-      let rec f = function
-        | [] -> raise Backtrack
-        | tr :: trs ->
-          try navigate sign tr (ps, rhs) :: trs
-          with Backtrack -> tr :: f trs
-      in Node (cD', simul_psubst_on_list sigma qs, simul_subst (subst_of_psubst sigma) t, n, f tr')
-    | _ -> raise Backtrack
+      | Yes (cD', sigma) ->
+        Debug.print (fun () -> "nav2 cD' = " ^ Pretty.print_ctx cD');
+        let rec f = function
+          | [] -> raise Backtrack
+          | tr :: trs ->
+            try navigate sign tr (ps, rhs) :: trs
+            with Backtrack -> tr :: f trs
+        in Node (cD', simul_psubst_on_list sigma qs, simul_subst (subst_of_psubst sigma) t, n, f tr')
+      | _ -> raise Backtrack
     end
   | Leaf (cD, qs, _, _) ->
     begin match check_all cD qs ps with
-    | Yes _ ->
-      raise (Error.Error ("Branch " ^ AP.print_pats ps ^ " cannot be reached."))
-    | _ ->
-      raise Backtrack
+      | Yes _ ->
+        raise (Error.Error ("Branch " ^ AP.print_pats ps ^ " cannot be reached."))
+      | _ ->
+        raise Backtrack
     end
 
 let check_clauses (sign : signature) (f : def_name) (t : exp) (ds : A.pat_decls) : signature_entry * split_tree =
@@ -503,7 +504,7 @@ let check_clauses (sign : signature) (f : def_name) (t : exp) (ds : A.pat_decls)
   let sign' =  (PSplit (f, t, None)) :: sign in
   let nav tr (ps, rhs) =
     Debug.print (fun () -> "Navigating through patterns " ^ AP.print_pats ps
-      ^ "\nusing tree " ^ print_tree tr);
+                           ^ "\nusing tree " ^ print_tree tr);
     try navigate sign' tr (ps, rhs)
     with Backtrack ->
       raise (Error.Error ("Branch: " ^ AP.print_pats ps

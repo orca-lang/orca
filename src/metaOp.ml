@@ -23,7 +23,7 @@ let rec fv cG =
   | Box (ctx, e) -> fv_ctx cG ctx @ fv_syn cG e
   | TermBox (ctx, e) -> fv_ctx cG ctx @ fv_syn cG e
   | Fn (xs, e) ->
-     List.fold_left (fun vars x -> vars -- x) (fv e) xs
+    List.fold_left (fun vars x -> vars -- x) (fv e) xs
   | App (e1, es) -> fv e1 @ List.concat (List.map fv es)
   | Const n -> []
   | Var n when in_ctx n cG -> []
@@ -47,13 +47,14 @@ and fv_syn cG =
   | Dot (e1, e2) -> fvs e1 @ fvs e2
   | ShiftS (_, e) -> fvs e
   | Unbox (e, s, cP) ->
-     fv cG e @ fvs s @ fv_ctx cG cP
+    fv cG e @ fvs s @ fv_ctx cG cP
   | SBCtx cP -> fv_ctx cG cP
   | SCtx sch -> fv_schema cG sch
   | Block block -> List.concat (Rlist.mapl (fun (_, t) -> fvs t) block)
 
 and fv_schema cG = function
-  | Schema expl -> List.concat (List.map (fun (_, t) -> fv_syn cG t) expl)
+  | Schema (quant,block) -> List.concat (List.map (fun (_, t) -> fv_syn cG t) quant) 
+                            @ List.concat (List.map (fun (_, t) -> fv_syn cG t) block)
 
 and fv_ctx cG = function
   | Nil -> []
@@ -87,17 +88,17 @@ let rec refresh_exp (rep : (name * name) list) : exp -> exp =
   | TermBox (cP, e) -> TermBox(refresh_bctx rep cP, refresh_syn_exp rep e)
   | BCtx cP -> BCtx (refresh_bctx rep cP)
   | Fn (xs, e) ->
-     let xs' = List.map refresh_name xs in
-     let extra = List.map2 (fun x y -> x, y) xs xs' in
-     Fn (xs', refresh_exp (extra @ rep) e)
+    let xs' = List.map refresh_name xs in
+    let extra = List.map2 (fun x y -> x, y) xs xs' in
+    Fn (xs', refresh_exp (extra @ rep) e)
   | App (e1, es) -> App(f e1, List.map f es)
   | Const n -> Const n
   | Var n ->
-     begin try
-         Var (List.assoc n rep)
-       with
-         Not_found -> Var n
-     end
+    begin try
+        Var (List.assoc n rep)
+      with
+        Not_found -> Var n
+    end
   | Annot (e1, e2) -> Annot(f e1, f e2)
   | Hole s -> Hole s
 
@@ -108,7 +109,7 @@ and refresh_syn_exp rep =
   | SCtx sch -> SCtx (refresh_schema rep sch)
   | SPi (tel, t) -> let tel', t' = refresh_stel rep tel t in SPi(tel', t')
   | Lam (x, e) ->
-     Lam(x, f e)
+    Lam(x, f e)
   | AppL (e1, es) -> AppL(f e1, List.map f es)
   | SConst n -> SConst n
   | BVar i -> BVar i
@@ -122,35 +123,35 @@ and refresh_syn_exp rep =
   | SBCtx cP -> SBCtx (refresh_bctx rep cP)
   | Block bs -> Block (Rlist.map (fun (n, t) -> (n, f t)) bs)
 
-and refresh_schema rep (Schema ex) =
+and refresh_schema rep (Schema (quant,block)) =
   let f (n, t) = (n, refresh_syn_exp rep t) in
-  Schema (List.map f ex)
+  Schema (List.map f quant, List.map f block)
 
 and refresh_bctx (rep : (name * name) list) : bctx -> bctx =
   function
   | Snoc (cP, x, e) -> Snoc (refresh_bctx rep cP, x, refresh_syn_exp rep e)
   | Nil -> Nil
   | CtxVar n ->
-     begin try
-         CtxVar (List.assoc n rep)
-       with
-         Not_found -> CtxVar n
-     end
+    begin try
+        CtxVar (List.assoc n rep)
+      with
+        Not_found -> CtxVar n
+    end
 
 and refresh_tel (rep : (name * name) list) (tel : tel) (t : exp) : tel * exp =
   match tel with
   | [] -> [], refresh_exp rep t
   | (i, n, e) :: tel ->
-     let n' = refresh_name n in
-     let tel', t' = refresh_tel ((n, n')::rep) tel t in
-     ((i, n', refresh_exp rep e)::tel'), t'
+    let n' = refresh_name n in
+    let tel', t' = refresh_tel ((n, n')::rep) tel t in
+    ((i, n', refresh_exp rep e)::tel'), t'
 
 and refresh_stel (rep : (name * name) list) (tel : stel) (t : syn_exp) : stel * syn_exp =
   match tel with
   | [] -> [], refresh_syn_exp rep t
   | (i, n, e) :: tel ->
-     let tel', t' = refresh_stel rep tel t in
-     ((i, n, refresh_syn_exp rep e)::tel'), t'
+    let tel', t' = refresh_stel rep tel t in
+    ((i, n, refresh_syn_exp rep e)::tel'), t'
 
 let refresh (e : exp) : exp = refresh_exp [] e
 
@@ -161,8 +162,8 @@ let rec refresh_free_var (x , y : name * name) (e : exp) : exp =
   | Set n -> Set n
   | Ctx sch -> Ctx (refresh_free_var_schema (x, y) sch)
   | Pi (tel, t) ->
-     let tel', t' = refresh_free_var_tel (x, y) tel t in
-     Pi (tel', t')
+    let tel', t' = refresh_free_var_tel (x, y) tel t in
+    Pi (tel', t')
   | Box (cP, e) -> Box(refresh_free_var_bctx (x, y) cP, refresh_free_var_syn (x, y) e)
   | TermBox (cP, e) -> TermBox(refresh_free_var_bctx (x, y) cP, refresh_free_var_syn (x, y) e)
   | BCtx cP -> BCtx (refresh_free_var_bctx (x, y) cP)
@@ -181,8 +182,8 @@ and refresh_free_var_syn (x, y) e =
   | Star -> Star
   | SCtx sch -> SCtx (refresh_free_var_schema (x, y) sch)
   | SPi (tel, t) ->
-     let tel', t' = refresh_free_var_stel (x, y) tel t in
-     SPi (tel', t')
+    let tel', t' = refresh_free_var_stel (x, y) tel t in
+    SPi (tel', t')
   | Lam (x, e) -> Lam(x, f e)
   | AppL (e1, es) -> AppL(f e1, List.map f es)
   | BVar i -> BVar i
@@ -197,9 +198,9 @@ and refresh_free_var_syn (x, y) e =
   | SBCtx cP -> SBCtx (refresh_free_var_bctx (x, y) cP)
   | Block cs -> Block (Rlist.map (fun (z, e) -> (z, f e)) cs) (* z has to be free *)
 
-and refresh_free_var_schema (x, y as rep) (Schema ex) =
+and refresh_free_var_schema (x, y as rep) (Schema (quant, block)) =
   let g (n, t) = (n, refresh_free_var_syn rep t) in
-  Schema (List.map g ex)
+  Schema (List.map g quant, List.map g block)
 
 and refresh_free_var_bctx (x, y) cP =
   match cP with
@@ -213,14 +214,14 @@ and refresh_free_var_tel (x, y) tel t =
   | [] -> [], refresh_free_var (x, y) t
   | (i, n, e) :: tel when n = x ->  raise (Error.Violation "Duplicate variable name")
   | (i, n, e) :: tel ->
-     let tel', t' = refresh_free_var_tel (x, y) tel t in
-     (i, n, refresh_free_var (x, y) e) :: tel', t'
+    let tel', t' = refresh_free_var_tel (x, y) tel t in
+    (i, n, refresh_free_var (x, y) e) :: tel', t'
 and refresh_free_var_stel (x, y) tel t =
   match tel with
   | [] -> [], refresh_free_var_syn (x, y) t
   | (i, n, e) :: tel ->
-     let tel', t' = refresh_free_var_stel (x, y) tel t in
-     (i, n, refresh_free_var_syn (x, y) e) :: tel', t'
+    let tel', t' = refresh_free_var_stel (x, y) tel t in
+    (i, n, refresh_free_var_syn (x, y) e) :: tel', t'
 
 
 let refresh_free_vars (rep : (name * name) list) e =
@@ -238,18 +239,18 @@ let rec subst (x, es : single_subst) (e : exp) :  exp =
   | Set n -> Set n
   | Ctx sch -> Ctx (sub_schema (x, es) sch)
   | Pi (tel, t) ->
-     let tel', t' = subst_pi (x, es) tel t in
-     Pi(tel', t')
+    let tel', t' = subst_pi (x, es) tel t in
+    Pi(tel', t')
   | Box (ctx, e) -> Box(subst_bctx (x, es) ctx, subst_syn (x, es) e)
   | TermBox (ctx, e) -> TermBox(subst_bctx (x, es) ctx, subst_syn (x, es) e)
   | BCtx cP -> BCtx(subst_bctx (x, es) cP)
   | Fn (ys, e) ->
-     let ys' = List.map refresh_name ys in
-     (* the following cannot happen because y' is just fresh *)
-     (* if List.mem y' (fv es) then raise (Error.Violation
+    let ys' = List.map refresh_name ys in
+    (* the following cannot happen because y' is just fresh *)
+    (* if List.mem y' (fv es) then raise (Error.Violation
        "Duplicate variable name would be captured.") ; *)
-     let extra = List.map2 (fun x y -> x, y) ys ys' in
-     Fn(ys', subst (x, es) (refresh_free_vars extra e))
+    let extra = List.map2 (fun x y -> x, y) ys ys' in
+    Fn(ys', subst (x, es) (refresh_free_vars extra e))
 
   | App (e1, es) -> App(f e1, List.map f es)
   | Const n -> Const n
@@ -258,9 +259,9 @@ let rec subst (x, es : single_subst) (e : exp) :  exp =
   | Annot (e1, e2) -> Annot(f e1, f e2)
   | Hole s -> Hole s
 
-and sub_schema s (Schema ex) =
+and sub_schema s (Schema (quant, block)) =
   let g (n, e) = (n, subst_syn s e) in
-  Schema (List.map g ex)
+  Schema (List.map g quant, List.map g block)
 
 and subst_syn (x, es) e =
   let f e = subst_syn (x, es) e in
@@ -268,8 +269,8 @@ and subst_syn (x, es) e =
   | Star -> Star
   | SCtx sch -> SCtx (sub_schema (x, es) sch)
   | SPi (tel, t) ->
-     let tel', t' = subst_spi (x, es) tel t in
-     SPi(tel', t')
+    let tel', t' = subst_spi (x, es) tel t in
+    SPi(tel', t')
   | Lam (x, e) -> Lam(x, f e)
   | AppL (e1, es) -> AppL(f e1, List.map f es)
   | SConst n -> SConst n
@@ -289,11 +290,11 @@ and subst_bctx (x, es : single_subst) cP =
   | Snoc (e1, y, e2) -> Snoc (subst_bctx (x, es) e1, y, subst_syn (x, es) e2)
   | Nil -> Nil
   | CtxVar n when x = n ->
-     begin match es with
-     | BCtx cP -> refresh_bctx [] cP
-     | Var y -> CtxVar y
-     | e -> raise (Error.Violation ("I don't believe you! " ^ print_exp e))
-     end
+    begin match es with
+      | BCtx cP -> refresh_bctx [] cP
+      | Var y -> CtxVar y
+      | e -> raise (Error.Violation ("I don't believe you! " ^ print_exp e))
+    end
   | CtxVar n -> CtxVar n
 
 and subst_block (x, es : single_subst) cP =
@@ -305,18 +306,18 @@ and subst_pi (x, es) tel t =
   match tel with
   | [] -> [], subst (x, es) t
   | (i, n, e) :: tel ->
-     let n' = refresh_name n in
-     (* the following cannot happen because n' is just fresh *)
-     (* if List.mem n' (fv es) then raise (Error.Violation "Duplicate variable name would be captured.") ; *)
-     let tel', t' = refresh_free_var_tel (n, n') tel t in
-     let tel'', t'' = subst_pi (x, es) tel' t' in
-     (i, n', subst (x, es) e) :: tel'', t''
+    let n' = refresh_name n in
+    (* the following cannot happen because n' is just fresh *)
+    (* if List.mem n' (fv es) then raise (Error.Violation "Duplicate variable name would be captured.") ; *)
+    let tel', t' = refresh_free_var_tel (n, n') tel t in
+    let tel'', t'' = subst_pi (x, es) tel' t' in
+    (i, n', subst (x, es) e) :: tel'', t''
 and subst_spi (x, es) tel t =
   match tel with
   | [] -> [], subst_syn (x, es) t
   | (i, n, e) :: tel ->
-     let tel', t' = subst_spi (x, es) tel t in
-     (i, n, subst_syn (x, es) e) :: tel', t'
+    let tel', t' = subst_spi (x, es) tel t in
+    (i, n, subst_syn (x, es) e) :: tel', t'
 
 let simul_subst sigma e =
   List.fold_left (fun e s -> subst s e) e sigma
@@ -371,32 +372,32 @@ let punbox_list_of_tel cP : tel -> syn_pat list = List.map (fun (_, x, _) -> PUn
 (* Re-orders variables to satisfy dependencies *)
 (* TODO have a nicer algorithm *)
 let topologic_ctx (cG0 : ctx) : ctx =
-let rec topo cG cD acc =
-  match cG with
-  | [] -> cD, acc
-  | (x, t) :: cG -> 
-    if fv cD t = [] then
-      topo cG ((x, t) :: cD) acc
-    else
-      topo cG cD ((x, t) :: acc)  
-in
-let rec tries cD cG = 
-  let cD', cG' = topo cG cD [] in
-  if cG' = [] then
-    cD'
-  else if List.length cD < List.length cD' then
-    tries cD' cG'
-  else 
-    raise (Error.Error ("No topological order found for context\n" ^ Pretty.print_ctx cG0 ^ "\n Leftover variables are\n" ^ Pretty.print_ctx cG'))
-in tries [] cG0
+  let rec topo cG cD acc =
+    match cG with
+    | [] -> cD, acc
+    | (x, t) :: cG -> 
+      if fv cD t = [] then
+        topo cG ((x, t) :: cD) acc
+      else
+        topo cG cD ((x, t) :: acc)  
+  in
+  let rec tries cD cG = 
+    let cD', cG' = topo cG cD [] in
+    if cG' = [] then
+      cD'
+    else if List.length cD < List.length cD' then
+      tries cD' cG'
+    else 
+      raise (Error.Error ("No topological order found for context\n" ^ Pretty.print_ctx cG0 ^ "\n Leftover variables are\n" ^ Pretty.print_ctx cG'))
+  in tries [] cG0
 
 let ctx_subst s cG =
-let rec ctx_subst s = function
-  | (x, t) :: cG -> (x, subst s t) :: (ctx_subst s cG)
-  | [] -> []
-in
-let cG' = ctx_subst s cG in
-topologic_ctx cG'    
+  let rec ctx_subst s = function
+    | (x, t) :: cG -> (x, subst s t) :: (ctx_subst s cG)
+    | [] -> []
+  in
+  let cG' = ctx_subst s cG in
+  topologic_ctx cG'    
 
 let ctx_var_subst (x, y) cG =
   let rec replace_var_in_subst (x, y) = function
@@ -415,7 +416,7 @@ let shift_subst_by_ctx sigma cG =
   sigma'
 
 let simul_subst_on_ctx sigma =
-    List.map (fun (x, e) -> x, simul_subst sigma e)
+  List.map (fun (x, e) -> x, simul_subst sigma e)
 
 let lookup_ctx cG n =
   try
@@ -434,9 +435,9 @@ let rec rename_ctx_using_subst (cG : ctx) (sigma : subst) =
   match cG with
   | [] -> []
   | (x, t) :: cG' ->
-     match lookup_ctx sigma x with
-     | Some (Var y) -> (y, t) :: (rename_ctx_using_subst cG' sigma)
-     | _ -> (x, t) :: (rename_ctx_using_subst cG' sigma)
+    match lookup_ctx sigma x with
+    | Some (Var y) -> (y, t) :: (rename_ctx_using_subst cG' sigma)
+    | _ -> (x, t) :: (rename_ctx_using_subst cG' sigma)
 
 let print_subst sigma = "[" ^ String.concat ", " (List.map (fun (x, e) -> print_exp e ^ "/" ^ print_name x) sigma) ^ "]"
 
@@ -470,7 +471,7 @@ let rec comp_pat_subst err s s' =
   | CEmpty, CShift _ -> raise (Error.Error err)
   | CEmpty, CDot _ -> raise (Error.Error err)
   | s, CDot(s', x) ->
-     CDot(comp_pat_subst err s s', lookup_pat_subst err x s)
+    CDot(comp_pat_subst err s s', lookup_pat_subst err x s)
   | CDot (s', x), CShift n -> comp_pat_subst err s' (CShift (n-1))
 
 type single_psubst = name * pat
@@ -484,48 +485,48 @@ let rec psubst (x, p') = function
   | PBCtx cP -> PBCtx (bctx_psubst (x, p') cP)
   | PUnder -> PUnder
   | PTBox (cP, p) -> let cP' = subst_bctx (x, exp_of_pat p') cP in
-                       PTBox (cP', syn_psubst cP' (x, p') p)
+    PTBox (cP', syn_psubst cP' (x, p') p)
 and syn_psubst cP (x, p') = function
   | PBVar i -> PBVar i
   | PLam (xs, p) -> PLam (xs, syn_psubst (bctx_of_lam_pars cP xs) (x, p') p) (* What about shifts in p'? *)
   | PSConst (n, ps) -> PSConst (n, List.map (syn_psubst cP (x, p')) ps)
   | PUnbox (n, s, cP') when n = x ->
-     begin match p' with
-       | PVar m -> PUnbox (m, s, cP')
-       | Inacc e -> SInacc (e, s, cP')
-       | PTBox (cP'', q) ->  (* cP' should be equal to cP'' *)
-          let rec push_unbox (s, cP') = function
-            | PBVar i ->
-               PBVar (lookup_pat_subst ("Expected term " ^ print_syn_pat q ^ " to be closed") i s)
-            | PLam (xs , p) -> PLam(xs, push_unbox (wkn_pat_subst_by_n s (List.length xs), bctx_of_lam_pars cP' xs) p)
-            | PSConst (n,ps) -> PSConst (n, List.map (push_unbox (s, cP')) ps)
-            | PUnbox (m, s', cP'') ->
-               PUnbox (m, comp_pat_subst ("Mismatching substitution from term " ^ print_syn_pat q) s s', cP'')
-            | SInacc (e, s', cP'') ->
-               SInacc (e, comp_pat_subst ("Mismatching substitution from term " ^ print_syn_pat q) s s', cP'')
-            | PEmpty  -> PEmpty
-            | PShift n ->
-               let rec comp s n =
-                 match s, n with
-                 | _, 0 ->
-                    let rec convert = function
-                      | CEmpty -> PEmpty
-                      | CShift n -> PShift n
-                      | CDot (s, i) -> PDot (convert s, PBVar i)
-                    in
-                    convert s
-                 | CDot (s', _), _ -> comp s' (n-1)
-                 | CShift n', _ -> PShift (n+n')
-                 | CEmpty, _ -> raise (Error.Error ("Empty substitution applied to a shift."))
-               in
-               comp s n
-            | PDot (sigma, p) -> PDot (push_unbox (s, cP') sigma, push_unbox (s, cP') p)
-            | PPar (n, pr) -> PPar (n, pr)
+    begin match p' with
+      | PVar m -> PUnbox (m, s, cP')
+      | Inacc e -> SInacc (e, s, cP')
+      | PTBox (cP'', q) ->  (* cP' should be equal to cP'' *)
+        let rec push_unbox (s, cP') = function
+          | PBVar i ->
+            PBVar (lookup_pat_subst ("Expected term " ^ print_syn_pat q ^ " to be closed") i s)
+          | PLam (xs , p) -> PLam(xs, push_unbox (wkn_pat_subst_by_n s (List.length xs), bctx_of_lam_pars cP' xs) p)
+          | PSConst (n,ps) -> PSConst (n, List.map (push_unbox (s, cP')) ps)
+          | PUnbox (m, s', cP'') ->
+            PUnbox (m, comp_pat_subst ("Mismatching substitution from term " ^ print_syn_pat q) s s', cP'')
+          | SInacc (e, s', cP'') ->
+            SInacc (e, comp_pat_subst ("Mismatching substitution from term " ^ print_syn_pat q) s s', cP'')
+          | PEmpty  -> PEmpty
+          | PShift n ->
+            let rec comp s n =
+              match s, n with
+              | _, 0 ->
+                let rec convert = function
+                  | CEmpty -> PEmpty
+                  | CShift n -> PShift n
+                  | CDot (s, i) -> PDot (convert s, PBVar i)
+                in
+                convert s
+              | CDot (s', _), _ -> comp s' (n-1)
+              | CShift n', _ -> PShift (n+n')
+              | CEmpty, _ -> raise (Error.Error ("Empty substitution applied to a shift."))
+            in
+            comp s n
+          | PDot (sigma, p) -> PDot (push_unbox (s, cP') sigma, push_unbox (s, cP') p)
+          | PPar (n, pr) -> PPar (n, pr)
 
-          in
-          push_unbox (s, cP') q
-       | _ -> assert false
-     end
+        in
+        push_unbox (s, cP') q
+      | _ -> assert false
+    end
   | PUnbox (n, s, cP) -> PUnbox (n, s, cP)
   | SInacc (e, s, cP) -> SInacc (subst (x, exp_of_pat p') e, s, cP)
   | PEmpty -> PEmpty
@@ -533,10 +534,10 @@ and syn_psubst cP (x, p') = function
   | PDot (s, p) -> PDot (syn_psubst cP (x, p') s, syn_psubst cP (x, p') p)
   | PPar (n, None) when n = x ->
     begin match p' with
-    | PVar m -> PUnbox (m, pid_sub, cP)
-    | Inacc e -> SInacc (e, pid_sub, cP)
-    | PTBox (cP', PPar (m, pr)) -> PPar (m, pr) (* MMMMMMMM *)
-    | _ -> assert false
+      | PVar m -> PUnbox (m, pid_sub, cP)
+      | Inacc e -> SInacc (e, pid_sub, cP)
+      | PTBox (cP', PPar (m, pr)) -> PPar (m, pr) (* MMMMMMMM *)
+      | _ -> assert false
     end
   | PPar (n, Some _) when n = x -> assert false
   | PPar (n , pr) -> PPar (n, pr)
@@ -546,11 +547,11 @@ and bctx_psubst (x, p') = function
   | PNil -> PNil
   | PSnoc (cP, s, t) -> PSnoc (bctx_psubst (x, p') cP, s, subst_syn (x, exp_of_pat p') t)
   | PCtxVar n when n = x ->
-     begin match p' with
-     | PBCtx p -> p
-     | PVar m -> PCtxVar m
-     | _ -> raise (Error.Violation ("Why not?" ^ print_pat p'))
-     end
+    begin match p' with
+      | PBCtx p -> p
+      | PVar m -> PCtxVar m
+      | _ -> raise (Error.Violation ("Why not?" ^ print_pat p'))
+    end
   | PCtxVar n -> PCtxVar n
 
 let rec compose_single_with_psubst s = function
@@ -610,14 +611,14 @@ and rename_syn (q : syn_pat) (p : Apx.pat) : (name * name) list =
   | PUnbox(n, s, cP), Apx.Inacc(Apx.Var m) -> [n, m]
   | _, Apx.PWildcard -> []
   | SInacc (e, s, cP), Apx.PVar m ->
-     let rec dig = function
-       | Var n -> [n, m]
-       | TermBox (_, Unbox(e', _, _)) -> dig e'
-       | _ -> raise (Error.Violation "Digging failed")
-     in
-     dig e
+    let rec dig = function
+      | Var n -> [n, m]
+      | TermBox (_, Unbox(e', _, _)) -> dig e'
+      | _ -> raise (Error.Violation "Digging failed")
+    in
+    dig e
   | _ -> raise (Error.Violation ("1. Renaming of tree node expects matching pattern with tree node\nq = "
-                                   ^ print_syn_pat q ^ "\np = " ^ Print.Apx.print_pat p))
+                                 ^ print_syn_pat q ^ "\np = " ^ Print.Apx.print_pat p))
 
 and rename_all (qs : pats) (ps : Apx.pats) : (name * name) list = List.concat (List.map2 rename qs ps)
 
@@ -630,8 +631,25 @@ let rec impl_to_ctx = function
   | [] -> []
   | (n, cP, t)::ps -> (n, Box(cP, t)) :: impl_to_ctx ps
 
-let simul_subst_in_impl sigma ps =
-    List.map (fun (n, cP, e) -> n, simul_subst_on_bctx sigma cP, simul_subst_syn sigma e) ps
+let simul_subst_in_part sigma ps =
+  List.map (fun (n, e) -> n, simul_subst_syn sigma e) ps
 
-let simul_subst_in_expl sigma ps =
-    List.map (fun (n, e) -> n, simul_subst_syn sigma e) ps
+(* generate meta variables for all the quantifiers in a schema and apply them to the block (generates a new block) *)
+let mk_quant_subst cP quant block = 
+  let rec mk_subst = function
+    | [] -> Empty, cP, []
+    | (x, t) :: quant -> 
+      let x' = Name.gen_name x in
+      Debug.print (fun () -> "mk_quant_subst generates new name: " ^ print_name x');
+      let sigma, cP', flex = mk_subst quant in
+      Dot (sigma, Unbox(Var x', id_sub,cP)), Snoc(cP', x, Clos(t,sigma, cP')), x'::flex
+  in
+  let sigma, cP', flex = mk_subst quant in
+  let rec subst_schema cP' sigma = function
+    | [] -> []
+    | (x, t) :: block -> 
+      Debug.print (fun () -> "subst_schema turns type " ^ print_syn_exp t ^ " into type " ^ print_syn_exp (Clos (t, sigma, cP')));
+      (x, Clos (t, sigma, cP')) :: subst_schema (Snoc(cP', x, Clos(t,sigma, cP'))) (Dot(sigma, BVar (0,None))) block
+  in
+  let block' = subst_schema cP sigma block in
+  block', flex
