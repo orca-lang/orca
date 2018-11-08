@@ -31,7 +31,8 @@ data rel: ctx -> ctx -> set where
 | empty : rel \0 \0
 | cons : (g h : ctx) (t : |- s-tp) -> rel g h -> rel (g, x: s-tm t) (h, y: t-tm (tran-tp t))
 
-
+(*) TODO: TODO
+(*
 def tran : (g h : ctx) -> rel g h -> (st : |- s-tp) -> (g |- s-tm st) -> (h |- t-tm (tran-tp st)) where
 | g h r t (app s[^] .t m n) => tapp (tran-tp s) (tran-tp t) (tran g h r (arr s t) m) (tran g h r s n)
 | g h r (arr s[^] t[^]) (lam .s .t m) =>
@@ -43,3 +44,4 @@ def tran : (g h : ctx) -> rel g h -> (st : |- s-tp) -> (g |- s-tm st) -> (h |- t
 
 | ._ ._ (cons g h .t r) t (g, x: s-tm t :> x) => (h, x: t-tm (tran-tp t) :> x)
 | ._ ._ (cons g h t r) s (v[^1]) => tran g h r s v
+*)

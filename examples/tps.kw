@@ -16,17 +16,19 @@ syn step : tm ->> tm ->> * where
 | s-app1 : (m n m' : tm) ->> step m m' ->> step (app m n) (app m' n)
 | s-app2 : (a : tm ->> tm) (b : tm) ->> step (app (lam a) b) (a b)
 
+(*) TODO: Fix missing cases
 thm tps : (m n : |- tm) (t : |- tp) -> |- oft m t -> |- step m n -> |- oft n t where
-| (app m n) .(app m' n) t (t-app .m .n s .t d1 d2) (s-app1 .m .n m' e) =>
+| .(app m n) .(app m' n) t (t-app m n s .t d1 d2) (s-app1 .m .n m' e) =>
   t-app m' n s t (tps m m' (arr s t) d1 e) d2
-| (app ._ n) .(m n) t
-  (t-app (lam .m) .n s .t (t-lam .s .t .m (\x.(\u.d1))) d2) (s-app2 m .n) =>
+(*| .(app m n) .(m n) t
+  (t-app (lam m) n s .t (t-lam .s .t .m (\x.(\u.d1))) d2) (s-app2 .m .n) =>
   d1[^ ; n ; d2]
+*) (*) TODO rea add this 
 
 (*) And now with contexts (they are not necessary, but we tried it anyways!)
 thm tps' : (g : ctx tm) (m n : g |- tm) (t : |- tp) -> g |- oft m t -> g |- step m n -> g |- oft n t where
 | g .(app m n) .(app m' n) t (t-app .m .n s[^] .t d1 d2) (s-app1 m n m' e) => 
   t-app m' n s t (tps' g m m' (arr s t) d1 e) d2 
-| g (app .(lam m) n) ._ t
+(*| g (app .(lam m) n) ._ t
   (t-app (lam .m) .n s .t (t-lam .s .t .m (\x.(\u.d1))) d2) (s-app2 m .n) => d1[.. ; n ; d2]
- 
+*)

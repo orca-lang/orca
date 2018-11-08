@@ -27,7 +27,7 @@ def tran-tp : (|- s-tp) -> (|- t-tp) where
 | bool => tsum tunit tunit
 | (arr s t) => tarr (tran-tp s) (tran-tp t)
 
-(*) data rel: ctx (s-tm T) -> ctx (t-tm (tran-tp T) -> set where
+(*) data rel: ctx (s-tm T) -> ctx (t-tm (tran-tp T)) -> set where
 (*) | empty : rel \0 \0
 (*) | cons : (g h : ctx) (t : |- s-tp) -> rel g h -> rel (g, x: s-tm t) (h, y: t-tm (tran-tp t))
 
@@ -37,7 +37,9 @@ def tran-tp : (|- s-tp) -> (|- t-tp) where
 (*) | .(g, x:s-tm t) .(h, x:t-tm (tran-tp t)) (cons g h .t r) t (g, x: s-tm t :> x) => (h, x: t-tm (tran-tp t) :> x)
 (*) | .(g, x:s-tm t) .(h, x:t-tm (tran-tp t)) (cons g h t r) s (v[^1]) => lookup g h r s v
 
-def tran : (g : ctx {t : (|- s-tp)} (s-tm t , t-tm (tran-tp t))) -> (st : |- s-tp) -> (g |- s-tm st) -> (g |- t-tm (tran-tp st)) where
+(*) TODO: Fix tran
+(*
+def tran : (g : ctx <t : s-tp> [es : s-tm t , et : t-tm (tran-tp t)]) -> (st : |- s-tp) -> (g |- s-tm st) -> (g |- t-tm (tran-tp st)) where
 | g .bool tt => tinl tunit tunit tone
 | g .bool ff => tinr tunit tunit tone
 | g t (if .t b e1 e2) => tcase tunit tunit (tran-tp t) (tran g bool b)
@@ -57,3 +59,4 @@ def tran : (g : ctx {t : (|- s-tp)} (s-tm t , t-tm (tran-tp t))) -> (st : |- s-t
 
 (*) | ._ ._ (cons g h .t r) t (g, x: s-tm t :> x) => (h, x: t-tm (tran-tp t) :> x)
 (*) | ._ ._ (cons g h t r) s (v[^1]) => tran g h r s v
+*)

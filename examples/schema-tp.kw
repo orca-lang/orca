@@ -9,8 +9,8 @@ spec tm : tp ->> * where
 | lam : (s : tp) ->> (t : tp) ->> (tm s ->> tm t) ->> tm (arr s t)
 | one : tm unit
 
-def copy : (g : ctx {s : (|- tp)} (tm s)) -> (t : |- tp) -> (g |- tm t) -> (g |- tm t)  where
+def copy : (g : ctx <s : tp> [e:tm s]) -> (t : |- tp) -> (g |- tm t) -> (g |- tm t)  where
 | g t (app s[^] .(t[^]) M N) =>  app s t (copy g (arr s t) M) (copy g s N)
 | g (arr s[^] t[^]) (lam ._ ._ (\x. M)) => ? (*) lam s t (\x. copy (g,(x:tm s)) (t[^]) M) (*) (g, x: tm s) t[^] M)
 | g unit one => one
-| g t (<: x) => x
+(*) | g t (<: x) => x (*) TODO re add this case
