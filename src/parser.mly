@@ -127,7 +127,7 @@ exp_level6:
 | e = located(raw_exp_level6) {e}
 
 raw_exp_level6:
-        | e1 = exp_level6 e2 = exp_level7 {App (e1, e2)}
+| e1 = exp_level6 e2 = exp_level7 {App (e1, e2)}
 | e1 = exp_level6 APPL e2 = exp_level7 {AppL (e1, e2)}
 | e = raw_exp_level7 {e}
 

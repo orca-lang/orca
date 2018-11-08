@@ -27,7 +27,7 @@ let lookup_bound cP (x, j) =
       | n when n = j' -> Shift (x+1)
       | n -> Dot(mk_subst (n+1), BVar (x, Some n)) 
       in
-      Clos(snd (Rlist.nth bs j'), mk_subst 0, cP)
+      Clos(snd (Rlist.nth (Rlist.rev bs) j'), mk_subst 0, cP)
     | t, None -> Clos(t, Shift (x+1), cP)
     | _ -> raise (Error.Error "Projection of something that is not a block.")
   in

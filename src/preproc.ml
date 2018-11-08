@@ -52,7 +52,7 @@ let index n cP =
   in
   let rec index n i = function
     | x :: xs ->
-       begin match proj n 0 x with
+       begin match proj n 0 (List.rev x) with
        | None -> index n (i + 1) xs
        | Some p -> Some (i, p)
        end
