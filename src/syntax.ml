@@ -191,19 +191,16 @@ module Int = struct
     | AppL of syn_exp * syn_exp list
     | SConst of def_name (* The name of a syntactic constant *)
     | BVar of index
-    | Clos of syn_exp * syn_exp * bctx
     | Empty
     | Dot of syn_exp * syn_exp
-    | Comp of syn_exp * bctx * syn_exp
     | Shift of int
-    | ShiftS of int * syn_exp
     | Star (* Universe of syntax *)
     | SPi of stel * syn_exp (* A syntactic type *)
     | Block of (string * syn_exp) rlist
     | TBlock of syn_exp rlist
     | SBCtx of bctx
     | SCtx of schema
-    | Unbox of exp * syn_exp * bctx (* TODO remove the context from Unbox *)
+    | Unbox of exp * syn_exp
     | UnboxParam of name * int * syn_exp
 
   and schema_part = (string * syn_exp) list
@@ -238,8 +235,8 @@ module Int = struct
     | PPar of name * int option
     | PLam of (string * syn_exp) list * syn_pat
     | PSConst of def_name * syn_pat list
-    | PUnbox of name * pat_subst * bctx
-    | SInacc of exp * pat_subst * bctx
+    | PUnbox of name * pat_subst
+    | SInacc of exp * pat_subst
     | PEmpty
     | PShift of int
     | PDot of syn_pat * syn_pat
@@ -395,13 +392,13 @@ let lookup_sign_def sign n =
   and syn_exp_of_pat =
     function
     | PBVar i -> BVar i
-    | PPar (n, None) -> Unbox(Var n, id_sub, Nil) (* MMMM *)
+    | PPar (n, None) -> Unbox(Var n, id_sub) (* MMMM *)
     | PPar (n, Some pr) -> UnboxParam(n, pr, id_sub) (* MMMM *)
     | PLam (fs, p) -> Lam (fs, syn_exp_of_pat p)
     | PSConst (n, ps) ->
        AppL (SConst n, List.map (syn_exp_of_pat) ps)
-    | PUnbox (n, s, cP) -> Unbox (Var n, syn_exp_of_pat_subst s, cP)
-    | SInacc (e, s, cP) -> Unbox (e, syn_exp_of_pat_subst s, cP)
+    | PUnbox (n, s) -> Unbox (Var n, syn_exp_of_pat_subst s)
+    | SInacc (e, s) -> Unbox (e, syn_exp_of_pat_subst s)
     | PEmpty -> Empty
     | PShift i -> Shift i
     | PDot (p1, p2) -> Dot (syn_exp_of_pat p1, syn_exp_of_pat p2)

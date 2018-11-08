@@ -40,14 +40,13 @@ and fv_syn cG =
   | AppL (e, es) -> fvs e @ List.concat (List.map fvs es)
   | SConst _ -> []
   | BVar i -> []
-  | Clos (e1, e2, _) -> fvs e1 @ fvs e2
   | Empty -> []
   | Shift n -> []
   | Comp (e1, _, e2)
   | Dot (e1, e2) -> fvs e1 @ fvs e2
   | ShiftS (_, e) -> fvs e
-  | Unbox (e, s, cP) ->
-    fv cG e @ fvs s @ fv_ctx cG cP
+  | Unbox (e, s) ->
+    fv cG e @ fvs s
   | SBCtx cP -> fv_ctx cG cP
   | SCtx sch -> fv_schema cG sch
   | Block block -> List.concat (Rlist.mapl (fun (_, t) -> fvs t) block)
@@ -113,13 +112,12 @@ and refresh_syn_exp rep =
   | AppL (e1, es) -> AppL(f e1, List.map f es)
   | SConst n -> SConst n
   | BVar i -> BVar i
-  | Clos (e1, e2, cP) -> Clos(f e1, f e2, refresh_bctx rep cP)
   | Empty -> Empty
   | Shift n -> Shift n
   | Comp (e1, cP, e2) -> Comp (f e1, refresh_bctx rep cP, f e2)
   | ShiftS (n, e) -> ShiftS (n, f e)
   | Dot (e1, e2) -> Dot (f e1, f e2)
-  | Unbox (e1, e2, cP) -> Unbox (refresh_exp rep e1, f e2, refresh_bctx rep cP)
+  | Unbox (e1, e2) -> Unbox (refresh_exp rep e1, f e2)
   | SBCtx cP -> SBCtx (refresh_bctx rep cP)
   | Block bs -> Block (Rlist.map (fun (n, t) -> (n, f t)) bs)
 
@@ -188,8 +186,7 @@ and refresh_free_var_syn (x, y) e =
   | AppL (e1, es) -> AppL(f e1, List.map f es)
   | BVar i -> BVar i
   | SConst n -> SConst n
-  | Clos (e1, e2, cP) -> Clos(f e1, f e2, refresh_free_var_bctx (x, y) cP)
-  | Unbox (e1, e2, cP) -> Unbox(refresh_free_var (x, y) e1, f e2, refresh_free_var_bctx (x, y) cP)
+  | Unbox (e1, e2) -> Unbox(refresh_free_var (x, y) e1, f e2)
   | Empty -> Empty
   | Shift n -> Shift n
   | Comp (e1, cP, e2) -> Comp (f e1, refresh_free_var_bctx (x, y) cP, f e2)
@@ -275,8 +272,7 @@ and subst_syn (x, es) e =
   | AppL (e1, es) -> AppL(f e1, List.map f es)
   | SConst n -> SConst n
   | BVar i -> BVar i
-  | Clos (e1, e2, cP) -> Clos(f e1, f e2, subst_bctx (x, es) cP)
-  | Unbox (e1, e2, cP) -> Unbox(subst (x, es) e1, f e2, subst_bctx (x, es) cP)
+  | Unbox (e1, e2) -> Unbox(subst (x, es) e1, f e2)
   | Empty -> Empty
   | Shift n -> Shift n
   | ShiftS (n, e) -> ShiftS (n, f e)
@@ -364,10 +360,10 @@ let var_list_of_ctx : ctx -> exp list = List.map (fun (x, _) -> Var x)
 
 let var_list_of_tel : tel -> exp list = List.map (fun (_, x, _) -> Var x)
 
-let unbox_list_of_ctx cP : ctx -> syn_exp list = List.map (fun (x, _) -> Unbox(Var x, id_sub, cP))
-let punbox_list_of_ctx cP : ctx -> syn_pat list = List.map (fun (x, _) -> PUnbox(x, pid_sub, cP))
-let unbox_list_of_tel cP : tel -> syn_exp list = List.map (fun (_, x, _) -> Unbox(Var x, id_sub, cP))
-let punbox_list_of_tel cP : tel -> syn_pat list = List.map (fun (_, x, _) -> PUnbox(x, pid_sub, cP))
+let unbox_list_of_ctx : ctx -> syn_exp list = List.map (fun (x, _) -> Unbox(Var x, id_sub))
+let punbox_list_of_ctx : ctx -> syn_pat list = List.map (fun (x, _) -> PUnbox(x, pid_sub))
+let unbox_list_of_tel : tel -> syn_exp list = List.map (fun (_, x, _) -> Unbox(Var x, id_sub))
+let punbox_list_of_tel : tel -> syn_pat list = List.map (fun (_, x, _) -> PUnbox(x, pid_sub))
 
 (* Re-orders variables to satisfy dependencies *)
 (* TODO have a nicer algorithm *)
@@ -490,20 +486,20 @@ and syn_psubst cP (x, p') = function
   | PBVar i -> PBVar i
   | PLam (xs, p) -> PLam (xs, syn_psubst (bctx_of_lam_pars cP xs) (x, p') p) (* What about shifts in p'? *)
   | PSConst (n, ps) -> PSConst (n, List.map (syn_psubst cP (x, p')) ps)
-  | PUnbox (n, s, cP') when n = x ->
+  | PUnbox (n, s) when n = x ->
     begin match p' with
-      | PVar m -> PUnbox (m, s, cP')
-      | Inacc e -> SInacc (e, s, cP')
+      | PVar m -> PUnbox (m, s)
+      | Inacc e -> SInacc (e, s)
       | PTBox (cP'', q) ->  (* cP' should be equal to cP'' *)
-        let rec push_unbox (s, cP') = function
+        let rec push_unbox s = function
           | PBVar i ->
             PBVar (lookup_pat_subst ("Expected term " ^ print_syn_pat q ^ " to be closed") i s)
-          | PLam (xs , p) -> PLam(xs, push_unbox (wkn_pat_subst_by_n s (List.length xs), bctx_of_lam_pars cP' xs) p)
-          | PSConst (n,ps) -> PSConst (n, List.map (push_unbox (s, cP')) ps)
-          | PUnbox (m, s', cP'') ->
-            PUnbox (m, comp_pat_subst ("Mismatching substitution from term " ^ print_syn_pat q) s s', cP'')
-          | SInacc (e, s', cP'') ->
-            SInacc (e, comp_pat_subst ("Mismatching substitution from term " ^ print_syn_pat q) s s', cP'')
+          | PLam (xs , p) -> PLam(xs, push_unbox (wkn_pat_subst_by_n s (List.length xs)) p)
+          | PSConst (n,ps) -> PSConst (n, List.map (push_unbox s) ps)
+          | PUnbox (m, s') ->
+            PUnbox (m, comp_pat_subst ("Mismatching substitution from term " ^ print_syn_pat q) s s')
+          | SInacc (e, s') ->
+            SInacc (e, comp_pat_subst ("Mismatching substitution from term " ^ print_syn_pat q) s s')
           | PEmpty  -> PEmpty
           | PShift n ->
             let rec comp s n =
@@ -520,22 +516,22 @@ and syn_psubst cP (x, p') = function
               | CEmpty, _ -> raise (Error.Error ("Empty substitution applied to a shift."))
             in
             comp s n
-          | PDot (sigma, p) -> PDot (push_unbox (s, cP') sigma, push_unbox (s, cP') p)
+          | PDot (sigma, p) -> PDot (push_unbox s sigma, push_unbox s p)
           | PPar (n, pr) -> PPar (n, pr)
 
         in
-        push_unbox (s, cP') q
+        push_unbox s q
       | _ -> assert false
     end
-  | PUnbox (n, s, cP) -> PUnbox (n, s, cP)
-  | SInacc (e, s, cP) -> SInacc (subst (x, exp_of_pat p') e, s, cP)
+  | PUnbox (n, s) -> PUnbox (n, s)
+  | SInacc (e, s) -> SInacc (subst (x, exp_of_pat p') e, s)
   | PEmpty -> PEmpty
   | PShift n -> PShift n
   | PDot (s, p) -> PDot (syn_psubst cP (x, p') s, syn_psubst cP (x, p') p)
   | PPar (n, None) when n = x ->
     begin match p' with
-      | PVar m -> PUnbox (m, pid_sub, cP)
-      | Inacc e -> SInacc (e, pid_sub, cP)
+      | PVar m -> PUnbox (m, pid_sub)
+      | Inacc e -> SInacc (e, pid_sub)
       | PTBox (cP', PPar (m, pr)) -> PPar (m, pr) (* MMMMMMMM *)
       | _ -> assert false
     end
@@ -574,7 +570,7 @@ let simul_syn_psubst_on_list cP sigma ps =
 
 let inac_subst e = List.map (fun (x, e) -> x, Inacc e) e
 let pvar_list_of_tel : tel -> pats = List.map (fun (_, x, _) -> PVar x)
-let punbox_list_of_tel cP : tel -> syn_pat list = List.map (fun (_, x, _) -> PUnbox(x, pid_sub, cP))
+let punbox_list_of_tel : tel -> syn_pat list = List.map (fun (_, x, _) -> PUnbox(x, pid_sub))
 let psubst_of_names e = List.map (fun (n, m) -> n, PVar m) e
 let subst_of_names e = List.map (fun (n, m) -> n, Var m) e
 
@@ -602,18 +598,18 @@ and rename_syn (q : syn_pat) (p : Apx.pat) : (name * name) list =
   | PPar (n, _), Apx.PPar (m, _) -> [n, m] (* MMMM might want to compare the projections *)
   | PLam (es, q), Apx.PLam (sl, p) -> rename_syn q p
   | PSConst (_, qs), Apx.PConst (_, ps) -> rename_all_syn qs ps
-  | PUnbox (n, _, _), Apx.PVar m -> [n, m]
+  | PUnbox (n, _), Apx.PVar m -> [n, m]
   | SInacc _, Apx.Inacc _ -> []
   | PEmpty, Apx.PEmpty -> []
   | PShift _, Apx.PShift _ -> []
   | PDot(sq, q), Apx.PDot (sp, p) -> rename_syn sq sp @ rename_syn q p
-  | PUnbox(n, s, cP), Apx.PClos(m, s') -> [n, m]
-  | PUnbox(n, s, cP), Apx.Inacc(Apx.Var m) -> [n, m]
+  | PUnbox(n, s), Apx.PClos(m, s') -> [n, m]
+  | PUnbox(n, s), Apx.Inacc(Apx.Var m) -> [n, m]
   | _, Apx.PWildcard -> []
-  | SInacc (e, s, cP), Apx.PVar m ->
+  | SInacc (e, s), Apx.PVar m ->
     let rec dig = function
       | Var n -> [n, m]
-      | TermBox (_, Unbox(e', _, _)) -> dig e'
+      | TermBox (_, Unbox(e', _)) -> dig e'
       | _ -> raise (Error.Violation "Digging failed")
     in
     dig e
@@ -634,6 +630,59 @@ let rec impl_to_ctx = function
 let simul_subst_in_part sigma ps =
   List.map (fun (n, e) -> n, simul_subst_syn sigma e) ps
 
+(* shift all variables by n *)
+let rec weaken_syn n = let f = weaken_syn n in function
+| Star -> Star
+  | SCtx sch -> SCtx sch 
+  | SPi (tel, t) -> assert false
+  | Lam (xs, e) -> assert false
+  | AppL (e1, es) -> AppL(f e1, List.map f es)
+  | SConst n -> SConst n
+  | BVar i -> BVar (i + n)
+  | Unbox (e, s) -> Unbox(e, f s)
+  | Empty -> Empty
+  | Shift n' -> Shift (n + n')
+  | Dot (s, e) -> Dot (f s, f e)
+  | SBCtx cP -> assert false
+  | Block cs -> assert false
+
+let rec apply_syn_subst (sigma : syn_exp) : syn_exp -> syn_exp = function
+  | Star -> Star
+  | SCtx sch -> SCtx sch (*MMMMM*)
+  | SPi (tel, t) -> 
+    let tel', sigma' = apply_syn_subst_stel sigma tel in
+    SPi (tel', apply_syn_subst sigma' t)
+  | Lam (xs, e) -> 
+    let xs', sigma' = apply_syn_subst_lam sigma xs in
+    Lam (xs', apply_syn_subst sigma' e)
+  | AppL (e1, es) -> AppL(f e1, List.map f es)
+  | SConst n -> SConst n
+  | BVar i -> BVar i
+  | Unbox (e1, e2) -> Unbox(subst (x, es) e1, f e2)
+  | Empty -> Empty
+  | Shift n -> Shift n
+  | ShiftS (n, e) -> ShiftS (n, f e)
+  | Comp (e1, cP, e2) -> Comp (f e1, subst_bctx (x, es) cP, f e2)
+  | Dot (e1, e2) -> Dot (f e1, f e2)
+  | SBCtx cP -> SBCtx (subst_bctx (x, es) cP)
+  | Block cs -> Block (subst_block (x, es) cs)
+ 
+and apply_syn_subst_stel sigma = function
+| [] -> [], sigma
+| (icit, x, t)::stel -> 
+  let el = (icit, x, apply_syn_subst sigma t) in
+  let sigma' = Dot (weaken_syn_subst 1 sigma, BVar i0) in
+  let stel', sigma'' = apply_syn_subst_stel sigma' stel) in
+  el::stel', sigma''
+
+and apply_syn_subst_lam sigma = function
+| [] -> [], sigma
+| (x, t)::xs -> 
+  let el = (icit, x, apply_syn_subst sigma t) in
+  let sigma' = Dot (weaken_syn_subst 1 sigma, BVar i0) in
+  let xs', sigma'' = apply_syn_subst_lam sigma' xs) in
+  el::xs', sigma''
+
 (* generate meta variables for all the quantifiers in a schema and apply them to the block (generates a new block) *)
 let mk_quant_subst cP quant block = 
   let rec mk_subst = function
@@ -642,7 +691,7 @@ let mk_quant_subst cP quant block =
       let x' = Name.gen_name x in
       Debug.print (fun () -> "mk_quant_subst generates new name: " ^ print_name x');
       let sigma, cP', flex = mk_subst quant in
-      Dot (sigma, Unbox(Var x', id_sub,cP)), Snoc(cP', x, Clos(t,sigma, cP')), x'::flex
+      Dot (sigma, Unbox(Var x', id_sub)), Snoc(cP', x, Clos(t,sigma, cP')), x'::flex
   in
   let sigma, cP', flex = mk_subst quant in
   let rec subst_schema cP' sigma = function

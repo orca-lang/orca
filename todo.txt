@@ -4,7 +4,7 @@ Small todo for next week:
 
 Big todos:
 
-- merge back to main
+- merge back to main [DONE]
 - remove newsplit (or fill it with something)
 - remove closures (keep boxes and unboxes), instead just apply the substitution and move on
 - is-open in copy.kw should work

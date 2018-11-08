@@ -257,8 +257,7 @@ module Int = struct
     | ShiftS (n, s) -> "(^^" ^ string_of_int n ^ " " ^ print_syn_exp s ^ ")"
     | Comp (e1, cP, e2) -> "(" ^ print_syn_exp e1 ^ " o" ^ print_bctx cP ^ " " ^ print_syn_exp e2 ^ ")"
     | Dot (s, e) -> "(" ^ print_syn_exp s ^ " ; " ^ print_syn_exp e ^ ")"
-    | Clos (e, s, cP) -> "(" ^ print_syn_exp e ^ " [" ^ print_syn_exp s ^ " : " ^ print_bctx cP ^ "])"
-    | Unbox (e, se, cP) -> "(ub " ^ print_exp e ^ "[" ^ print_syn_exp se ^ " : " ^ print_bctx cP  ^ "])"
+    | Unbox (e, se) -> "(ub " ^ print_exp e ^ "[" ^ print_syn_exp se  ^ "])"
     | SCtx sch -> "ctx " ^ print_schema sch
     | SBCtx cP -> print_bctx cP
     | Block bs -> "|aa" ^ Rlist.to_string (fun (n, t) -> n ^ " : " ^ print_syn_exp t) bs ^ "|"
@@ -311,8 +310,8 @@ module Int = struct
     | PPar (n, Some pr) -> "(<: " ^ print_name n ^ "#" ^ string_of_int pr ^ ")"
     | PLam (fs, p) -> "(\\ " ^ String.concat " " (List.map (fun (x, t) -> "("^ x ^ " : " ^ print_syn_exp t ^ ")") fs) ^ ". " ^ print_syn_pat p ^ ")"
     | PSConst (n, ps) -> "(" ^ n ^ " " ^ (String.concat " " (List.map (fun p -> "(" ^ print_syn_pat p ^ ")") ps)) ^ ")"
-    | PUnbox (n, s, cP) -> "(u " ^ print_name n ^ "[" ^ print_pat_subst s ^ " : " ^ print_bctx cP ^ "])"
-    | SInacc (e, s, cP) -> "(s. " ^ print_exp e ^ "[" ^ print_pat_subst s ^ " : " ^ print_bctx cP ^ "])"
+    | PUnbox (n, s) -> "(u " ^ print_name n ^ "[" ^ print_pat_subst s ^ "])"
+    | SInacc (e, s) -> "(s. " ^ print_exp e ^ "[" ^ print_pat_subst s ^ "])"
     | PEmpty -> "^"
     | PShift i -> "^ " ^ string_of_int i
     | PDot (p1, p2) -> "(" ^ print_syn_pat p1 ^ " ; " ^ print_syn_pat p2 ^ ")"
