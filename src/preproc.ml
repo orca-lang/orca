@@ -353,8 +353,8 @@ and pproc_stel (s : sign) (cG : ctx) (cP : bctx) (e : E.exp) : A.stel * A.exp =
     tel @ tel', t
   | E.Arr (t0, t1)
   | E.SArr (t0, t1) ->
-     let tel, t = pproc_stel s cG (["_3223"]::cP) t1 in
-     (Syntax.Explicit, "_asgwq", pproc_exp s cG cP t0) :: tel , t
+     let tel, t = pproc_stel s cG ([Name.gen_string "_y"]::cP) t1 in
+     (Syntax.Explicit, Name.gen_string "_x", pproc_exp s cG cP t0) :: tel , t
   | t -> [], pproc_exp s cG cP (ghost t)
 
 and pproc_app (s : sign) (cG : ctx) (cP : bctx) (e : E.exp) : A.exp * A.exp list =
