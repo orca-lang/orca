@@ -106,13 +106,9 @@ and occur_check_syn sign cP n e =
   | SPi (tel, t) -> occur_check_stel sign cP n tel || f cP t
   | AppL (e, es) -> f cP e || List.fold_left (||) false (List.map (f cP) es)
   | Lam (xs, e) -> f (bctx_of_lam_pars cP xs) e
-  | Clos (e1, e2, cP') ->
-     f cP' e1 || f cP e2 || occur_check_bctx sign n cP
   | Dot (e1, e2) -> f cP e1 || f cP e2
-  | Comp (e1, cP', e2) -> f cP e1 || f cP' e2 || occur_check_bctx sign n cP'
-  | ShiftS (n, e) -> f (drop_suffix cP n) e
   | SBCtx cP -> occur_check_bctx sign n cP
-  | Unbox (e, s, cP) -> f cP s || occur_check sign n e || occur_check_bctx sign n cP
+  | Unbox (e, s) -> f cP s || occur_check sign n e
   | _ -> false
 
 
@@ -224,26 +220,16 @@ and unify_flex_syn (sign, cG) cP flex e1 e2 =
   | Lam(_,e), Lam(xs, e') -> unify_flex_syn (sign, cG) (bctx_of_lam_pars cP xs) flex e e'
   | AppL(e1, es), AppL(e1', es') -> unify_many_syn (e1::es) (e1'::es')
   | BVar i, BVar i' when i = i' -> cG, []
-  | Clos(e1, s1, cP1), Clos(e2, s2, cP2) ->
-     let cG', sigma = unify_flex_syn (sign, cG) cP flex s1 s2 in
-     let cP1' = simul_subst_on_bctx sigma cP1 in
-     let cG'', sigma' = unify_flex_bctx (sign, cG') flex cP1' (simul_subst_on_bctx sigma cP2) in
-     let sigma0 = sigma' @ sigma in
-     let cG''', sigma'' = unify_flex_syn (sign, cG'') (simul_subst_on_bctx sigma' cP1') flex
-                                         (simul_subst_syn sigma0 e1) (simul_subst_syn sigma0 e2) in
-     cG''', sigma'' @ sigma0
   | Empty, Empty -> cG, []
   | Shift n, Shift n' when n = n' -> cG, []
   | Shift 0, Empty when cP = Nil -> cG, []
   | Empty, Shift 0 when cP = Nil -> cG, []
-  | ShiftS (n, e), ShiftS (n', e') when n = n' -> unify_flex_syn (sign, cG) (drop_suffix cP n) flex e e'
   | Dot(e1, e2), Dot(e1', e2') -> unify_many_syn [e1;e2] [e1';e2']
-  | Comp (e1, cP, e2), Comp(e1', cP', e2') -> (* unify_many cG [e1;e2] [e1';e2'] *) assert false
   | SCtx sch, SCtx sch' -> unify_flex_schemata (sign, cG) flex sch sch'
   | SBCtx cP, SBCtx cP' -> unify_flex_bctx (sign, cG) flex cP cP'
   | Star, Star -> cG, []
   (* This is comparing eta long and eta short versions *)
-  | Unbox(Var n, s, _), Lam (xs, (AppL (Unbox (Var m, s', _), es))) when n = m ->
+  | Unbox(Var n, s), Lam (xs, (AppL (Unbox (Var m, s'), es))) when n = m ->
     Debug.print (fun () -> "Hello!");
     let n = List.length xs in
     let rec is_eta n =
@@ -253,11 +239,10 @@ and unify_flex_syn (sign, cG) cP flex e1 e2 =
       | _ -> false
     in
     if is_eta (n-1, None) es then
-      unify_flex_syn (sign, cG) cP flex s' (Comp (Shift n, bctx_of_lam_pars cP xs, s))
+      unify_flex_syn (sign, cG) cP flex s' (weaken_syn n s)
     else
       raise (Unification_failure(Expressions_dont_unify_syn (flex, e1', e2')))
-  | Lam (xs, (AppL (Unbox (Var m, s', _), es))), Unbox(Var n, s, _) when n = m  ->
-    Debug.print (fun () -> "Hello!!");
+  | Lam (xs, (AppL (Unbox (Var m, s'), es))), Unbox(Var n, s) when n = m  ->
     let n = List.length xs in
     let rec is_eta n =
       function
@@ -266,14 +251,14 @@ and unify_flex_syn (sign, cG) cP flex e1 e2 =
       | _ -> false
     in
     if is_eta (n-1, None) es then
-      unify_flex_syn (sign, cG) cP flex s' (Comp (Shift n, bctx_of_lam_pars cP xs, s))
+      unify_flex_syn (sign, cG) cP flex s' (weaken_syn n s)
     else
       raise (Unification_failure(Expressions_dont_unify_syn (flex, e1', e2')))
 
-  | Unbox(Var n, Empty, _), Unbox (Var m, Shift 0, _) (* when n = m -> cG, [] *)
-  | Unbox(Var n, Shift 0, _), Unbox (Var m, Empty, _) when n = m -> cG, []
-  | Unbox(Var n, s, _), Unbox (Var m, s', _) when n = m ->  unify_flex_syn (sign, cG) cP flex s s'
-  | Unbox(Var n, s, cP'), _ when is_flex n ->
+  | Unbox(Var n, Empty), Unbox (Var m, Shift 0) (* when n = m -> cG, [] *)
+  | Unbox(Var n, Shift 0), Unbox (Var m, Empty) when n = m -> cG, []
+  | Unbox(Var n, s), Unbox (Var m, s') when n = m ->  unify_flex_syn (sign, cG) cP flex s s'
+  | Unbox(Var n, s), _ when is_flex n ->
     Debug.print (fun () -> "Unifying variable " ^ print_name n ^ " which is flexible");
      if not (occur_check_syn sign cP n e2') then
        try
@@ -281,13 +266,14 @@ and unify_flex_syn (sign, cG) cP flex e1 e2 =
          match apply_inv_subst e2' s with
          | None -> raise (Unification_failure (Expressions_dont_unify_syn(flex, e1', e2')))
          | Some e ->
+            let cP' = apply_inv_subst_ctx cP s in
             let e' = Whnf.whnf sign (TermBox (cP', e)) in
             ctx_subst (n, e') (rem n cG), [n, e']
        with
          Inv_fail -> raise (Unification_failure (Expressions_dont_unify_syn(flex, e1', e2')))
      else
        raise (Unification_failure(Occur_check_syn (n, e2)))
-  | _, Unbox(Var n, s, cP') when is_flex n ->
+  | _, Unbox(Var n, s) when is_flex n ->
   Debug.print (fun () -> "Unifying variable " ^ print_name n ^ " which is flexible");
      if not (occur_check_syn sign cP n e1') then
        try
@@ -295,6 +281,7 @@ and unify_flex_syn (sign, cG) cP flex e1 e2 =
          match apply_inv_subst e1' s with
          | None -> raise (Unification_failure (Expressions_dont_unify_syn(flex, e1', e2')))
          | Some e ->
+            let cP' = apply_inv_subst_ctx cP s in
             let e' =  Whnf.whnf sign (TermBox (cP', e)) in
             ctx_subst (n, e') (rem n cG), [n, e']
        with
@@ -302,7 +289,7 @@ and unify_flex_syn (sign, cG) cP flex e1 e2 =
      else
        raise (Unification_failure(Occur_check_syn (n, e1)))
 
-  | Unbox(e1, s1, cP1), Unbox(e2, s2, cP2) ->
+  | Unbox(e1, s1), Unbox(e2, s2) ->
      let cG', sigma = unify_flex_syn (sign, cG) cP flex s1 s2 in
      let cG'' = cG' in
      (* let cP1' = simul_subst_on_bctx sigma cP1 in *)

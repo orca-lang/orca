@@ -264,35 +264,10 @@ and fmt_syn_exp cG cP parens pps e =
     (fmt_stel cG cP) (stel, e)
     (close_paren 6)
 
-  (* | Clos (e1, Shift 0, cP') -> *)
-  (*   fmt_syn_exp cG cP' pps e1 *)
-
-  | Clos (e1, e2, cP') ->
-     Fmt.pf pps "%a[%a]"
-            (fmt_syn_exp cG cP' 0) e1
-            (fmt_syn_exp cG cP never_paren) e2
-
-  (* | Unbox (e1, Shift 0, _) -> *)
-  (*   fmt_exp cG pps e1 *)
-
-  | Unbox (e1, e2, _) ->
+  | Unbox (e1, e2) ->
      Fmt.pf pps "%a[%a]"
             (fmt_exp cG 0) e1
             (fmt_syn_exp cG cP never_paren) e2
-
-  | Comp(e1, _, e2) ->
-    Fmt.pf pps "%s%a o %a%s"
-      (open_paren 4)
-      (fmt_syn_exp cG cP 4) e1
-      (fmt_syn_exp cG cP 3) e2
-      (close_paren 4)
-
-  | ShiftS (n, e) ->
-     Fmt.pf pps "%s ⇑%d %a%s"
-       (open_paren 1)
-       n
-       (fmt_syn_exp cG cP 1) e
-       (close_paren 1)
 
   | SConst n ->
      Fmt.pf pps "%a"
@@ -449,19 +424,19 @@ and fmt_syn_pat cG cP pps = function
             (list ~sep:nbsp bound_name) (beautify_bound_names xs' cP)
             (fmt_syn_pat cG cP') p
 
-  | PUnbox (n, CShift 0, _) ->
+  | PUnbox (n, CShift 0) ->
     comp_var cG pps n
 
-  | PUnbox (n, psub, _) ->
+  | PUnbox (n, psub) ->
     Fmt.pf pps "%a[%a]"
             (comp_var cG) n
             fmt_pat_subst psub
 
-  | SInacc (e, CShift 0, _) ->
+  | SInacc (e, CShift 0) ->
     Fmt.pf pps ".%a"
       (fmt_exp cG 0) e
 
-  | SInacc (e, psub, _) ->
+  | SInacc (e, psub) ->
      Fmt.pf pps ".%a[%a]"
             (fmt_exp cG 0) e
             fmt_pat_subst psub

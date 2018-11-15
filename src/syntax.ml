@@ -221,6 +221,7 @@ module Int = struct
   type ctx = (name * exp) list
 
   let id_sub = Shift 0
+  let i0 = BVar(0, None)
 
   type pat =
     | PVar of name

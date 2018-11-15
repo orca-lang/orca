@@ -56,7 +56,7 @@ and syn_check_match cD cP q p =
     let cD'_sane = topologic_ctx cD' in
     Yes (cD', [n, PTBox (cP, PPar (n', pr))])
   | PPar (n, pr), A.PBVar (i, pr') when pr = pr' -> Yes (cD, [])
-  | PUnbox (n, s, cP'), A.PClos (m, s') ->
+  | PUnbox (n, s), A.PClos (m, s') ->
     Debug.print (fun () -> "Punbox vs pclos: s = " ^ print_pat_subst s ^ ", s' = " ^ print_pat_subst s');
     let cP' = shift_cp_inv_pat_subst cP s' in
     let rec ctx_change = function
@@ -64,7 +64,7 @@ and syn_check_match cD cP q p =
       | (n', Box(cP1, t)) :: cD' when n = n' ->
         begin match apply_inv_pat_subst (psubst_of_pat_subst s) s' with
           | None -> raise (Error.Error "Unable to apply invers substitution, go figure!")
-          | Some s'' -> Some (n, m), (m, Box(cP', Clos(t, s'', cP1))) :: cD'
+          | Some s'' -> Some (n, m), (m, Box(cP', apply_syn_subst s'' t)) :: cD'
         end
       | (n', t) :: cD' when n = n' -> raise (Error.Violation "This shouldn't be happening. n' should have box type.")
       | (n', t) :: cD' -> let b, cD'' = ctx_change cD' in b, (n', t) :: cD''
@@ -77,13 +77,13 @@ and syn_check_match cD cP q p =
     in
     Debug.print(fun () -> "(syn_check_match - ctx_change) Sanitizing cD'");
     let cD'_sane = topologic_ctx cD' in
-    Yes (cD', [n, PTBox(cP, PUnbox (m, s', cP'))])
-  | PUnbox (n, s, cP'), A.PBVar i' ->
+    Yes (cD', [n, PTBox(cP, PUnbox (m, s'))])
+  | PUnbox (n, s), A.PBVar i' ->
     begin match apply_inv_pat_subst (BVar i') s with
       | Some _ -> Yes (cD, [])
       | None -> No
     end
-  | PUnbox (n, s, cP'), _ -> Yes (cD, [])
+  | PUnbox (n, s), _ -> Yes (cD, [])
   | SInacc _, _ -> Yes (cD, [])
   | PEmpty, A.PEmpty -> Yes (cD, [])
   | PShift n, A.PShift n' when n = n' -> Yes (cD, [])
@@ -175,7 +175,7 @@ and choose_blocking_syn (q : syn_pat) (p : A.pat) : (name * A.pat * bool) option
       end 
     in consume_vars xs ys
   | PSConst (c, qs), A.PConst(c', ps) -> choose_blocking_var_syn qs ps
-  | PUnbox (n, s, cP), p when is_blocking p -> Some (n, p, false)
+  | PUnbox (n, s), p when is_blocking p -> Some (n, p, false)
   | PPar (n, _), A.PBVar i -> Some (n, p, true)
   | _ -> None
 
@@ -226,8 +226,8 @@ let split_sconst (sign : signature) (cD : ctx) (cP : bctx) (qs : pats)
       Debug.print (fun () -> "split_sconst cD' = " ^ Pretty.print_ctx cD');
 
       let flex = List.map fst cD' in
-      (ts, cD', flex, (if tel == [] then SConst c else AppL (SConst c, unbox_list_of_tel cP tel)),
-       PSConst (c, punbox_list_of_tel cP tel)) :: process cs'
+      (ts, cD', flex, (if tel == [] then SConst c else AppL (SConst c, unbox_list_of_tel tel)),
+       PSConst (c, punbox_list_of_tel tel)) :: process cs'
   in
   let cs' = process cs in
   let rec print_processed = function
@@ -244,8 +244,8 @@ let split_lam (sign : signature) (cD : ctx) (cP : bctx) (qs : pats)
   let cP' = bctx_of_lam_pars cP xs in
   let m = Name.refresh_name n in
   let cD' = (m, Box(cP', t)) :: cD in
-  let e = Unbox (Var m, id_sub, cP') in
-  let p = PUnbox (m, pid_sub, cP') in
+  let e = Unbox (Var m, id_sub) in
+  let p = PUnbox (m, pid_sub) in
   [[], cD', [], Lam (xs, e), PLam (xs, p)]
 
 type scheme_in_var
@@ -295,10 +295,11 @@ let split_box (sign : signature) (cD : ctx) (qs : pats)
       begin match lookup_ctx_fail cD g with
         | Ctx (Schema ([], [_,t'])) -> (* Schema has a 1-tuple, no projections needed *)
           (* let _tel = impl_to_tel im in *)
-          begin try let _ = Unify.unify_syn (sign, cD) cP t (Clos (t', Shift (n+1), CtxVar g))
+          begin try let _ = Unify.unify_syn (sign, cD) cP t (weaken_syn (n+1) t')
               in Yes
             with Unify.Unification_failure _ -> No
           end
+          
         | Ctx (Schema (quant, block)) ->
           let block', flex = mk_quant_subst cP quant block in
           let rec find n = function
@@ -314,7 +315,7 @@ let split_box (sign : signature) (cD : ctx) (qs : pats)
 
         | _ -> raise (Error.Violation "Admits variable has bctx which is not a context")
       end
-    | Snoc (cP', _, s) -> try let _ = Unify.unify_syn (sign, cD) cP t (Clos (s, Shift (n+1), cP')) in Yes
+    | Snoc (cP', _, s) -> try let _ = Unify.unify_syn (sign, cD) cP t (weaken_syn (n+1) s) in Yes
       with Unify.Unification_failure _ -> admits_variables (n+1) cP'
   in
   match admits_variables 0 cP with

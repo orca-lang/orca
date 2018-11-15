@@ -254,8 +254,6 @@ module Int = struct
     | SConst n -> n ^ "%"
     | Empty -> "^"
     | Shift n -> "^" ^ string_of_int n
-    | ShiftS (n, s) -> "(^^" ^ string_of_int n ^ " " ^ print_syn_exp s ^ ")"
-    | Comp (e1, cP, e2) -> "(" ^ print_syn_exp e1 ^ " o" ^ print_bctx cP ^ " " ^ print_syn_exp e2 ^ ")"
     | Dot (s, e) -> "(" ^ print_syn_exp s ^ " ; " ^ print_syn_exp e ^ ")"
     | Unbox (e, se) -> "(ub " ^ print_exp e ^ "[" ^ print_syn_exp se  ^ "])"
     | SCtx sch -> "ctx " ^ print_schema sch

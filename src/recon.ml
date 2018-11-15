@@ -92,7 +92,7 @@ let rec infer (sign, cG : I.signature * I.ctx) (e : A.exp) : I.exp * I.exp =
                begin match Whnf.rewrite sign cP t with
                | I.SPi (tel, t) ->
                   let sp'', t'' = check_syn_spine (sign, cG) cP spA tel t in
-                  I.TermBox(cP, I.AppL(I.Unbox(nh, I.id_sub, cP), sp'')), I.Box (cP, t'')
+                  I.TermBox(cP, I.AppL(I.Unbox(nh, I.id_sub), sp'')), I.Box (cP, t'')
                | _ -> raise (Error.Error ("Too many parameters for the type"))
                end
             | _ -> raise (Error.Error "Extra parameters non consumed")
@@ -395,7 +395,7 @@ and check_syn (sign, cG) cP (e : A.exp) (t : I.syn_exp) =
       in I.Shift n
     | A.Dot (s, e), I.SBCtx (I.Snoc (cP', _, t)) ->
       let s' = check_syn (sign, cG) cP s (I.SBCtx cP') in
-      I.Dot (s', check_syn (sign, cG) cP e (I.Clos(t, s', cP')))
+      I.Dot (s', check_syn (sign, cG) cP e (apply_syn_subst s' t))
     | A.TBlock tbs, I.Block bs ->
        let tbs', _ =
          Rlist.fold2 (fun (b, cP) e (x,t) -> Rlist.RCons (b, check_syn (sign, cG) cP e t), I.Snoc (cP, x, t)) (Rlist.RNil, cP) tbs bs
@@ -421,7 +421,7 @@ and check_syn (sign, cG) cP (e : A.exp) (t : I.syn_exp) =
     | e, t ->
       Debug.print(fun ()-> "Expression " ^ AP.print_exp e ^ " is not syntactic and thus back to check");
       let e' = check (sign, cG) e (I.Box (cP, t)) in
-      I.Unbox (e', I.id_sub, cP)
+      I.Unbox (e', I.id_sub)
   in Debug.deindent (); res
 
 and infer_syn (sign, cG) cP (e : A.exp) =
@@ -440,7 +440,7 @@ and infer_syn (sign, cG) cP (e : A.exp) =
           Debug.print (fun () -> "Infering type " ^ Pretty.print_exp cG t ^ "\nfor term " ^ Pretty.print_exp cG e);
           Debug.print (fun () -> "Weakening context " ^ Pretty.print_bctx cG cP' ^ "\ninto context " ^ Pretty.print_bctx cG cP);
           let sigma = compute_wkn (sign, cG) e cP cP' in
-          I.Unbox (e, sigma, cP'), I.Clos (t', sigma, cP')
+          I.Unbox (e, sigma), apply_syn_subst sigma t'
        | _ -> raise (Error.Error ("Expected a box type, got " ^ IP.print_exp t))
        end
     (* App of Spi type get translated to AppL *)
@@ -478,7 +478,7 @@ and infer_syn (sign, cG) cP (e : A.exp) =
       (*   I.Lam(xs, I.AppL(I.Unbox(I.Var x, sigma, cP''), eta_tail (List.length xs))), I.Clos(t', sigma, cP'') *)
        | I.Box(cP', t') ->
           let sigma = compute_wkn (sign, cG) (I.Var x) cP cP' in
-          I.Unbox(I.Var x, sigma, cP'), I.Clos(t', sigma, cP')
+          I.Unbox(I.Var x, sigma), apply_syn_subst sigma t'
        | t -> raise (Error.Error ("Expected a box type, got " ^ IP.print_exp t))
        end
     | A.Const n when I.is_syn_con sign n ->
@@ -488,7 +488,7 @@ and infer_syn (sign, cG) cP (e : A.exp) =
        begin match lookup_sign sign n with
        | I.Box (cP', t') ->
           let sigma = compute_wkn (sign, cG) (I.Const n) cP cP' in
-          I.Unbox(I.Const n, sigma, cP'), I.Clos(t', sigma, cP')
+          I.Unbox(I.Const n, sigma), apply_syn_subst sigma t'
        | t -> raise (Error.Error ("Constant " ^ n ^ " has type " ^ PP.print_exp cG t ^ " where a syntactic type was expected."))
        end
 
@@ -508,7 +508,7 @@ and infer_syn (sign, cG) cP (e : A.exp) =
         match t with
         | I.Box(cP', t) ->
           let s' = check_syn (sign, cG) cP s (I.SBCtx cP') in
-          I.Unbox (e', s', cP'), I.Clos(t, s', cP')
+          I.Unbox (e', s'), apply_syn_subst s' t
         | _ -> raise (Error.Error ("Expected " ^ AP.print_exp e ^ " to be of boxed type. Instead inferred type " ^ IP.print_exp t))
       end
     | _ -> raise (Error.Error ("Cannot infer syntactic expression " ^ AP.print_exp e))
@@ -522,13 +522,13 @@ and check_syn_spine (sign, cG) cP sp tel t =
     let sigma = List.fold_right (fun x sigma -> I.Dot(sigma, x)) sl (I.Shift (List.length sl)) in
     match sp, tel with
     | e::sp', (_, x, s)::tel ->
-       let e' = check_syn (sign, cG) cP e (I.Clos (s, sigma, cP')) in
+       let e' = check_syn (sign, cG) cP e (apply_syn_subst sigma s) in
        let sp'', t' = check_spine sp' tel t (e' :: sl) (I.Snoc(cP', x, s)) in
        e'::sp'', t'
-    | [], [] -> [], I.Clos(t, sigma, cP')
+    | [], [] -> [], apply_syn_subst sigma t
     | _, [] ->
        begin
-         match Whnf.rewrite sign cP (I.Clos (t, sigma, cP')) with
+         match Whnf.rewrite sign cP (apply_syn_subst sigma t) with
          | I.SPi (tel', t') -> check_spine sp tel' t [] cP'
          | _ -> raise (Error.Error ("Unconsumed application cannot check against type " ^ IP.print_syn_exp t))
        end

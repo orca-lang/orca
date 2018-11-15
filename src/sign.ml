@@ -3,6 +3,7 @@ open Syntax.Int
 open Print.Int
 open Name
 open MetaSub
+open MetaOp
 
 (* abstracts the stel to produce a telescope where each meta-variable
    corresponds to each variable in stel, a substitution to perform
@@ -18,9 +19,9 @@ let abstract sign (cP : bctx) (tel : stel) : tel * syn_exp * bctx =
        let cP' = extend_cP sl in
        let sigma = extract_sigma sl in
        let xn = Name.gen_name x in
-       let sl' = (x, s, Unbox(Var xn, Shift 0, cP')) :: sl in
+       let sl' = (x, s, Unbox(Var xn, Shift 0)) :: sl in
        let tel'', sl'' = abstract tel' sl'  in
-       (i, xn, Box(cP, Whnf.rewrite sign cP (Clos (s, sigma, cP'))))::tel'', sl''
+       (i, xn, Box(cP, Whnf.rewrite sign cP (apply_syn_subst sigma s)))::tel'', sl''
   in
   let tel', sl = abstract tel [] in
   Debug.print (fun () -> "Abstracted version is " ^ print_tel (List.map (fun (i, x, t) -> (i, x, Whnf.normalize sign t)) tel'));
@@ -30,7 +31,7 @@ let lookup_syn_cons_entry (sign : signature) (c : def_name) (cP : bctx) : tel * 
   match lookup_sign_entry sign c with
   | SConstructor (_, tel, (n, es)) ->
      let tel', sigma, cP' = abstract sign cP tel in
-    tel', (n, List.map (fun e -> Clos(e, sigma, cP')) es)
+    tel', (n, List.map (fun e -> apply_syn_subst sigma e) es)
   | _ -> raise (Error.Error ("Constant " ^ c ^ " was expected to be a syntactic constructor."))
 
 let lookup_sign sign n =
@@ -103,7 +104,7 @@ let rec lookup_syn_constructors sign cP n =
   match sign with
   | SConstructor(c, tel, (n',ts)) :: sign' when n = n' ->
     let tel', sigma, cP' = abstract sign cP tel in
-    (c, tel', List.map (fun e -> Clos(e, sigma, cP')) ts) :: lookup_syn_constructors sign' cP n
+    (c, tel', List.map (fun e -> apply_syn_subst sigma e) ts) :: lookup_syn_constructors sign' cP n
     | _ :: sign' -> lookup_syn_constructors sign' cP n
     | [] -> []
 

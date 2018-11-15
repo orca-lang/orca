@@ -90,8 +90,8 @@ let matching (p : I.pat) (q : pat) : pats =
        match p, q with
        | I.PLam (xs, p), A.PLam (ys, q) -> syn_apx_match (bctx_of_lam_pars cP xs) p q
        | I.PPar (n, pr), A.PPar (n', pr') when pr = pr' -> [Int (I.PTBox (cP, I.PPar (n', pr')))]
-       | I.PUnbox (n, s, cP'), A.PClos (m, s') when s = s' -> [Int (I.PTBox (cP, (I.PUnbox (m, s, cP'))))]
-       | I.PUnbox (n, s, cP'), _ -> [Apx q] (* need to apply inverse sub to q *)
+       | I.PUnbox (n, s), A.PClos (m, s') when s = s' -> [Int (I.PTBox (cP, (I.PUnbox (m, s))))]
+       | I.PUnbox (n, s), _ -> [Apx q] (* need to apply inverse sub to q *)
        | I.SInacc _, _ -> []
        | I.PEmpty, A.PEmpty -> []
        | I.PShift n, A.PShift n' when n = n' -> []
@@ -121,7 +121,7 @@ let matching (p : I.pat) (q : pat) : pats =
      and syn_int_match cP p q =
        match p, q with
        | I.PLam (xs, p), I.PLam (ys, q) -> syn_int_match (bctx_of_lam_pars cP xs) p q
-       | I.PUnbox (n, s, cP'), _ -> [Int (I.PTBox(cP, q))]
+       | I.PUnbox (n, s), _ -> [Int (I.PTBox(cP, q))]
        | I.PPar (n, _), I.PPar (n', _) -> [Int(I.PTBox (cP, q))] (* and now pattern matching is now broken  *)
        | I.SInacc _, _ -> []
        | I.PEmpty, I.PEmpty -> []
@@ -251,7 +251,7 @@ let split_lam (sign : signature) (p1 : pats) (xs, p : string list * pat) (cD1 : 
     | _ -> raise (Error.Violation ("Split_lam obtained more than one parameter out of td (" ^ IP.print_ctx td ^ ")"))
   in
   let xs' = List.map2 (fun x (_,_,t) -> x, t) xs tel0 in
-  let ss = x, I.TermBox (g, I.Lam (xs', I.Unbox(e, I.id_sub, bctx_of_lam_pars g xs'))) in
+  let ss = x, I.TermBox (g, I.Lam (xs', I.Unbox(e, I.id_sub))) in
   let p' = assert false (* match simul_syn_psubst_on_list sign g pdelta (punbox_list_of_ctx g cT) with *)
     (* | [p'] -> p' *)
     (* | _ -> raise (Error.Violation ("Split_lam obtained more than one parameter out of substituting in cT")) *)
@@ -301,12 +301,12 @@ let split_const (sign : signature) (p1 : pats) (c, ps : def_name * pats)
     let cD', cT, delta, pdelta, td = split_flex_unify sign sigma maybe_g p1 thetatel ps cD1 vs ws in
     let ss = if I.is_syn_con sign c then
                let cP = get_cP maybe_g in
-               x, I.TermBox(cP, I.AppL (I.SConst c, unbox_list_of_ctx cP td))
+               x, I.TermBox(cP, I.AppL (I.SConst c, unbox_list_of_ctx td))
              else
                x, I.App (I.Const c, var_list_of_ctx td) in
     let pss = if I.is_syn_con sign c then
                let cP = get_cP maybe_g in
-               x, I.PTBox(cP, I.PSConst (c, simul_syn_psubst_on_list cP pdelta (punbox_list_of_ctx cP cT)))
+               x, I.PTBox(cP, I.PSConst (c, simul_syn_psubst_on_list cP pdelta (punbox_list_of_ctx cT)))
              else
                x, I.PConst (c, simul_psubst_on_list pdelta (pvar_list_of_ctx cT)) in
     let res = compute_split_map sign ss pss cD1 x cD2 delta pdelta cD' in
@@ -342,8 +342,8 @@ let split_clos (sign : signature) (p1 : pats) (n, s : name * pat_subst) (cD1 : I
   in
   match apply_inv_pat_subst t s with
   | Some t -> let cP' = get_domain cP s in
-              compute_split_map sign (x, I.TermBox (cP, I.Unbox(I.Var n, subst_of_pat_subst s, cP')))
-                                (x, I.PTBox(cP, I.PUnbox(n, s, cP')))
+              compute_split_map sign (x, I.TermBox (cP, I.Unbox(I.Var n, subst_of_pat_subst s)))
+                                (x, I.PTBox(cP, I.PUnbox(n, s)))
                                 cD1 x cD2 [] [] (cD1 @ [n, I.Box (cP', t)])
   | None -> raise (Error.Error ("Cannot check pattern matching clause " ^ print_name n ^ "[" ^ print_pat_subst s ^ "] "
                                ^ " because it was not possible to compute an inverse substitution for " ^ print_pat_subst s))
@@ -423,8 +423,8 @@ let split_rec (sign : signature) (ps : pats) (cD : I.ctx) : I.ctx * I.pats =
       search (p1 @ [Int(I.PVar y)]) ps (cD1 @ [y, t]) (ctx_subst (x, I.Var y) cD2)
     | I.Inacc e, (x, t) :: cD2 ->
        search (p1 @ [Int(I.Inacc e)]) ps (cD1 @ [x, t]) cD2
-    | I.PTBox (cP1, I.PUnbox(n, s, cP2)), (x, t) :: cD2 ->
-      search (p1 @ [Int(I.PTBox (cP1, I.PUnbox(n, s, cP2)))]) ps (cD1 @ [x, t]) cD2
+    | I.PTBox (cP1, I.PUnbox(n, s)), (x, t) :: cD2 ->
+      search (p1 @ [Int(I.PTBox (cP1, I.PUnbox(n, s)))]) ps (cD1 @ [x, t]) cD2
     | I.PTBox (cP1, I.PPar (y, pr)), (x, t) :: cD2 ->
       search (p1 @ [Int(I.PTBox (cP1, I.PPar (y, pr)))]) ps (cD1 @ [y, t]) (ctx_subst (x, I.Var y) cD2)
       (*and pattern matching may have broken*)
@@ -553,7 +553,7 @@ and check_inacs_syn (sign, cD : signature * I.ctx) (cP : I.bctx) (p : A.pats) (s
     | p::ps, q::qs ->
        begin match tel with
        | (_, x, t)::tel' ->
-          let p' = check_inac_syn (sign, cD) cP p q (I.Clos (t, s, cP')) in
+          let p' = check_inac_syn (sign, cD) cP p q (apply_syn_subst s t) in
           let s' = I.Dot(s, I.syn_exp_of_pat p') in
           p' :: (make_subst_tel ps qs tel' (I.Snoc (cP', x, t)) s')
        | _ -> raise (Error.Error "The context ended unexpectedly.")
@@ -609,17 +609,17 @@ and check_inac (sign, cD : signature * I.ctx) (p : A.pat) (q : I.pat) (t : I.exp
 
 and check_inac_syn (sign, cD : signature * I.ctx) (cP : I.bctx) (p : A.pat) (q : I.syn_pat) (t : I.syn_exp) : I.syn_pat =
   match p, q with
-  | A.PWildcard, I.SInacc (eq, s, cP') -> I.SInacc (eq, s, cP')
-  | A.Inacc ep, I.SInacc (eq, s, cP') ->
+  | A.PWildcard, I.SInacc (eq, s) -> I.SInacc (eq, s)
+  | A.Inacc ep, I.SInacc (eq, s) ->
      Debug.indent ();
      let ep' = check_syn (sign, cD) cP ep t in
      let s' = exp_of_pat_subst s in
-     let _, sigma = try Unify.unify_syn (sign, cD) cP ep' (I.Unbox (eq, s', cP'))
+     let _, sigma = try Unify.unify_syn (sign, cD) cP ep' (I.Unbox (eq, s'))
              with Unify.Unification_failure prob ->
                raise (Error.Error ("Inaccessible pattern check failed with:\n" ^ Unify.print_unification_problem prob))
      in
      Debug.deindent ();
-     I.SInacc (simul_subst sigma eq, s, simul_subst_on_bctx sigma cP')
+     I.SInacc (simul_subst sigma eq, s)
   | A.PConst (n, sp), I.PSConst (n', sq) when n = n' ->
      begin match I.lookup_sign_entry sign n with
      | Constructor (_, tel, _) -> raise (Error.Error ("Used a data type constructor inside a syntactic pattern"))
@@ -639,10 +639,10 @@ and check_inac_syn (sign, cD : signature * I.ctx) (cP : I.bctx) (p : A.pat) (q :
        I.PLam (ys, check_inac_syn (sign, cD) cP' p q (if tel' = [] then t else I.SPi (tel', t)))
      else
        raise (Error.Violation "Match - check_inac - PLam binding sizes differ. Who knows why?")
-  | A.PClos (n, s), I.PUnbox (n', s', cP') when n = n' && s = s' ->
-     I.PUnbox(n, s', cP')
-  | A.PVar n, I.PUnbox (n', CShift 0, cP') when n = n' ->
-     I.PUnbox(n, CShift 0, cP')
+  | A.PClos (n, s), I.PUnbox (n', s') when n = n' && s = s' ->
+     I.PUnbox(n, s')
+  | A.PVar n, I.PUnbox (n', CShift 0) when n = n' ->
+     I.PUnbox(n, CShift 0)
   | A.PBVar i, I.PBVar i' when i = i' ->
      I.PBVar i
   | A.PPar (x, pr1), I.PPar (y, pr2) when x = y && pr1 = pr2 -> I.PPar (x, pr1)

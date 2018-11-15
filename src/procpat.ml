@@ -32,7 +32,7 @@ let rec get_domain cP s =
 
 let pvar_list_of_ctx : I.ctx -> I.pats = List.map (fun (x, _) -> I.PVar x)
 
-let punbox_list_of_ctx cP : I.ctx -> I.syn_pat list = List.map (fun (x, _) -> I.PUnbox(x, pid_sub, cP))
+let punbox_list_of_ctx cP : I.ctx -> I.syn_pat list = List.map (fun (x, _) -> I.PUnbox(x, pid_sub))
 
 type single_psubst = name * I.pat
 type psubst = single_psubst list
@@ -52,8 +52,8 @@ and syn_psubst sign cP (x, p') = function
   | I.PBVar i -> I.PBVar i
   | I.PPar (n, _) when n = x -> (* MMMM *)
     begin match p' with
-    | I.PVar m -> I.PUnbox (m, pid_sub, cP)
-    | I.Inacc e -> I.SInacc (e, pid_sub, cP)
+    | I.PVar m -> I.PUnbox (m, pid_sub)
+    | I.Inacc e -> I.SInacc (e, pid_sub)
     | I.PTBox (cP', q) -> assert false
     | _ -> assert false
     end
@@ -61,20 +61,20 @@ and syn_psubst sign cP (x, p') = function
 
   | I.PLam (xs, p) -> I.PLam (xs, syn_psubst sign (bctx_of_lam_pars cP xs) (x, p') p) (* What about shifts in p'? *)
   | I.PSConst (n, ps) -> I.PSConst (n, List.map (syn_psubst sign cP (x, p')) ps)
-  | I.PUnbox (n, s, cP') when n = x ->
+  | I.PUnbox (n, s) when n = x ->
      begin match p' with
-       | I.PVar m -> I.PUnbox (m, s, cP')
-       | I.Inacc e -> I.SInacc (e, s, cP')
-       | I.PTBox (cP'', q) ->  (* cP' should be equal to cP'' *)
+       | I.PVar m -> I.PUnbox (m, s)
+       | I.Inacc e -> I.SInacc (e, s)
+       | I.PTBox (cP', q) -> 
           let rec push_unbox (s, cP') = function
             | I.PBVar i ->
                I.PBVar (lookup_pat_subst ("Expected term " ^ IP.print_syn_pat q ^ " to be closed") i s)
             | I.PLam (xs , p) -> I.PLam(xs, push_unbox (wkn_pat_subst_by_n s (List.length xs), bctx_of_lam_pars cP' xs) p)
             | I.PSConst (n,ps) -> I.PSConst (n, List.map (push_unbox (s, cP')) ps)
-            | I.PUnbox (m, s', cP'') ->
-               I.PUnbox (m, comp_pat_subst ("Mismatching substitution from term " ^ IP.print_syn_pat q) s s', cP'')
-            | I.SInacc (e, s', cP'') ->
-               I.SInacc (e, comp_pat_subst ("Mismatching substitution from term " ^ IP.print_syn_pat q) s s', cP'')
+            | I.PUnbox (m, s') ->
+               I.PUnbox (m, comp_pat_subst ("Mismatching substitution from term " ^ IP.print_syn_pat q) s s')
+            | I.SInacc (e, s') ->
+               I.SInacc (e, comp_pat_subst ("Mismatching substitution from term " ^ IP.print_syn_pat q) s s')
             | I.PEmpty  -> I.PEmpty
             | I.PShift n ->
                let rec comp s n =
@@ -97,8 +97,8 @@ and syn_psubst sign cP (x, p') = function
           push_unbox (s, cP') q
        | _ -> assert false
      end
-  | I.PUnbox (n, s, cP) -> I.PUnbox (n, s, cP)
-  | I.SInacc (e, s, cP) -> I.SInacc (subst (x, I.exp_of_pat p') e, s, cP)
+  | I.PUnbox (n, s) -> I.PUnbox (n, s)
+  | I.SInacc (e, s) -> I.SInacc (subst (x, I.exp_of_pat p') e, s)
   | I.PEmpty -> I.PEmpty
   | I.PShift n -> I.PShift n
   | I.PDot (s, p) -> I.PDot (syn_psubst sign cP (x, p') s, syn_psubst sign cP (x, p') p)

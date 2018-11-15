@@ -2,6 +2,7 @@ open Name
 open Syntax
 open Syntax.Int
 open Print.Int
+open MetaOp
 
 (* Utilities *)
 
@@ -14,7 +15,7 @@ let rec append_bctx cP cP' =
 let lookup_bound_name cP x =
   let rec lookup cP0 i =
     match cP0 with
-    | Snoc (_, x', t) when x = x' -> i, Clos(t, Shift (i+1), cP)
+    | Snoc (_, x', t) when x = x' -> i, apply_syn_subst (Shift (i+1)) t
     | Snoc (cP', _, _) -> lookup cP' (i+1)
     | _ -> raise (Error.Error ("Bound variable " ^ x ^ " not found in bound context"))
   in
@@ -27,8 +28,8 @@ let lookup_bound cP (x, j) =
       | n when n = j' -> Shift (x+1)
       | n -> Dot(mk_subst (n+1), BVar (x, Some n)) 
       in
-      Clos(snd (Rlist.nth (Rlist.rev bs) j'), mk_subst 0, cP)
-    | t, None -> Clos(t, Shift (x+1), cP)
+      apply_syn_subst (mk_subst 0) (snd (Rlist.nth (Rlist.rev bs) j'))
+    | t, None -> apply_syn_subst (Shift (x+1)) t
     | _ -> raise (Error.Error "Projection of something that is not a block.")
   in
   let rec lookup cP0 i =
@@ -137,19 +138,15 @@ let apply_inv_pat_subst e s =
     | Lam (x, e), _ -> Lam(x, apply_inv e (CDot (s, (0, None))))
     | AppL (e, es), _ -> AppL(apply_inv e s, List.map (fun e -> apply_inv e s) es)
     | SBCtx cP, _ -> SBCtx cP
-    | Clos (e, s', cP), _ -> Clos(e, apply_inv s' s, cP)
     | Empty, _ -> Empty
     | Shift n, CShift m when n >= m -> Shift (n - m)
     | Shift n, CShift _ -> raise Inv_fail
     | Shift n, CEmpty -> Empty
     | Shift n, CDot(_,_) -> assert false
-
     | Dot (s, e), s' -> Dot (apply_inv s s', apply_inv e s')
-    | Comp _, _-> assert false
-    | ShiftS _, _-> assert false
     | SCtx t, _ -> SCtx t
     | SConst n, _ -> SConst n
-    | Unbox(e, s', cP), _ -> Unbox (e, apply_inv s' s, cP)
+    | Unbox(e, s'), _ -> Unbox (e, apply_inv s' s)
     | Block _, _ -> assert false
     | _ -> assert false
   in
@@ -171,8 +168,6 @@ let apply_inv_subst e s =
       | Shift m when fst n < m -> raise Inv_fail
       | Shift m -> BVar (fst n - m, snd n) (* This is suspicious. Please revisit when broken *)
       | Empty -> raise Inv_fail
-      | ShiftS _ -> assert false
-      | Comp _ -> assert false
       | _ -> raise Inv_fail (* Not a substitution *)
     in
     match e, s with
@@ -181,23 +176,19 @@ let apply_inv_subst e s =
     | Star, _ -> Star
     | SPi(tel, t'),_ ->
       SPi(List.map (fun (i,x,e) -> i, x, apply_inv e s) tel, apply_inv t' (add_id_cdot (List.length tel) s))
-    | Lam (xs, e), _ -> Lam(xs, apply_inv e (ShiftS (List.length xs, s)))
+    | Lam (xs, e), _ -> Lam(xs, apply_inv e (shiftS_syn  (List.length xs) s))
     | AppL (e, es), _ -> AppL(apply_inv e s, List.map (fun e -> apply_inv e s) es)
     | SBCtx cP, _ -> SBCtx cP
-    | Clos (e, s', cP), _ -> Clos(e, apply_inv s' s, cP)
     | Empty, _ -> Empty
     | Shift n, Shift m when n >= m -> Shift (n - m)
     | Shift n, Shift m -> Debug.print (fun () -> "Incompatible shifts " ^ string_of_int n ^ " " ^ string_of_int m)  ; raise Inv_fail
     | Shift n, Empty -> Empty
     | Shift n, Dot(_,_) -> assert false
-    | Shift 0, ShiftS (n, Empty) -> Shift 0
 
     | Dot (s, e), s' -> Dot (apply_inv s s', apply_inv e s')
-    | Comp _, _-> assert false
-    | ShiftS _, _-> assert false
     | SCtx t, _ -> SCtx t
     | SConst n, _ -> SConst n
-    | Unbox(e, s', cP), _ -> Unbox (e, apply_inv s' s, cP)
+    | Unbox(e, s'), _ -> Unbox (e, apply_inv s' s)
     | _ -> raise (Error.Violation ("Failed to apply inverse substitution " ^ print_syn_exp s
                                    ^ " because it was not a substitution."))
   in
@@ -205,6 +196,25 @@ let apply_inv_subst e s =
   with Inv_fail -> 
     Debug.print (fun () -> "Cannot find an inverse for " ^ print_syn_exp s ^ " to apply to " ^ print_syn_exp e);
     None
+
+let rec apply_inv_psubst_ctx cP s =
+  match s with
+  | CEmpty -> Nil
+  | CShift n -> drop_suffix cP n
+  | CDot(s, e) -> 
+    let cP' = apply_inv_psubst_ctx cP s in
+    let t = assert false in (* TODO infer the type of e, using the internal type checker that we have to write *)
+    Snoc(cP', Name.gen_string "x", t)
+
+  let rec apply_inv_subst_ctx cP s =
+  match s with
+  | Empty -> Nil
+  | Shift n -> drop_suffix cP n
+  | Dot(s, e) -> 
+    let cP' = apply_inv_subst_ctx cP s in
+    let t = assert false in (* TODO infer the type of e, using the internal type checker that we have to write *)    
+    Snoc(cP', Name.gen_string "x", t)
+  | _ -> raise (Error.Violation ("Applying inverse substitution where substitution is in fact " ^ (print_syn_exp s)))
 
 let rec psubst_of_pat_subst = function
   | CShift n -> Shift n

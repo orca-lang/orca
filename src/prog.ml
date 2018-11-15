@@ -105,7 +105,7 @@ let tc_syn_constructor (sign , cG : I.signature * I.ctx) (tel : I.stel)
     match es, tel with
     | [], [] -> []
     | e::es', (_, x, t)::tel' ->
-       let e' = check' e (I.Clos (t, s, cP')) in
+       let e' = check' e (apply_syn_subst s t) in
        e' :: check_indices es' tel' (I.Snoc(cP', x, t)) (I.Dot(s, e'))
     | _ -> raise (Error.Error ("Constructor " ^ n
              ^ " does not return a term of the fully applied type for " ^ n'))

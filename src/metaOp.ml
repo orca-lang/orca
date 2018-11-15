@@ -42,9 +42,7 @@ and fv_syn cG =
   | BVar i -> []
   | Empty -> []
   | Shift n -> []
-  | Comp (e1, _, e2)
   | Dot (e1, e2) -> fvs e1 @ fvs e2
-  | ShiftS (_, e) -> fvs e
   | Unbox (e, s) ->
     fv cG e @ fvs s
   | SBCtx cP -> fv_ctx cG cP
@@ -114,8 +112,6 @@ and refresh_syn_exp rep =
   | BVar i -> BVar i
   | Empty -> Empty
   | Shift n -> Shift n
-  | Comp (e1, cP, e2) -> Comp (f e1, refresh_bctx rep cP, f e2)
-  | ShiftS (n, e) -> ShiftS (n, f e)
   | Dot (e1, e2) -> Dot (f e1, f e2)
   | Unbox (e1, e2) -> Unbox (refresh_exp rep e1, f e2)
   | SBCtx cP -> SBCtx (refresh_bctx rep cP)
@@ -189,8 +185,6 @@ and refresh_free_var_syn (x, y) e =
   | Unbox (e1, e2) -> Unbox(refresh_free_var (x, y) e1, f e2)
   | Empty -> Empty
   | Shift n -> Shift n
-  | Comp (e1, cP, e2) -> Comp (f e1, refresh_free_var_bctx (x, y) cP, f e2)
-  | ShiftS (n, e) -> ShiftS (n, f e)
   | Dot (e1, e2) -> Dot (f e1, f e2)
   | SBCtx cP -> SBCtx (refresh_free_var_bctx (x, y) cP)
   | Block cs -> Block (Rlist.map (fun (z, e) -> (z, f e)) cs) (* z has to be free *)
@@ -275,8 +269,6 @@ and subst_syn (x, es) e =
   | Unbox (e1, e2) -> Unbox(subst (x, es) e1, f e2)
   | Empty -> Empty
   | Shift n -> Shift n
-  | ShiftS (n, e) -> ShiftS (n, f e)
-  | Comp (e1, cP, e2) -> Comp (f e1, subst_bctx (x, es) cP, f e2)
   | Dot (e1, e2) -> Dot (f e1, f e2)
   | SBCtx cP -> SBCtx (subst_bctx (x, es) cP)
   | Block cs -> Block (subst_block (x, es) cs)
@@ -631,14 +623,16 @@ let simul_subst_in_part sigma ps =
   List.map (fun (n, e) -> n, simul_subst_syn sigma e) ps
 
 (* shift all variables by n *)
-let rec weaken_syn n = let f = weaken_syn n in function
-| Star -> Star
+let rec weaken_syn n t = 
+let f = weaken_syn n in 
+match t with
+  | Star -> Star
   | SCtx sch -> SCtx sch 
   | SPi (tel, t) -> assert false
   | Lam (xs, e) -> assert false
   | AppL (e1, es) -> AppL(f e1, List.map f es)
   | SConst n -> SConst n
-  | BVar i -> BVar (i + n)
+  | BVar (i, o) -> BVar (i + n, o)
   | Unbox (e, s) -> Unbox(e, f s)
   | Empty -> Empty
   | Shift n' -> Shift (n + n')
@@ -646,7 +640,12 @@ let rec weaken_syn n = let f = weaken_syn n in function
   | SBCtx cP -> assert false
   | Block cs -> assert false
 
-let rec apply_syn_subst (sigma : syn_exp) : syn_exp -> syn_exp = function
+(* Shifts all variables except the top n *)
+let rec shiftS_syn n t =
+if n = 0 then t else Dot (weaken_syn (n-1) t, i0)
+
+let rec apply_syn_subst (sigma : syn_exp) (t : syn_exp) : syn_exp = 
+let f = apply_syn_subst sigma in match t with
   | Star -> Star
   | SCtx sch -> SCtx sch (*MMMMM*)
   | SPi (tel, t) -> 
@@ -658,29 +657,27 @@ let rec apply_syn_subst (sigma : syn_exp) : syn_exp -> syn_exp = function
   | AppL (e1, es) -> AppL(f e1, List.map f es)
   | SConst n -> SConst n
   | BVar i -> BVar i
-  | Unbox (e1, e2) -> Unbox(subst (x, es) e1, f e2)
+  | Unbox (e1, e2) -> Unbox(e1, f e2)
   | Empty -> Empty
   | Shift n -> Shift n
-  | ShiftS (n, e) -> ShiftS (n, f e)
-  | Comp (e1, cP, e2) -> Comp (f e1, subst_bctx (x, es) cP, f e2)
   | Dot (e1, e2) -> Dot (f e1, f e2)
-  | SBCtx cP -> SBCtx (subst_bctx (x, es) cP)
-  | Block cs -> Block (subst_block (x, es) cs)
+  | SBCtx cP -> assert false
+  | Block cs -> assert false
  
 and apply_syn_subst_stel sigma = function
 | [] -> [], sigma
 | (icit, x, t)::stel -> 
   let el = (icit, x, apply_syn_subst sigma t) in
-  let sigma' = Dot (weaken_syn_subst 1 sigma, BVar i0) in
-  let stel', sigma'' = apply_syn_subst_stel sigma' stel) in
+  let sigma' = shiftS_syn 1 sigma in
+  let stel', sigma'' = apply_syn_subst_stel sigma' stel in
   el::stel', sigma''
 
 and apply_syn_subst_lam sigma = function
 | [] -> [], sigma
 | (x, t)::xs -> 
-  let el = (icit, x, apply_syn_subst sigma t) in
-  let sigma' = Dot (weaken_syn_subst 1 sigma, BVar i0) in
-  let xs', sigma'' = apply_syn_subst_lam sigma' xs) in
+  let el = (x, apply_syn_subst sigma t) in
+  let sigma' = shiftS_syn 1 sigma in
+  let xs', sigma'' = apply_syn_subst_lam sigma' xs in
   el::xs', sigma''
 
 (* generate meta variables for all the quantifiers in a schema and apply them to the block (generates a new block) *)
@@ -691,14 +688,14 @@ let mk_quant_subst cP quant block =
       let x' = Name.gen_name x in
       Debug.print (fun () -> "mk_quant_subst generates new name: " ^ print_name x');
       let sigma, cP', flex = mk_subst quant in
-      Dot (sigma, Unbox(Var x', id_sub)), Snoc(cP', x, Clos(t,sigma, cP')), x'::flex
+      Dot (sigma, Unbox(Var x', id_sub)), Snoc(cP', x, apply_syn_subst sigma t), x'::flex
   in
   let sigma, cP', flex = mk_subst quant in
   let rec subst_schema cP' sigma = function
     | [] -> []
     | (x, t) :: block -> 
-      Debug.print (fun () -> "subst_schema turns type " ^ print_syn_exp t ^ " into type " ^ print_syn_exp (Clos (t, sigma, cP')));
-      (x, Clos (t, sigma, cP')) :: subst_schema (Snoc(cP', x, Clos(t,sigma, cP'))) (Dot(sigma, BVar (0,None))) block
+      let t' = apply_syn_subst sigma t in
+      (x, t') :: subst_schema (Snoc(cP', x, t')) (Dot(sigma, BVar (0,None))) block
   in
   let block' = subst_schema cP sigma block in
   block', flex
