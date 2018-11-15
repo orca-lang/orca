@@ -4,21 +4,18 @@ open Syntax.Apx
 open Print.Apx
 open MetaOp
 open MetaSub
-open Match
 open Recon
 
 module I = Syntax.Int
 module IP = Print.Int
 
 type pattern_matching_option
-  = Old
-  | Split
+  = Split
   | New
 
 let current_pm = ref Split
 
 let parse_pm_option = function
-  | "old" -> current_pm := Old
   | "split" -> current_pm := Split
   | "new" -> current_pm := New
   | _ -> raise (Error.Violation "Unknown pattern matching processor specified")
@@ -200,20 +197,6 @@ let tc_program (sign : I.signature) : program -> I.signature * I.program =
       in
       let sentries, def'' = process def' in
       sentries @ sign, I.DefPMTree def''
-    | Old ->
-      let rec process = function
-        | (n, tel, t, ds) :: def ->
-          Debug.print_string ("\nTypechecking pattern matching definition: " ^ n);
-          Debug.indent ();
-          let sentry, ds' = check_clauses sign_temp n tel t ds in
-
-          Debug.deindent ();
-          let sentries, def' = process def in
-          sentry :: sentries, (n, tel, t, ds') :: def'
-        | [] -> [], []
-      in
-      let sentries, def'' = process def' in
-      sentries @ sign, I.DefPM def''
     end
   | Def (n, t, e) ->
      Debug.print_string ("Typechecking definition: " ^ n);
