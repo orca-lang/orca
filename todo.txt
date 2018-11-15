@@ -5,13 +5,13 @@ Small todo for next week:
 Big todos:
 
 - merge back to main [DONE]
-- remove newsplit (or fill it with something)
-- remove closures (keep boxes and unboxes), instead just apply the substitution and move on
+- remove newsplit (or fill it with something) [PENDING]
+- remove closures (keep boxes and unboxes), instead just apply the substitution and move on [DONE]
 - is-open in copy.kw should work
-- remove the bctx in Unbox
+- remove the bctx in Unbox [DONE]
 - join metaOp and metaSub
 - implement a module for environments that implements all the operations (the idea is to remove all the list.revs we have)
-- remove the old pattern matching code
+- remove the old pattern matching code [DONE]
 - improve unification
 - add coverage checking
 - add termination checking (or think about it)
@@ -22,7 +22,7 @@ Big todos:
 - add a version with markdown comments for documentation (lightweight literate programming)
 - instead of creating closures to apply syntactic substitutions it would be
   better to have a meta-operation that applies these (for both performance and
-  simplicity reasons)
+  simplicity reasons) [DONE]
 - pretty uses print if we set a flag
 - pretty should print paresable code
 
