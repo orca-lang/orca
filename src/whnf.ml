@@ -1,8 +1,7 @@
 open Syntax
 open Syntax.Int
 open Print.Int
-open MetaOp
-open MetaSub
+open Meta
 open Util
 
 exception Matching_failure of pat * exp

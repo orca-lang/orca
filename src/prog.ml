@@ -2,8 +2,7 @@ open Sign
 open Syntax
 open Syntax.Apx
 open Print.Apx
-open MetaOp
-open MetaSub
+open Meta
 open Recon
 
 module I = Syntax.Int

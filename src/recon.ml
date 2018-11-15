@@ -1,5 +1,4 @@
-open MetaOp
-open MetaSub
+open Meta
 open Sign
 open Name
 open Structures

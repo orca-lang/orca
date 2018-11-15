@@ -9,7 +9,7 @@ Big todos:
 - remove closures (keep boxes and unboxes), instead just apply the substitution and move on [DONE]
 - is-open in copy.kw should work
 - remove the bctx in Unbox [DONE]
-- join metaOp and metaSub
+- join metaOp and metaSub into meta [DONE]
 - implement a module for environments that implements all the operations (the idea is to remove all the list.revs we have)
 - remove the old pattern matching code [DONE]
 - improve unification

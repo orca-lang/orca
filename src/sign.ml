@@ -2,8 +2,7 @@ open Syntax
 open Syntax.Int
 open Print.Int
 open Name
-open MetaSub
-open MetaOp
+open Meta
 
 (* abstracts the stel to produce a telescope where each meta-variable
    corresponds to each variable in stel, a substitution to perform
