@@ -402,4 +402,6 @@ module Int = struct
       (List.map (fun (n, e, tree) -> "(" ^ n ^ " ("
         ^ print_exp e ^ "\n" ^ print_tree tree ^ ")" ^ ")") d) ^ ")"
     | Def (n, e1, e2) -> "(def " ^ n ^ " " ^ print_exp e1 ^ " " ^ print_exp e2 ^ ")"
+
+  let print_programs ps = String.concat "\n" (List.map print_program ps)
 end

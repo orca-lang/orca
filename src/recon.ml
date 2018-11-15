@@ -2,6 +2,7 @@ open Meta
 open Sign
 open Name
 open Structures
+open Pp
 
 module A = Syntax.Apx
 module AP = Print.Apx

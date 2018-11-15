@@ -1,5 +1,7 @@
 module Menhir = MenhirLib.Convert.Simplified
 
+open Pretty
+
 let file_name = "orca"
 let parse menhir_parser lexbuf =
   let position = ref (Lexer.initial_pos file_name) in
@@ -41,6 +43,7 @@ let args = [("-ext", Arg.Unit set_print_external, "Print external syntax before 
            ;("-verbose", Arg.Unit Debug.set_verbose_on, "Turns on verbose debugging")
            ;("-no-beauty", Arg.Unit Name.disable_beautify, "Turns off beautification in pretty printing")
            ;("-ansi-off", Arg.Unit disable_ansi, "Turns off ansi colours in pretty printing")
+           ;("-simple-printer", Arg.Unit Pp.set_simple_pp, "Turns off the fancy pretty printer, and prints S-exps")
            ;("-pm", Arg.Symbol (["old" ; "split" ; "new"], Prog.parse_pm_option)
              ," Select the pattern matching implementation (Default: split).")
            ]

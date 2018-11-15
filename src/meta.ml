@@ -7,6 +7,7 @@ open Print.Int
 open Syntax
 open Syntax.Int
 open Free
+open Pp
 
 let rec in_ctx n = function
   | (x, _) :: _ when x = n -> true

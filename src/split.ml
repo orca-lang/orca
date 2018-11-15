@@ -5,6 +5,7 @@ open Meta
 open Syntax.Int
 open Print
 open Print.Int
+open Pp
 
 module A = Syntax.Apx
 module AP = Print.Apx

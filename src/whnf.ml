@@ -3,6 +3,7 @@ open Syntax.Int
 open Print.Int
 open Meta
 open Util
+open Pp
 
 exception Matching_failure of pat * exp
 exception Matching_syn_failure of syn_pat * syn_exp

@@ -4,6 +4,7 @@ open Print.Int
 open Meta
 open Sign
 open Name
+open Pp
 
 type unification_problem
   = Different_constuctors of def_name * def_name

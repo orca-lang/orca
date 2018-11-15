@@ -1,4 +1,4 @@
-
+module Pretty : Ppsig.Pretty_printer = struct
 (* Pretty printer - Should produce a nice output *)
 
 open Name
@@ -9,6 +9,8 @@ open Syntax.Int
 (* Supports utf8 and colours that Format doesn't, and the output is
    cute *)
 open Fmt
+
+
 
 (* Beautify variable *)
 
@@ -735,3 +737,25 @@ let print_tel cG tel = produce_string (fmt_tel cG) tel
 let print_stel_entry cG cP te = produce_string (fmt_stel_entry cG cP) te
 let print_stel cG cP tel t = produce_string (fmt_stel cG cP) (tel, t)
 let print_tree tr = produce_string (fmt_tree 0) tr
+
+
+
+ (* let fmt_program = fmt_program
+  let fmt_programs = fmt_programs
+  let fmt_exp = fmt_exp
+  let fmt_pats = fmt_pats
+  let fmt_syn_exp = fmt_syn_exp 
+  let fmt_bctx  = fmt_bctx
+  let fmt_ctx = fmt_ctx
+
+  (* String pretty printers *)
+  let print_program = print_program
+  let print_programs = print_programs
+  let print_exp = print_exp
+  let print_pats = print_pats
+  let print_syn_exp = print_syn_exp
+  let print_bctx = print_bctx
+  let print_ctx = print_ctx
+  let print_stel = print_stel
+  let print_tree = print_tree *)
+end
