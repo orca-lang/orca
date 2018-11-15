@@ -657,10 +657,25 @@ let f = apply_syn_subst sigma in match t with
     Lam (xs', apply_syn_subst sigma' e)
   | AppL (e1, es) -> AppL(f e1, List.map f es)
   | SConst n -> SConst n
-  | BVar i -> BVar i
+  | BVar i -> 
+    let rec lookup (n, proj) = function
+    | Dot (s, e) -> if n = 0 then 
+      match proj, e with
+      | None, _ -> e
+      | Some i, Block bs -> Rlist.nth bs i |> snd 
+     else lookup (n-1, proj) s
+    | Shift m -> BVar (n+m, proj)
+    | _ -> raise (Error.Violation "Impossible to lookup up a variable in a subst")
+    in  lookup i sigma
   | Unbox (e1, e2) -> Unbox(e1, f e2)
   | Empty -> Empty
-  | Shift n -> Shift n
+  | Shift n -> if n = 0 then sigma else
+    let rec apply n = function
+    | Shift m -> Shift (m+n)
+    | Dot(s, e) -> if n > 1 then apply (n-1) s else s
+    | _ -> raise (Error.Violation "Trying to compose substitutions, found something that is not a subst.")
+    in 
+    apply n sigma
   | Dot (e1, e2) -> Dot (f e1, f e2)
   | SBCtx cP -> assert false
   | Block cs -> assert false
