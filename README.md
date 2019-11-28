@@ -1,7 +1,7 @@
 # Orca: A Dependent Type Theory with Contextual Types
 
 Orca a type theory with support for Higher Order Abstract Syntax
-(HOAS) by ex- tending Martin-Lf style type theory with contextual
+(HOAS) by extending Martin-Löf style type theory with contextual
 types and a specification framework based on the logical framework LF.
 
 ## Examples
